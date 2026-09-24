@@ -1,0 +1,457 @@
+<title>Sinaliza Data Recon</title>
+<style>
+  :root {
+    --bg: #F6F4EF;
+    --surface: #FFFFFF;
+    --surface-2: #F0EDE6;
+    --text: #1E2420;
+    --muted: #5C6560;
+    --border: #E1DDD3;
+    --accent: #1E5F5A;
+    --accent-soft: #DCEDEA;
+    --accent-contrast: #FFFFFF;
+
+    --conf-verified: #2E7D4F;    --conf-verified-bg: #E4F3EA;
+    --conf-medium: #9A6B14;      --conf-medium-bg: #FBF0DC;
+    --conf-low: #B24A29;         --conf-low-bg: #FBE7DF;
+    --conf-unverified: #5B4B8A;  --conf-unverified-bg: #EDE8F7;
+    --conf-disputed: #B23A3A;    --conf-disputed-bg: #FBE4E4;
+
+    --font-display: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --font-body: -apple-system, "Segoe UI", system-ui, sans-serif;
+    --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12201C;
+      --surface: #182924;
+      --surface-2: #1F332D;
+      --text: #EAF1EE;
+      --muted: #9FB3AC;
+      --border: #2A423B;
+      --accent: #5FC2B6;
+      --accent-soft: #1E3934;
+      --accent-contrast: #0B1613;
+
+      --conf-verified: #7FD9A4;    --conf-verified-bg: #1C3A28;
+      --conf-medium: #E4B968;      --conf-medium-bg: #3A2F14;
+      --conf-low: #EF9273;         --conf-low-bg: #3D2318;
+      --conf-unverified: #B7A6E8;  --conf-unverified-bg: #2C2440;
+      --conf-disputed: #EF8A8A;    --conf-disputed-bg: #3B1E1E;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12201C;
+    --surface: #182924;
+    --surface-2: #1F332D;
+    --text: #EAF1EE;
+    --muted: #9FB3AC;
+    --border: #2A423B;
+    --accent: #5FC2B6;
+    --accent-soft: #1E3934;
+    --accent-contrast: #0B1613;
+
+    --conf-verified: #7FD9A4;    --conf-verified-bg: #1C3A28;
+    --conf-medium: #E4B968;      --conf-medium-bg: #3A2F14;
+    --conf-low: #EF9273;         --conf-low-bg: #3D2318;
+    --conf-unverified: #B7A6E8;  --conf-unverified-bg: #2C2440;
+    --conf-disputed: #EF8A8A;    --conf-disputed-bg: #3B1E1E;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  ::selection { background: var(--accent-soft); }
+
+  a { color: var(--accent); }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px 80px; }
+
+  header.hero {
+    background: linear-gradient(180deg, var(--accent-soft), transparent 140%);
+    border-bottom: 1px solid var(--border);
+    padding: 40px 0 28px;
+  }
+  header.hero .wrap { padding-top: 0; padding-bottom: 0; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-size: .72rem;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1.title {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 3.4vw, 2.35rem);
+    line-height: 1.22;
+    margin: .35em 0 .3em;
+    text-wrap: balance;
+    font-weight: 600;
+  }
+  .decision-line {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 62ch;
+    margin: 0 0 18px;
+  }
+  .meta-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: .82rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+
+  nav.toc {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav.toc .toc-row {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 10px 0;
+    scrollbar-width: thin;
+  }
+  nav.toc a {
+    white-space: nowrap;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: .84rem;
+    padding: 6px 11px;
+    border-radius: 999px;
+  }
+  nav.toc a:hover { background: var(--surface-2); color: var(--text); }
+
+  main { padding-top: 8px; }
+
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 10px;
+    padding: 24px 26px;
+    margin: 28px 0 40px;
+  }
+  .summary-card h2 { margin-top: 0; }
+  .summary-card ol { padding-left: 1.3em; }
+  .summary-card li { margin-bottom: .7em; }
+  .caveat {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+    font-size: .95rem;
+    color: var(--muted);
+  }
+  .caveat b { color: var(--text); }
+
+  section.dim { margin: 44px 0; }
+  section.dim h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    display: flex;
+    align-items: baseline;
+    gap: .5em;
+    margin-bottom: .2em;
+  }
+  section.dim h2 .num {
+    font-family: var(--font-mono);
+    color: var(--accent);
+    font-size: .75em;
+  }
+  section.dim > p, section.dim > ul { margin-top: 1em; }
+  section.dim ul { padding-left: 1.2em; }
+  section.dim li { margin-bottom: .55em; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .35em;
+    padding: .1em .6em;
+    border-radius: 999px;
+    font-size: .74em;
+    font-weight: 700;
+    letter-spacing: .01em;
+    white-space: nowrap;
+    vertical-align: middle;
+    font-family: var(--font-mono);
+  }
+  .badge-verified { background: var(--conf-verified-bg); color: var(--conf-verified); border: 1px solid transparent; }
+  .badge-medium   { background: var(--conf-medium-bg);   color: var(--conf-medium);   border: 1px solid transparent; }
+  .badge-low      { background: var(--conf-low-bg);      color: var(--conf-low);      border: 1px solid transparent; }
+  .badge-unverified { background: var(--conf-unverified-bg); color: var(--conf-unverified); border: 1px dashed var(--conf-unverified); font-weight: 800; }
+  .badge-disputed   { background: var(--conf-disputed-bg);   color: var(--conf-disputed);   border: 1px dashed var(--conf-disputed); font-weight: 800; }
+
+  code { font-family: var(--font-mono); background: var(--surface-2); padding: .1em .4em; border-radius: 5px; font-size: .88em; }
+
+  .insight-box {
+    background: var(--surface-2);
+    border-radius: 10px;
+    padding: 22px 24px;
+    margin: 18px 0;
+  }
+
+  ol.recs { padding-left: 1.3em; }
+  ol.recs li { margin-bottom: 1.1em; }
+
+  .oq-list { padding-left: 1.2em; }
+  .oq-list li { margin-bottom: .8em; }
+
+  details.appendix {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px 22px 18px;
+    margin: 20px 0;
+  }
+  details.appendix > summary {
+    cursor: pointer;
+    padding: 16px 0;
+    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    list-style: none;
+  }
+  details.appendix > summary::-webkit-details-marker { display: none; }
+  details.appendix > summary::before {
+    content: "▸ ";
+    color: var(--accent);
+  }
+  details.appendix[open] > summary::before { content: "▾ "; }
+
+  .table-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .87rem; }
+  table.sources td, table.sources th,
+  table.stale td, table.stale th {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  table thead th {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    font-size: .72rem;
+    letter-spacing: .06em;
+    color: var(--muted);
+    border-bottom: 2px solid var(--border);
+  }
+  table.sources td:first-child, table.sources td:nth-child(4), table.sources td:nth-child(5) {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--muted);
+  }
+  table.stale td:nth-child(3), table.stale td:nth-child(4) {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  footer {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: .84rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { scroll-behavior: auto !important; }
+  }
+  html { scroll-behavior: smooth; }
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Pesquisa técnica &middot; Deep Recon</div>
+    <h1 class="title">Bases públicas de dados educacionais para calibrar o gerador sintético do Sinaliza</h1>
+    <p class="decision-line">Decisão: calibrar as distribuições (frequência, notas, evasão, atividades) de um dataset sintético de ~200 alunos fictícios com fontes públicas brasileiras reais.</p>
+    <div class="meta-chips">
+      <span class="chip">Tipo: <b>Pesquisa técnica</b></span>
+      <span class="chip">Concluído: <b>17 set 2026</b></span>
+      <span class="chip">Esforço: <b>padrão</b> (3 assistentes · 2 rodadas/frente)</span>
+      <span class="chip">Validação: <b>normal</b></span>
+      <span class="chip">Claims: <b>6 verificadas</b> · <b>3 não verificadas</b> · <b>1 disputada</b> (de 10 avaliadas)</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <div class="toc-row">
+      <a href="#resumo">Resumo</a>
+      <a href="#s1">1. Bases existentes</a>
+      <a href="#s2">2. Acesso e formato</a>
+      <a href="#s3">3. Distribuições reais</a>
+      <a href="#s4">4. Limitações e vieses</a>
+      <a href="#insights">Insights</a>
+      <a href="#recomendacoes">Recomendações</a>
+      <a href="#perguntas">Perguntas em aberto</a>
+      <a href="#fontes">Fontes</a>
+      <a href="#obsolescencia">Obsolescência</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <div class="summary-card" id="resumo">
+    <h2>Resumo executivo</h2>
+    <p>Existem bases públicas brasileiras sólidas para calibrar <b>evasão/abandono</b> e <b>desempenho relativo</b> (proficiência), mas nenhuma para <b>notas em escala 0–10</b>, <b>frequência diária/assiduidade</b> ou <b>atividades não entregues</b> — essas três variáveis, centrais ao modelo do Sinaliza, não têm equivalente estatístico público no Brasil e precisarão ser tratadas como suposições de design documentadas, não como dado calibrado.</p>
+    <ol>
+      <li><b>Só dá para calibrar por escola/rede, nunca por aluno.</b> Desde o Censo Escolar 2021, o INEP reestruturou os microdados públicos para conformidade com a LGPD — o RIPD oficial declara que o novo modelo é <span class="badge badge-verified">verificado</span> "agregado por escola". Acesso a dados por aluno exige projeto aprovado via Sedap. O gerador sintético não pode amostrar um aluno real anonimizado do INEP — só calibrar contra taxas agregadas e <em>desenhar</em> a distribuição individual como decisão de modelagem.</li>
+      <li><b>Evasão/abandono é a variável mais bem calibrável.</b> Censo Escolar 2023: abandono ~3,0% (Fundamental) e evasão ~5,9% / reprovação 3,9% (Médio) <span class="badge badge-verified">verificado</span>, confirmados por MEC/INEP e Fundação Carlos Chagas de forma independente. O 1º ano do Ensino Médio chega a 16–21% de insucesso escolar combinado.</li>
+      <li><b>Notas, frequência diária e atividades não entregues não têm base pública.</b> O único proxy de desempenho é a proficiência do SAEB (4 níveis categóricos, não 0–10); o único proxy de frequência é a "frequência líquida ajustada" (adequação idade-etapa, não assiduidade diária); não existe fonte para atividades não entregues.</li>
+    </ol>
+    <p class="caveat"><b>Maior ressalva:</b> boa parte dos números carrega confiança média, não alta — vários PDFs primários do INEP bloquearam o fetch automatizado (erro de certificado ou "conteúdo restrito"), forçando os pesquisadores a citar sínteses de busca em vez da tabela oficial linha a linha. Isso é reportado claim a claim abaixo.</p>
+  </div>
+
+  <section class="dim" id="s1">
+    <h2><span class="num">01</span> Bases existentes</h2>
+    <p>As bases públicas brasileiras relevantes cobrem quatro grandes fontes federais e um conjunto de portais estaduais/municipais que, em geral, apenas espelham as federais:</p>
+    <ul>
+      <li><b>Censo Escolar da Educação Básica (INEP)</b> — o levantamento central: escolas, turmas, matrículas e docentes, anual, cobertura nacional censitária (pública e privada). É a fonte primária das taxas de rendimento e de distorção idade-série. <span class="badge badge-verified">alta</span></li>
+      <li><b>SAEB — Sistema de Avaliação da Educação Básica (INEP)</b> — avaliação de proficiência (Língua Portuguesa e Matemática) por amostragem, bienal desde 1990, obrigatória para a rede pública e facultativa (adesão paga) para a privada. <span class="badge badge-verified">alta</span></li>
+      <li><b>IDEB — Índice de Desenvolvimento da Educação Básica (INEP)</b> — indicador derivado (Proficiência SAEB × Fluxo do Censo Escolar), não é base de microdados, é consultado via painel por escola/rede/UF. <span class="badge badge-verified">alta</span></li>
+      <li><b>PNAD Contínua — módulo Educação (IBGE)</b> — pesquisa amostral domiciliar (não é registro de matrícula), com frequência líquida, escolaridade e abandono por faixa etária/renda/raça. <span class="badge badge-medium">média</span></li>
+      <li><b>QEdu</b> — portal agregador (Fundação Lemann/Meritt) que replica a metodologia oficial do INEP; não é fonte primária, mas é o caminho mais acessível para números já calculados. <span class="badge badge-medium">média</span></li>
+      <li><b>Portais estaduais/municipais de dados abertos</b> (SP, RJ, MG identificados) — o único testado em detalhe (SP) é um espelho do INEP, sem granularidade adicional; os demais foram localizados mas não inspecionados. <span class="badge badge-unverified">não verificado</span></li>
+      <li><b>Busca Ativa Escolar</b> (UNICEF/Undime/Congemas/Conasems) — ferramenta operacional de monitoramento municipal, não uma base pública nacional consultável. <span class="badge badge-medium">média</span></li>
+    </ul>
+    <p>Nenhuma base encontrada mede "atividades/tarefas não entregues" — recorrente em todas as quatro dimensões pesquisadas. As taxas de rendimento citadas ao longo deste relatório seguem uma metodologia oficial fixada pelo INEP desde 2010 e mantida sem alteração relevante desde então.</p>
+  </section>
+
+  <section class="dim" id="s2">
+    <h2><span class="num">02</span> Acesso e formato</h2>
+    <ul>
+      <li><b>Licença:</b> o rodapé institucional do INEP declara CC BY-ND 3.0 — mas não há confirmação de que essa é a licença específica dos pacotes de microdados em si. <span class="badge badge-unverified">não verificado</span></li>
+      <li><b>Formato:</b> pacotes comprimidos com dados tabulares (CSV/ASCII), dicionário de dados, "Leia-Me" e programas de leitura para SAS/SPSS/R. Confirmado para o ENEM via RIPD primário. <span class="badge badge-verified">alta</span></li>
+    </ul>
+    <p><b>LGPD e anonimização — o achado mais importante desta dimensão.</b> <span class="badge badge-verified">verificado</span> O RIPD dos Censos da Educação (INEP, 30/12/2022, fonte primária lida integralmente) declara que o INEP "estruturou um novo modelo de arquivos de microdados públicos <b>agregados por escola</b>" para o Censo Escolar, reduzindo deliberadamente o risco de reidentificação. Confirmado de forma independente por reportagem do Correio Braziliense (fev/2022), pela nota oficial de esclarecimento do INEP e por cobertura contemporânea do mesmo episódio. O INEP cita conformidade com a LGPD e parceria técnica com o Laboratório Inscrypt (UFMG). O processo foi acompanhado por fiscalização formal da ANPD.</p>
+    <p><span class="badge badge-disputed">disputado / não verificado</span> Existe uma tensão não resolvida: o mesmo RIPD é compatível, em outras passagens, com a manutenção de arquivos "ALUNOS" com registro por aluno mas identificadores suprimidos (modelo análogo ao ENEM). Nenhum documento lido resolve definitivamente se o Censo Escolar pós-2021 é (a) por aluno com identificadores suprimidos ou (b) genuinamente agregado por escola — só a inspeção direta de um microdado real resolveria isso.</p>
+    <ul>
+      <li><b>Acesso a dados desagregados:</b> via Sedap (Portaria 637/2019, ampliada pela 312/2023), presencial ou em "núcleos" remotos, mediante projeto aprovado. A página oficial não especifica quais bases exatas estão disponíveis por esse canal. <span class="badge badge-verified">verificado</span> (processo) / <span class="badge badge-unverified">não verificado</span> (escopo)</li>
+      <li><b>Tamanho:</b> só há número oficial para o ENEM (1,4 GB / 3,39M registros em 2021, RIPD primário). Para o Censo Escolar, a única estimativa (~200 GB, 2007–2019) vem de um projeto comunitário no GitHub, não do INEP. <span class="badge badge-low">baixa</span></li>
+    </ul>
+  </section>
+
+  <section class="dim" id="s3">
+    <h2><span class="num">03</span> Distribuições reais</h2>
+    <p>Estas são as variáveis com maior aplicação direta na calibração do gerador — e onde ficam mais claras as lacunas.</p>
+    <p><b>Evasão, abandono e reprovação</b> <span class="badge badge-verified">verificado</span> — a variável mais bem calibrável. Censo Escolar 2023 (MEC/INEP oficial, corroborado pela Fundação Carlos Chagas):</p>
+    <ul>
+      <li>Ensino Fundamental: abandono ~3,0%.</li>
+      <li>Ensino Médio: reprovação 3,9%, evasão 5,9% (abandono masculino 3,8% vs. feminino 2,9%).</li>
+      <li>O INEP distingue oficialmente <b>abandono</b> (situação de fim de ano) de <b>evasão</b> (taxa de transição — não rematrícula); não devem ser somados. Recorte 2019/2020: abandono 4,7% vs. evasão 6,9%.</li>
+      <li>Séries mais críticas (reprovação + abandono, FCC): 3º ano EF 10,2%→1,3%(2020)→6,8%(2023); 6º ano EF 13,8%→2,4%→8,7%; <b>1º ano EM 21,3%→6,4%→16,4%</b>. 2020 é outlier pandêmico (promoção quase automática).</li>
+      <li>Distorção idade-série 2023: 4,28 milhões de alunos, concentrados no Nordeste (35,9%) e Sudeste (27,8%); nos anos finais do EF, alunos pretos/pardos com distorção quase o dobro de brancos (20,9% vs. 10,8%).</li>
+      <li>PNAD Educação 2025: 7,7 milhões de jovens de 14–29 anos sem concluir o EM — citado apenas por reportagem secundária (CartaCapital), fonte primária IBGE não confirmada. <span class="badge badge-unverified">não verificado</span></li>
+    </ul>
+    <p><b>Notas (0–10) — sem base pública.</b> <span class="badge badge-medium">média</span> Nem Censo Escolar nem INEP coletam notas de boletim; o único proxy é a proficiência do SAEB (escala de pontos, 4 níveis categóricos). Dado 2023: 59% dos estudantes no último ano da educação básica em nível "Insuficiente" em Matemática; no 2º ano do EF, 49% alfabetizados na rede pública contra 77% na privada. Via cobertura secundária — o PDF primário do relatório SAEB 2023 não pôde ser aberto (erro de certificado) em nenhuma rodada.</p>
+    <p><b>Frequência diária — sem base pública.</b> <span class="badge badge-medium">média</span> Não existe indicador nacional de "% de presença por aula/dia". O único dado oficial é a frequência líquida ajustada da PNAD (adequação idade-etapa, ~98,9–100% no Fundamental, 80,6% no Médio) — conceito de acesso/permanência, não de assiduidade cotidiana. Confundir os dois infla artificialmente a taxa de frequência simulada.</p>
+    <p><b>Atividades não entregues — sem base pública</b> em nenhuma das quatro dimensões pesquisadas. É dado operacional interno de sistemas de gestão escolar, nunca consolidado nacionalmente.</p>
+  </section>
+
+  <section class="dim" id="s4">
+    <h2><span class="num">04</span> Limitações e vieses</h2>
+    <ul>
+      <li><b>Defasagem estrutural de 9–12 meses</b> entre coleta e publicação, confirmada em dois ciclos: SAEB/IDEB 2021 (coleta 2021, resultados só em set/2022) e o cronograma oficial do Censo Escolar 2026 (coleta até jul/2026, indicadores só em mai/2027). Não é episódio isolado — é o padrão do ciclo INEP; o Fórum Nacional de Educação chegou a emitir nota criticando o atraso. <span class="badge badge-verified">verificado</span></li>
+      <li><b>Agregação mascara variância individual:</b> nenhuma das três bases centrais produz nota ou frequência por aluno de forma pública; o próprio INEP reconhece que o IDEB "não revela por que o fluxo é alto" nem se a aprendizagem está distribuída equitativamente.</li>
+      <li><b>Rupturas de comparabilidade sem mudança formal de metodologia:</b> a taxa de aprovação pública saltou de 91,7% (2019) para 98,4% (2020) — não por mudança de fórmula do IDEB (mesma desde 2007), mas por "ajustes nos critérios de aprovação" durante a pandemia. Alerta direto para cenários sintéticos "atípicos".</li>
+      <li><b>Cobertura desigual rede pública vs. privada:</b> SAEB é obrigatório para públicas e facultativo (adesão paga) para privadas; o percentual de adesão privada não é publicado — qualquer comparação carrega viés de autosseleção de magnitude não quantificada. <span class="badge badge-unverified">não verificado</span> (magnitude)</li>
+      <li><b>Qualidade dos dados autodeclarados:</b> o preenchimento do Censo Escolar (Educacenso) é feito pelas próprias escolas; guias institucionais tratam a qualificação de registros de frequência e declaração de raça/cor como pontos de atenção reconhecidos.</li>
+      <li><b>Acesso condicionado a canais formais:</b> análises mais desagregadas frequentemente exigem LAI ou projeto aprovado via Sedap.</li>
+    </ul>
+  </section>
+
+  <section class="dim" id="insights">
+    <h2>Insights entre dimensões</h2>
+    <div class="insight-box">
+      <p>O fato que mais restringe a decisão de calibração só fica visível ao cruzar as seções: a mudança de granularidade dos microdados do Censo Escolar pós-2021 (Seção 2) <b>é exatamente o motivo pelo qual</b> a Seção 3 não encontra nenhuma distribuição pública de notas ou frequência por aluno individual — essas variáveis existiam no desenho conceitual do Censo Escolar antes de 2021, mas deixaram de ser públicas por decisão de política de privacidade no mesmo período em que o gerador do Sinaliza precisaria delas. O projeto precisa <b>inferir</b> uma distribuição plausível por aluno a partir de taxas agregadas por escola/rede — uma etapa de modelagem estatística adicional que não seria necessária se os microdados de 2021+ ainda fossem por aluno.</p>
+      <p>Segundo cruzamento: a ausência de dado público para "atividades não entregues" e "frequência diária" (Seção 3) não é lacuna de busca — é estrutural, porque nenhuma base (Seção 1) foi desenhada para medir isso. As variáveis <code>AttendanceRecord</code> e <code>AssignmentSubmission</code> do modelo do Sinaliza não têm — e estruturalmente não podem ter — equivalente público brasileiro; só <code>Grade</code>/taxas de rendimento (via proxy de proficiência/abandono) e a lógica de <code>TrajectorySnapshot</code> (evasão/distorção) têm ancoragem estatística real.</p>
+    </div>
+  </section>
+
+  <section class="dim" id="recomendacoes">
+    <h2>Recomendações</h2>
+    <ol class="recs">
+      <li><b>Calibrar <code>TrajectorySnapshot</code>/evasão e a lógica de <code>FollowUp</code> com as taxas do Censo Escolar 2023</b> — abandono ~3% (EF) / evasão ~5,9% e reprovação ~3,9% (EM), com o 1º ano do EM como subgrupo de risco elevado (~16–21% de insucesso combinado). <span class="badge badge-verified">confiança alta</span> — verificado por duas fontes independentes. Tratar abandono e evasão como variáveis distintas, documentando a definição de cada uma.</li>
+      <li><b>Calibrar <code>Grade</code> por um proxy categórico de proficiência, não por uma distribuição real 0–10</b> — não existe fonte pública para notas de boletim; usar os 4 níveis do SAEB (~59% "insuficiente" em Matemática ao fim da educação básica) para desenhar uma distribuição sintética 0–10 documentada como suposição de design. <span class="badge badge-medium">confiança média</span></li>
+      <li><b>Tratar <code>AttendanceRecord</code> e <code>AssignmentSubmission</code> como suposições de design puras</b> — nenhuma fonte pública brasileira mede assiduidade cotidiana ou entrega de tarefas; usar a frequência líquida ajustada da PNAD (98,9–100% EF / 80,6% EM) só como ordem de grandeza de "acesso à escola", nunca como proxy de presença diária.</li>
+      <li><b>Se o projeto precisar de granularidade por aluno para validar o gerador contra dado real</b>, o único caminho formal é o Sedap do INEP — requer projeto de pesquisa aprovado, não é download direto; avaliar se compensa frente à calibração por taxas agregadas (recomendações 1–3).</li>
+      <li><b>Registrar fonte e confiança ao lado de cada parâmetro de calibração</b> (ex. comentário no seed/fixture) — vários números vieram de fonte secundária por bloqueio técnico ao PDF primário do INEP; isso evita que uma suposição de design vire "fato" silenciosamente no código.</li>
+    </ol>
+  </section>
+
+  <section class="dim" id="perguntas">
+    <h2>Perguntas em aberto</h2>
+    <ul class="oq-list">
+      <li><b>O Censo Escolar pós-2021 tem ou não registro por aluno individual</b> (identificadores suprimidos) por trás do agregado publicado por escola? O RIPD é ambíguo entre suas próprias seções — só a inspeção direta de um microdado real (2023–2025) resolveria isso.</li>
+      <li><b>Delimitador exato e estrutura de arquivo real</b> dos microdados do Censo Escolar e do SAEB — só confirmado para o ENEM.</li>
+      <li><b>Percentual oficial de adesão de escolas privadas ao SAEB</b> — não publicado nas fontes oficiais acessadas.</li>
+      <li><b>Nota Técnica 02/2022 do IBGE sobre autodeclaração</b> na PNAD Educação — localizada, mas bloqueada ao acesso nas duas rodadas.</li>
+      <li><b>Quais bases exatas estão disponíveis via Sedap</b> (Censo Escolar desagregado? SAEB desagregado?) — a página oficial não especifica.</li>
+      <li><b>Existe base estadual/municipal (RJ, MG, RS, ES) com granularidade além do espelho do INEP?</b> — portais localizados, datasets não inspecionados dentro do orçamento deste run.</li>
+    </ul>
+    <p style="color:var(--muted); font-size:.92rem;">Cada uma resolveria uma lacuna concreta de calibração; nenhuma foi perseguida além do orçamento de 2 rodadas por dimensão aprovado no plano gate — ficam como trabalho de um Deepen futuro.</p>
+  </section>
+
+  <section id="fontes">
+    <details class="appendix">
+      <summary>Apêndice de fontes (33)</summary>
+      <div class="table-scroll">
+        <table class="sources">
+          <thead><tr><th>#</th><th>Suporta</th><th>Publisher</th><th>Data pub.</th><th>Acessado</th><th>Confiança</th></tr></thead>
+          <tbody><tr id="src-1"><td>[1]</td><td>Censo Escolar: o que mede, granularidade histórica, licença</td><td><a href="https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/microdados/censo-escolar" target="_blank" rel="noopener">INEP — Censo Escolar (microdados)</a></td><td>s/d</td><td>2026-09-17</td><td>alta</td></tr><tr id="src-2"><td>[2]</td><td>Exclusão de microdados do Censo Escolar pós-2021 (contexto)</td><td><a href="https://educacaointegral.org.br/reportagens/por-que-exclusao-de-dados-do-censo-escolar-e-um-problema/" target="_blank" rel="noopener">Centro de Referências em Educação Integral</a></td><td>s/d</td><td>2026-09-17</td><td>média</td></tr><tr id="src-3"><td>[3]</td><td>RIPD dos Censos da Educação — agregação por escola, risco de reidentificação, Sedap</td><td><a href="https://download.inep.gov.br/microdados/RIPD_dos_microdados_dos_Censos_da_Educa%C3%A7%C3%A3o.pdf" target="_blank" rel="noopener">INEP — RIPD dos microdados dos Censos da Educação</a></td><td>2022-12-30</td><td>2026-09-17</td><td>alta (fonte primária lida integralmente)</td></tr><tr id="src-4"><td>[4]</td><td>Confirmação independente da remoção de microdados pós-2021</td><td><a href="https://www.correiobraziliense.com.br/euestudante/enem/2022/02/4987511-inep-remove-microdados-do-censo-escolar-e-do-enem-e-oculta-informacoes.html" target="_blank" rel="noopener">Correio Braziliense — Inep remove microdados do Censo Escolar e do Enem</a></td><td>2022-02</td><td>2026-09-17</td><td>alta (fonte independente)</td></tr><tr id="src-5"><td>[5]</td><td>Nota oficial de esclarecimento do INEP sobre divulgação dos microdados</td><td><a href="https://www.gov.br/inep/pt-br/centrais-de-conteudo/noticias/institucional/nota-de-esclarecimento-divulgacao-dos-microdados" target="_blank" rel="noopener">INEP — Nota de esclarecimento</a></td><td>s/d</td><td>2026-09-17</td><td>alta</td></tr><tr id="src-6"><td>[6]</td><td>IDEB: fórmula, granularidade, periodicidade</td><td><a href="https://www.gov.br/inep/pt-br/areas-de-atuacao/pesquisas-estatisticas-e-indicadores/ideb" target="_blank" rel="noopener">INEP — Ideb</a></td><td>s/d</td><td>2026-09-17</td><td>alta</td></tr><tr id="src-7"><td>[7]</td><td>SAEB: o que mede, amostragem, licença, edições</td><td><a href="https://www.gov.br/inep/pt-br/areas-de-atuacao/avaliacao-e-exames-educacionais/saeb" target="_blank" rel="noopener">INEP — Saeb</a></td><td>s/d</td><td>2026-09-17</td><td>alta</td></tr><tr id="src-8"><td>[8]</td><td>QEdu: metodologia de taxas de rendimento, replica cálculo oficial</td><td><a href="https://qedu.org.br/brasil/taxas-rendimento" target="_blank" rel="noopener">QEdu — Brasil, Taxas de Rendimento</a> / [Academia QEdu](https://academia.qedu.org.br/censo-escolar/taxa-de-rendimento/)</td><td>s/d</td><td>2026-09-17</td><td>média</td></tr><tr id="src-9"><td>[9]</td><td>PNAD Contínua Educação: frequência líquida ajustada, cobertura</td><td><a href="https://www.ibge.gov.br/estatisticas/sociais/educacao/17270-pnad-continua.html" target="_blank" rel="noopener">IBGE — PNAD Contínua</a></td><td>s/d</td><td>2026-09-17</td><td>média</td></tr><tr id="src-10"><td>[10]</td><td>PNAD Educação 2025 — 7,7 milhões de jovens sem concluir o EM (não confirmado na fonte primária)</td><td><a href="https://www.cartacapital.com.br/educacao/87-milhoes-de-jovens-brasileiros-abandonaram-ou-nunca-frequentaram-a-escola-mostra-ibge/" target="_blank" rel="noopener">CartaCapital</a></td><td>2025/2026</td><td>2026-09-17</td><td>baixa</td></tr><tr id="src-11"><td>[11]</td><td>Portal estadual de dados abertos (SP) — indicadores próprios (IDESP/SARESP)</td><td><a href="https://dados.educacao.sp.gov.br/" target="_blank" rel="noopener">Dados Abertos da Educação — SP</a></td><td>s/d</td><td>2026-09-17</td><td>média</td></tr><tr id="src-12"><td>[12]</td><td>Sedap — canal formal de acesso a dados protegidos/desagregados</td><td><a href="https://www.gov.br/inep/pt-br/areas-de-atuacao/gestao-do-conhecimento-e-estudos-educacionais/cibec/servico-de-acesso-a-dados-protegidos-sedap" target="_blank" rel="noopener">INEP — Serviço de Acesso a Dados Protegidos (Sedap)</a></td><td>s/d</td><td>2026-09-17</td><td>alta</td></tr><tr id="src-13"><td>[13]</td><td>Metodologia oficial de cálculo das taxas de rendimento</td><td><a href="https://download.inep.gov.br/download/censo/2009/NT_indicadores_rendimento2009.pdf" target="_blank" rel="noopener">INEP — Nota Técnica 002/2010</a></td><td>2010</td><td>2026-09-17</td><td>alta</td></tr><tr id="src-14"><td>[14]</td><td>RIPD do ENEM — formato, tamanho, técnica de anonimização</td><td><a href="https://download.inep.gov.br/microdados/RIPD_dos_microdados_do_Enem.pdf" target="_blank" rel="noopener">INEP — RIPD dos microdados do Enem</a></td><td>2022-12-21</td><td>2026-09-17</td><td>alta (fonte primária lida integralmente)</td></tr><tr id="src-15"><td>[15]</td><td>Estimativa de tamanho dos microdados do Censo Escolar (não oficial)</td><td><a href="https://github.com/paeselhz/microdados_censo_escolar" target="_blank" rel="noopener">GitHub — paeselhz/microdados_censo_escolar</a></td><td>s/d</td><td>2026-09-17</td><td>baixa</td></tr><tr id="src-16"><td>[16]</td><td>Como consultar o IDEB por escola (painel, não microdado)</td><td><a href="https://portal.mec.gov.br" target="_blank" rel="noopener">MEC — Confira como acessar os resultados do Ideb por escola</a></td><td>2026-08</td><td>2026-09-17</td><td>média</td></tr><tr id="src-17"><td>[17]</td><td>ANPD — fiscalização da divulgação de microdados pelo INEP</td><td><a href="https://www.gov.br/anpd/pt-br/centrais-de-conteudo/documentos-tecnicos-orientativos/nota-tecnica-no-12-2023-cgf-anpd-inep.pdf" target="_blank" rel="noopener">ANPD — Nota Técnica nº 12/2023-CGF/ANPD/INEP</a></td><td>2023</td><td>2026-09-17</td><td>média</td></tr><tr id="src-18"><td>[18]</td><td>LGPD e microdados de educação — variáveis suprimidas</td><td><a href="https://portaliede.org.br/wp-content/uploads/2024/06/Nota_Tecnica_LGPD.pdf" target="_blank" rel="noopener">IEDE — Nota Técnica LGPD</a></td><td>2024</td><td>2026-09-17</td><td>média</td></tr><tr id="src-19"><td>[19]</td><td>Portal SP — dataset é espelho do INEP, sem licença própria</td><td><a href="https://dadosabertos.sp.gov.br/painel" target="_blank" rel="noopener">Dados Abertos SP</a></td><td>s/d</td><td>2026-09-17</td><td>média</td></tr><tr id="src-20"><td>[20]</td><td>Censo Escolar 2023 — abandono/reprovação/evasão, distorção idade-série</td><td><a href="https://www.fcc.org.br/fcc-noticia/censo-escolar-2023-reprovacao-e-abandono-retomam-crescimento-apos-pandemia/" target="_blank" rel="noopener">Fundação Carlos Chagas — Censo Escolar 2023</a></td><td>2024</td><td>2026-09-17</td><td>alta (corroborado por [21])</td></tr><tr id="src-21"><td>[21]</td><td>Confirmação oficial MEC/INEP dos números do Censo Escolar 2023</td><td><a href="https://www.gov.br/inep/pt-br/assuntos/noticias/censo-escolar/mec-e-inep-divulgam-resultados-do-censo-escolar-2023" target="_blank" rel="noopener">MEC/INEP — Resultados do Censo Escolar 2023</a></td><td>2024-02-22</td><td>2026-09-17</td><td>alta (fonte primária)</td></tr><tr id="src-22"><td>[22]</td><td>Distinção oficial abandono vs. evasão (taxas de transição)</td><td><a href="https://portaliede.org.br/contribuicao/qedu-disponibiliza-taxas-de-rendimento-2023-para-cada-um-dos-anos-escolares/" target="_blank" rel="noopener">QEdu Conteúdos / IEDE</a></td><td>2024</td><td>2026-09-17</td><td>média</td></tr><tr id="src-23"><td>[23]</td><td>SAEB 2023 — % em nível &quot;insuficiente&quot;, alfabetização por rede</td><td><a href="https://download.inep.gov.br/saeb/resultados/relatorio-saeb_volume_1_2023.pdf" target="_blank" rel="noopener">INEP — Relatório SAEB 2023 Volume 1</a> (via cobertura secundária)</td><td>2024</td><td>2026-09-17</td><td>média</td></tr><tr id="src-24"><td>[24]</td><td>IDEB não revela distribuição de aprendizagem nem causa do fluxo</td><td><a href="https://download.inep.gov.br/educacao_basica/portal_ideb/o_que_e_o_ideb/Nota_Tecnica_n1_concepcaoIDEB.pdf" target="_blank" rel="noopener">INEP — Nota Técnica nº 1, Concepção do IDEB</a></td><td>s/d</td><td>2026-09-17</td><td>média</td></tr><tr id="src-25"><td>[25]</td><td>Distorções de composição amostral SAEB/IDEB 2021</td><td><a href="https://observatorio.movimentopelabase.org.br/distorcoes-saeb-ideb-2021/" target="_blank" rel="noopener">Observatório do Movimento pela Base</a></td><td>2021/2022</td><td>2026-09-17</td><td>média</td></tr><tr id="src-26"><td>[26]</td><td>Atraso na divulgação de dados do INEP (Censo Escolar/SAEB)</td><td><a href="https://anped.org.br/nota-do-forum-nacional-de-educacao-sobre-o-atraso-da-divulgacao-de-dados-produzidos-pelo-inep/" target="_blank" rel="noopener">ANPEd — Nota do Fórum Nacional de Educação</a></td><td>2025</td><td>2026-09-17</td><td>média</td></tr><tr id="src-27"><td>[27]</td><td>Cronograma oficial do Censo Escolar 2026 (defasagem ~9-10 meses)</td><td><a href="https://convivaeducacao.org.br/fique_atento/6106" target="_blank" rel="noopener">Conviva Educação — Portaria INEP nº 219/2026</a></td><td>2026</td><td>2026-09-17</td><td>média (reproduz portaria oficial)</td></tr><tr id="src-28"><td>[28]</td><td>Divulgação SAEB/IDEB 2021, mesma metodologia desde 2007, aprovação inflada na pandemia</td><td><a href="https://www.gov.br/mec/pt-br/assuntos/noticias/2022/mec-e-inep-divulgam-resultados-do-saeb-e-do-ideb-2021" target="_blank" rel="noopener">MEC/INEP — Divulgação Saeb e Ideb 2021</a></td><td>2022-09-16</td><td>2026-09-17</td><td>alta</td></tr><tr id="src-29"><td>[29]</td><td>Adesão de escolas privadas ao SAEB (facultativa, sem % público)</td><td><a href="https://www.gov.br/inep/pt-br/acesso-a-informacao/perguntas-frequentes/sistema-de-avaliacao-da-educacao-basica-saeb" target="_blank" rel="noopener">INEP — Perguntas frequentes sobre o Saeb</a></td><td>s/d</td><td>2026-09-17</td><td>alta</td></tr><tr id="src-30"><td>[30]</td><td>Nota técnica do IBGE sobre autodeclaração na PNAD Educação (não lida integralmente)</td><td><a href="https://www.ibge.gov.br/novo-portal-destaques/34430-notas-tecnicas-pnad-continua-educacao-em-2020-e-2021" target="_blank" rel="noopener">IBGE — Notas técnicas PNAD Contínua Educação 2020/2021</a></td><td>2022</td><td>2026-09-17</td><td>baixa (não lida na íntegra)</td></tr><tr id="src-31"><td>[31]</td><td>Qualidade de preenchimento do Educacenso pelas escolas</td><td><a href="https://fundacaolemann.org.br/wp-content/uploads/2025/07/Guia-Censo-Escolar-e-Declaracao-Racial-Fundacao-Lemann-e-Undime.pdf" target="_blank" rel="noopener">Fundação Lemann/Undime — Guia Censo Escolar e Declaração Racial</a></td><td>2025</td><td>2026-09-17</td><td>média</td></tr><tr id="src-32"><td>[32]</td><td>Impacto da indisponibilidade de microdados do INEP (audiência Senado)</td><td><a href="https://media.campanha.org.br/acervo/documentos/NotaTecnica_DadosInep_BalancoPNE_2023_10_26_AudienciaPublica-CE-Senado.docx.pdf" target="_blank" rel="noopener">Campanha Nacional pelo Direito à Educação</a></td><td>2023</td><td>2026-09-17</td><td>média</td></tr><tr id="src-33"><td>[33]</td><td>Busca Ativa Escolar — ferramenta operacional, não base pública nacional</td><td><a href="https://www.unicef.org/brazil/busca-ativa-escolar" target="_blank" rel="noopener">UNICEF Brasil — Busca Ativa Escolar</a></td><td>s/d</td><td>2026-09-17</td><td>média</td></tr></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <section id="obsolescencia">
+    <h2>Mapa de obsolescência</h2>
+    <p style="color:var(--muted); font-size:.92rem;">Computado por <code>recon_kit.py staleness</code> a partir do ledger de claims carga-crítica do memlog, com janelas por classe: fato oficial (fonte primária) → 12 meses · metodologia oficial → 24 meses · número estatístico → 6 meses · processo/acesso institucional → 12 meses.</p>
+    <div class="table-scroll">
+      <table class="stale">
+        <thead><tr><th>Claim</th><th>Classe</th><th>Publicado</th><th>Reverificar até</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>RIPD Censo Escolar pós-2021 agregado por escola (LGPD)</td><td>fato oficial</td><td>2022-12</td><td>2023-12-01</td><td><span class="badge badge-low">vencido</span></td></tr>
+          <tr><td>Censo Escolar 2023 — abandono/evasão/reprovação</td><td>número estatístico</td><td>2024-02</td><td>2024-08-01</td><td><span class="badge badge-low">vencido</span></td></tr>
+          <tr><td>SAEB 2023 — % nível insuficiente, alfabetização</td><td>número estatístico</td><td>2024-01</td><td>2024-07-01</td><td><span class="badge badge-low">vencido</span></td></tr>
+          <tr><td>PNAD Educação 2025 — 7,7 milhões sem concluir EM</td><td>número estatístico</td><td>2025-06</td><td>2025-12-01</td><td><span class="badge badge-low">vencido</span></td></tr>
+          <tr><td>Sedap — processo de acesso</td><td>processo/acesso</td><td>2023-07</td><td>2024-07-01</td><td><span class="badge badge-low">vencido</span></td></tr>
+          <tr><td>Metodologia do IDEB, reafirmada em 2022</td><td>metodologia oficial</td><td>2022-09</td><td>2024-09-01</td><td><span class="badge badge-low">vencido</span></td></tr>
+          <tr><td>RIPD do ENEM — formato/tamanho/anonimização</td><td>fato oficial</td><td>2022-12</td><td>2023-12-01</td><td><span class="badge badge-low">vencido</span></td></tr>
+          <tr><td>Licença CC BY-ND 3.0 dos microdados do INEP</td><td>processo/acesso</td><td>2020-01</td><td>2021-01-01</td><td><span class="badge badge-low">vencido</span></td></tr>
+          <tr><td>SAEB — adesão facultativa da rede privada</td><td>fato oficial</td><td>2020-01</td><td>2021-01-01</td><td><span class="badge badge-low">vencido</span></td></tr>
+          <tr><td>Defasagem estrutural 9–12 meses (Censo Escolar 2026)</td><td>processo/acesso</td><td>2026-06</td><td>2027-06-01</td><td><span class="badge badge-verified">dentro da janela</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px;"><b>9 das 10 claims carga-crítica já estão fora da janela de reverificação recomendada.</b> A mais relevante para a calibração numérica é o Censo Escolar 2023/SAEB 2023, vencidos desde 2024 — antes de usar estes valores em produção, checar se o Censo Escolar 2024/2025 ou um eventual SAEB 2025 já publicaram números mais recentes (não verificado neste run). Isso é esperado para uma primeira pesquisa sobre bases cuja atualização mais recente só saiu em julho/2026 — o mapa aponta o que reverificar, não que os dados estejam errados.</p>
+  </section>
+
+  <footer>
+    <p>Pesquisa nativa (Deep Recon) · preset padrão · validação normal · red-team desligado · 4 frentes, até 2 rodadas cada, orquestradas via workflow paralelo.</p>
+    <p>Relatório completo, ledger de claims e memlog em <code>docs/research/technical-bases-publicas-dados-educacionais-calibr-2026-09-17/</code>.</p>
+  </footer>
+
+</main>

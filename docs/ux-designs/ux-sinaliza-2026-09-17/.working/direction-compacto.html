@@ -1,0 +1,367 @@
+<title>Sinaliza — Direção Visual: Compacto</title>
+<meta charset="UTF-8">
+<style>
+/* ==========================================================================
+   SINALIZA — DIREÇÃO "COMPACTO"
+   Tokens (Clínico calmo, light — únicos usados neste arquivo):
+   --bg:#F5F9F8; --surface:#FFFFFF; --text:#1E3A36; --text-secondary:#5B7A74;
+   --border:#D3E4E0; --primary:#2C6E63; --warn:#C97A3D; --success:#4C9A7A;
+   Derivados (não fazem parte do registro, só utilidade de contraste/fundo):
+   --on-primary:#FFFFFF; --band: rgba(44,110,99,0.14); --warn-tint: rgba(201,122,61,0.10)
+   ========================================================================== */
+:root {
+  --bg:#F5F9F8; --surface:#FFFFFF; --text:#1E3A36; --text-secondary:#5B7A74;
+  --border:#D3E4E0; --primary:#2C6E63; --warn:#C97A3D; --success:#4C9A7A;
+  --on-primary:#FFFFFF; --band: rgba(44,110,99,0.14); --warn-tint: rgba(201,122,61,0.10);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: #E7EEEC;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #1A1A1A;
+  padding: 28px 20px 64px;
+}
+
+.page-head { max-width: 1180px; margin: 0 auto 22px; }
+.page-head h1 { font-size: 22px; margin: 0 0 4px; color: #1A1A1A; }
+.page-head .sub { font-size: 13px; color: #555; margin: 0; }
+
+aside.rationale {
+  max-width: 1180px;
+  margin: 0 auto 28px;
+  background: #FBF3EA;
+  border: 1px solid #E9D8C4;
+  border-left: 4px solid var(--warn);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #4A3F33;
+}
+aside.rationale strong { color: #2E2620; }
+
+.state-block { max-width: 1180px; margin: 0 auto 34px; }
+.state-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin: 0 0 10px;
+  padding-left: 2px;
+}
+.state-label .dot { width: 8px; height: 8px; border-radius: 50%; }
+.state-label.a .dot { background: var(--warn); }
+.state-label.b .dot { background: var(--success); }
+
+/* ---- browser frame ---- */
+.browser-frame {
+  background: #DCE6E3;
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: 0 8px 24px rgba(20,40,36,0.10);
+  overflow: hidden;
+}
+.browser-topbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #CBD9D5;
+}
+.browser-topbar .tl-dot { width: 9px; height: 9px; border-radius: 50%; background: #AFC2BC; }
+.browser-url {
+  margin-left: 10px;
+  font-size: 11px;
+  color: #4E625D;
+  background: #FFFFFF;
+  border-radius: 5px;
+  padding: 3px 10px;
+  flex: 1;
+  max-width: 360px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.browser-content { background: var(--bg); color: var(--text); padding: 18px 20px 20px; }
+
+/* ---- screen header ---- */
+.screen-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+.screen-header h2 { font-size: 18px; margin: 0; color: var(--text); }
+.screen-header .turma { font-size: 12.5px; color: var(--text-secondary); }
+.breadcrumb { font-size: 11px; color: var(--text-secondary); margin-bottom: 2px; }
+
+/* ---- compact two-col grid ---- */
+.grid-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.panel h3 {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+/* ---- trajectory chart ---- */
+.chart-band { fill: var(--band); }
+.chart-line { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-linecap: round; }
+.chart-line-calm { fill: none; stroke: var(--success); stroke-width: 2.5; stroke-linecap: round; }
+.chart-ring { fill: none; stroke: var(--warn); stroke-width: 2; }
+.chart-point { fill: var(--warn); }
+.chart-point-calm { fill: var(--success); }
+.axis-label { font-size: 9.5px; fill: var(--text-secondary); font-family: system-ui, sans-serif; }
+.axis-label.hot { fill: var(--warn); font-weight: 700; }
+.legend-line {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+/* ---- evidence card (mudança confirmada) ---- */
+.evidence-card { border-left: 3px solid var(--warn); }
+.evidence-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.warn-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; border-radius: 5px; font-size: 11px; font-weight: 700;
+  color: var(--on-primary); background: var(--warn); flex-shrink: 0;
+}
+.evidence-head strong { font-size: 13px; color: var(--text); }
+.evidence-card p.desc { font-size: 12px; line-height: 1.4; color: var(--text-secondary); margin: 0 0 8px; }
+.source-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.source-list li {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding-left: 12px;
+  position: relative;
+}
+.source-list li::before {
+  content: "";
+  position: absolute; left: 0; top: 6px;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--border);
+}
+
+/* ---- fator preocupante (discreto) ---- */
+.factor-quiet {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: transparent;
+}
+.factor-quiet .factor-title {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 5px;
+  display: flex; align-items: center; gap: 6px;
+}
+.factor-quiet .factor-title .ring-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid var(--warn); opacity: 0.55;
+}
+.factor-quiet p { font-size: 11.5px; line-height: 1.4; color: var(--text-secondary); margin: 0; }
+
+/* ---- timeline compact list ---- */
+.timeline { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow: hidden; }
+.timeline li {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+}
+.timeline li:last-child { border-bottom: none; }
+.timeline .date { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.timeline .desc-text { color: var(--text); line-height: 1.35; }
+.timeline .tag { font-size: 9.5px; color: var(--text-secondary); }
+
+/* ---- calm / sem novidades ---- */
+.calm-card {
+  border-left: 3px solid var(--success);
+}
+.calm-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.success-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; border-radius: 5px; font-size: 11px; font-weight: 700;
+  color: var(--on-primary); background: var(--success); flex-shrink: 0;
+}
+.calm-card p { font-size: 12px; line-height: 1.4; color: var(--text-secondary); margin: 0; }
+
+/* ---- button ---- */
+.btn-row { display: flex; justify-content: flex-end; }
+.btn-primary {
+  font-size: 12.5px; font-weight: 700; border: none; border-radius: 7px;
+  padding: 8px 16px; background: var(--primary); color: var(--on-primary); cursor: default;
+}
+.btn-secondary {
+  font-size: 12.5px; font-weight: 700; border: 1px solid var(--border); border-radius: 7px;
+  padding: 8px 16px; background: var(--surface); color: var(--text); cursor: default;
+}
+</style>
+
+<div class="page-head">
+  <h1>Sinaliza — Direção "Compacto"</h1>
+  <p class="sub">Mock da tela "Trajetória do Estudante" (RF-19), registro visual Clínico Calmo.</p>
+</div>
+
+<aside class="rationale">
+  <strong>Racional:</strong> hierarquia enxuta e painéis lado a lado para reduzir rolagem e mostrar
+  gráfico, evidência, fator preocupante e histórico na mesma dobra. Densidade alta de informação,
+  mas nunca densidade de urgência — nenhum número de risco, nenhuma cor isolada como alarme.
+</aside>
+
+<!-- ============================= ESTADO A ============================= -->
+<div class="state-block">
+  <div class="state-label a"><span class="dot"></span>Estado A — Mudança detectada</div>
+  <div class="browser-frame">
+    <div class="browser-topbar">
+      <span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span>
+      <div class="browser-url">sinaliza.app/estudantes/ana-beatriz-souza</div>
+    </div>
+    <div class="browser-content">
+      <div class="breadcrumb">Coordenação Pedagógica &nbsp;›&nbsp; 8º Ano B &nbsp;›&nbsp; Trajetória do Estudante</div>
+      <div class="screen-header">
+        <h2>Ana Beatriz Souza</h2>
+        <span class="turma">8º Ano B</span>
+      </div>
+
+      <div class="grid-row">
+        <div class="panel">
+          <h3>Trajetória — últimos 4 bimestres</h3>
+          <svg viewBox="0 0 600 190" style="width:100%;height:auto;display:block;">
+            <path class="chart-band" d="M60,70 C140,55 180,50 220,60 C280,50 320,58 380,65 C440,55 480,50 540,60 L540,130 C480,120 440,128 380,125 C320,132 280,122 220,120 C180,128 140,122 60,115 Z" />
+            <path class="chart-line" d="M60,95 C120,90 160,88 220,90 C280,110 320,145 380,160 C440,165 480,168 540,168" />
+            <circle class="chart-ring" cx="380" cy="160" r="8" />
+            <circle class="chart-point" cx="380" cy="160" r="3.5" />
+            <text class="axis-label" x="60" y="182" text-anchor="middle">1º Bim</text>
+            <text class="axis-label" x="220" y="182" text-anchor="middle">2º Bim</text>
+            <text class="axis-label hot" x="380" y="182" text-anchor="middle">3º Bim</text>
+            <text class="axis-label" x="540" y="182" text-anchor="middle">4º Bim</text>
+          </svg>
+          <p class="legend-line">Zona sombreada = faixa habitual da própria Ana &middot; linha = trajetória real &middot; ponto = mudança detectada</p>
+        </div>
+
+        <div class="panel evidence-card">
+          <h3>Mudança detectada — 3º bimestre</h3>
+          <div class="evidence-head">
+            <span class="warn-badge">!</span>
+            <strong>Queda de frequência e atividades pendentes</strong>
+          </div>
+          <p class="desc">A trajetória de Ana saiu da faixa habitual dela própria a partir do 3º bimestre.</p>
+          <ul class="source-list">
+            <li>Falta em 12/09</li>
+            <li>Atividade não entregue em 15/09</li>
+            <li>Observação pedagógica de 10/09</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="grid-row">
+        <div class="panel factor-quiet">
+          <div class="factor-title"><span class="ring-dot"></span>Fator preocupante (ainda não confirmado)</div>
+          <p>Sinal isolado: nota 4,5 em Matemática no mesmo período. Um único registro não caracteriza mudança de padrão — segue em observação.</p>
+        </div>
+
+        <div class="panel">
+          <h3>Registros pedagógicos</h3>
+          <ul class="timeline">
+            <li><span class="date">10/09</span><span><span class="desc-text">"Ana comentou dificuldade para organizar as tarefas de casa desde mudança na rotina familiar."</span><br><span class="tag">Observação pedagógica</span></span></li>
+            <li><span class="date">12/09</span><span><span class="desc-text">Falta registrada, não justificada.</span></span></li>
+            <li><span class="date">15/09</span><span><span class="desc-text">Atividade de Matemática não entregue.</span></span></li>
+            <li><span class="date">18/08</span><span><span class="desc-text">"Aluna participativa em sala, boa relação com colegas."</span><br><span class="tag">Observação pedagógica</span></span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-primary">Abrir acompanhamento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= ESTADO B ============================= -->
+<div class="state-block">
+  <div class="state-label b"><span class="dot"></span>Estado B — Sem novidades recentes</div>
+  <div class="browser-frame">
+    <div class="browser-topbar">
+      <span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span>
+      <div class="browser-url">sinaliza.app/estudantes/pedro-henrique-lima</div>
+    </div>
+    <div class="browser-content">
+      <div class="breadcrumb">Coordenação Pedagógica &nbsp;›&nbsp; 7º Ano A &nbsp;›&nbsp; Trajetória do Estudante</div>
+      <div class="screen-header">
+        <h2>Pedro Henrique Lima</h2>
+        <span class="turma">7º Ano A</span>
+      </div>
+
+      <div class="grid-row">
+        <div class="panel">
+          <h3>Trajetória — últimos 4 bimestres</h3>
+          <svg viewBox="0 0 600 190" style="width:100%;height:auto;display:block;">
+            <path class="chart-band" d="M60,70 C140,55 180,50 220,60 C280,50 320,58 380,65 C440,55 480,50 540,60 L540,130 C480,120 440,128 380,125 C320,132 280,122 220,120 C180,128 140,122 60,115 Z" />
+            <path class="chart-line-calm" d="M60,95 C120,90 160,80 220,85 C280,90 320,95 380,100 C440,95 480,85 540,90" />
+            <circle class="chart-point-calm" cx="540" cy="90" r="3.5" />
+            <text class="axis-label" x="60" y="182" text-anchor="middle">1º Bim</text>
+            <text class="axis-label" x="220" y="182" text-anchor="middle">2º Bim</text>
+            <text class="axis-label" x="380" y="182" text-anchor="middle">3º Bim</text>
+            <text class="axis-label" x="540" y="182" text-anchor="middle">4º Bim</text>
+          </svg>
+          <p class="legend-line">Zona sombreada = faixa habitual do próprio Pedro &middot; linha = trajetória real, dentro da faixa o período todo</p>
+        </div>
+
+        <div class="panel calm-card">
+          <h3>Situação atual</h3>
+          <div class="calm-head">
+            <span class="success-badge">✓</span>
+            <strong>Sem novidades</strong>
+          </div>
+          <p>A trajetória de Pedro seguiu dentro da faixa habitual dele nos últimos 4 bimestres. Nenhuma ação é necessária no momento.</p>
+        </div>
+      </div>
+
+      <div class="grid-row">
+        <div class="panel">
+          <h3>Registros pedagógicos recentes</h3>
+          <ul class="timeline">
+            <li><span class="date">05/09</span><span><span class="desc-text">"Pedro entregou o projeto de Ciências no prazo, com boa qualidade."</span><br><span class="tag">Observação pedagógica</span></span></li>
+            <li><span class="date">22/08</span><span><span class="desc-text">Presença regular mantida no período.</span></span></li>
+            <li><span class="date">30/07</span><span><span class="desc-text">"Início de bimestre sem intercorrências."</span><br><span class="tag">Observação pedagógica</span></span></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Nada pendente</h3>
+          <p style="font-size:12px;color:var(--text-secondary);line-height:1.5;margin:0;">Não há mudanças de padrão, fatores preocupantes ou atividades pendentes para revisar neste momento.</p>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-secondary">Abrir acompanhamento</button>
+      </div>
+    </div>
+  </div>
+</div>

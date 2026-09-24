@@ -1,0 +1,370 @@
+<title>Sinaliza — Mock: Tela de Acompanhamento (RF-20)</title>
+<meta charset="UTF-8">
+<style>
+/* ==========================================================================
+   SINALIZA — MOCK 1:1 — TELA DE ACOMPANHAMENTO (RF-20)
+   Ilustra:
+   - DESIGN.md.colors (tokens finais pós-correção de contraste: text-secondary #57746E)
+   - DESIGN.md.Shapes (pílula reservada só para followup-status-pill, 4 estados fechados)
+   - DESIGN.md.Components: followup-status-pill, evidence-card (reaproveitado para as
+     evidências vinculadas, com link de volta à trajetória), form-field, button
+   - EXPERIENCE.md.Component Patterns: "Selo de status de acompanhamento" (select nativo,
+     4 estados fechados), "Formulário de ação/registro" (botão desabilitado com campo vazio)
+   - EXPERIENCE.md.Key Flows, Fluxo 3 (UJ-3): registrar ação → status "Encerrado" →
+     histórico e evidências continuam 100% visíveis (climax: "encerrar não apaga nem esconde")
+   - EXPERIENCE.md.Voice and Tone: microcopy "Acompanhamento encerrado." (sem tom de
+     "caso resolvido")
+   - EXPERIENCE.md.Accessibility Floor: labels sempre visíveis, foco visível, nenhuma
+     informação só por cor
+
+   Tokens (Clínico calmo, light — DESIGN.md, text-secondary já corrigido para AA):
+   --bg:#F5F9F8; --surface:#FFFFFF; --text:#1E3A36; --text-secondary:#57746E;
+   --border:#D3E4E0; --primary:#2C6E63; --attention:#C97A3D; --success:#4C9A7A;
+   ========================================================================== */
+:root {
+  --bg:#F5F9F8; --surface:#FFFFFF; --text:#1E3A36; --text-secondary:#57746E;
+  --border:#D3E4E0; --primary:#2C6E63; --attention:#C97A3D; --success:#4C9A7A;
+  --on-primary:#FFFFFF;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: #E7EEEC;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #1A1A1A;
+  padding: 36px 20px 96px;
+}
+
+.page-head { max-width: 900px; margin: 0 auto 26px; }
+.page-head h1 { font-size: 24px; margin: 0 0 6px; }
+.page-head .sub { font-size: 14px; color: #555; margin: 0; }
+
+.state-block { max-width: 900px; margin: 0 auto 64px; }
+.state-label {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-secondary); margin: 0 0 16px;
+}
+.state-label .dot { width: 9px; height: 9px; border-radius: 50%; }
+.state-label.a .dot { background: var(--primary); }
+.state-label.b .dot { background: var(--success); }
+
+/* ---- browser frame ---- */
+.browser-frame { background: #DCE6E3; border-radius: 16px; box-shadow: 0 12px 32px rgba(20,40,36,0.12); overflow: hidden; }
+.browser-topbar { display: flex; align-items: center; gap: 7px; padding: 12px 18px; background: #CBD9D5; }
+.browser-topbar .tl-dot { width: 10px; height: 10px; border-radius: 50%; background: #AFC2BC; }
+.browser-url {
+  margin-left: 14px; font-size: 12px; color: #4E625D; background: #FFFFFF;
+  border-radius: 6px; padding: 5px 14px; flex: 1; max-width: 460px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.browser-content { background: var(--bg); color: var(--text); padding: 40px 56px 56px; }
+
+/* ---- app header ---- */
+.app-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding-bottom: 20px; margin-bottom: 36px; border-bottom: 1px solid var(--border);
+  font-size: 13px; color: var(--text-secondary);
+}
+.app-header .app-name { font-weight: 700; color: var(--text); font-size: 15px; }
+.app-header a { color: var(--primary); text-decoration: none; font-weight: 700; }
+.app-header a:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+
+/* ---- screen header (heading 24px — Home e Acompanhamento, per DESIGN.md.Typography) ---- */
+.screen-header { margin-bottom: 40px; }
+.breadcrumb { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 10px; }
+.screen-head-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.screen-header h1 { font-size: 24px; font-weight: 700; margin: 0; color: var(--text); }
+.turma-tag {
+  font-size: 13px; color: var(--text-secondary); border: 1px solid var(--border);
+  border-radius: 999px; padding: 4px 14px;
+}
+
+/* ---- status pill (DESIGN.md.components.followup-status-pill) ---- */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 6px 14px;
+  border: 1px solid var(--border); white-space: nowrap;
+}
+.status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.status-pill.ativo { background: rgba(44,110,99,0.13); color: var(--primary); border-color: var(--primary); }
+.status-pill.encerrado { background: rgba(76,154,122,0.16); color: #2E6E52; border-color: var(--success); }
+
+/* ---- closure confirmation strip (Voice and Tone: "Acompanhamento encerrado.") ---- */
+.closure-note {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(76,154,122,0.10); border: 1px solid var(--success); border-radius: 10px;
+  padding: 12px 18px; font-size: 14px; color: var(--text); margin-bottom: 36px;
+}
+.closure-note .badge {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--success);
+  display: flex; align-items: center; justify-content: center;
+}
+.closure-note .badge svg { width: 12px; height: 12px; }
+
+/* ---- vertical rhythm sections ---- */
+.section { margin-bottom: 52px; }
+.section:last-child { margin-bottom: 0; }
+.section-eyebrow {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--text-secondary); font-weight: 700; margin: 0 0 16px;
+}
+
+/* ---- status selector: <select> nativo estilizado (Component Patterns) ---- */
+.status-field label {
+  display: block; font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px;
+}
+.select-wrap { position: relative; max-width: 320px; }
+.select-wrap select {
+  appearance: none; -webkit-appearance: none;
+  width: 100%; min-height: 44px; font-size: 15px; font-family: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 0 40px 0 14px; cursor: pointer;
+}
+.select-wrap::after {
+  content: ""; position: absolute; right: 16px; top: 50%; width: 9px; height: 9px;
+  border-right: 2px solid var(--text-secondary); border-bottom: 2px solid var(--text-secondary);
+  transform: translateY(-70%) rotate(45deg); pointer-events: none;
+}
+.select-hint { font-size: 12.5px; color: var(--text-secondary); margin: 10px 0 0; }
+
+/* ---- registros / histórico de ações (FollowUpAction) ---- */
+.action-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.action-list li { display: grid; grid-template-columns: 96px 1fr; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--border); }
+.action-list li:last-child { border-bottom: none; }
+.action-date { color: var(--text-secondary); font-size: 13px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.action-desc { color: var(--text); font-size: 15px; line-height: 1.65; margin: 0 0 6px; }
+.action-author { display: block; font-size: 12.5px; color: var(--text-secondary); }
+
+/* ---- evidências vinculadas: evidence-card reaproveitado + link de volta ---- */
+.evidence-card {
+  background: var(--surface); border: 1px solid var(--border); border-left: 5px solid var(--attention);
+  border-radius: 16px; padding: 26px 30px; margin-bottom: 14px;
+}
+.evidence-card:last-child { margin-bottom: 0; }
+.evidence-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.attention-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 7px; background: var(--attention); flex-shrink: 0;
+}
+.attention-badge svg { width: 13px; height: 13px; }
+.evidence-head strong { font-size: 15px; color: var(--text); }
+.evidence-card p.desc { font-size: 14px; line-height: 1.6; color: var(--text-secondary); margin: 0 0 14px; max-width: 62ch; }
+.evidence-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13.5px; font-weight: 700; color: var(--primary); text-decoration: none;
+}
+.evidence-link:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+
+/* ---- form-field: registrar ação ---- */
+.form-field label {
+  display: block; font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px;
+}
+.form-field textarea {
+  width: 100%; min-height: 110px; resize: vertical; font-family: inherit; font-size: 15px;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px 14px; line-height: 1.6;
+}
+.form-field textarea::placeholder { color: var(--text-secondary); }
+.form-row { display: flex; justify-content: flex-end; margin-top: 14px; }
+.btn-send {
+  font-size: 15px; font-weight: 700; border: none; border-radius: 10px; min-height: 44px;
+  padding: 0 28px; background: var(--primary); color: var(--on-primary); cursor: pointer;
+}
+.btn-send[disabled] { background: var(--border); color: var(--text-secondary); cursor: not-allowed; }
+.form-hint { font-size: 12.5px; color: var(--text-secondary); margin-top: 10px; text-align: right; }
+
+select:focus-visible, textarea:focus { outline: 3px solid var(--primary); outline-offset: 2px; }
+</style>
+
+<div class="page-head">
+  <h1>Sinaliza — Mock: Tela de Acompanhamento (RF-20)</h1>
+  <p class="sub">Ilustra EXPERIENCE.md.Component Patterns (selo de status via select nativo, formulário de ação com botão desabilitado) e Key Flows Fluxo 3 (UJ-3): encerrar não apaga nem esconde o histórico.</p>
+</div>
+
+<!-- ============================= ESTADO A — ATIVO ============================= -->
+<div class="state-block">
+  <div class="state-label a"><span class="dot"></span>Estado A — Acompanhamento ativo</div>
+  <div class="browser-frame">
+    <div class="browser-topbar">
+      <span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span>
+      <div class="browser-url">sinaliza.app/acompanhamentos/ana-beatriz-souza</div>
+    </div>
+    <div class="browser-content">
+
+      <div class="app-header">
+        <span class="app-name">Sinaliza</span>
+        <span><a href="#">← Voltar à Home</a> &nbsp;·&nbsp; Fernanda Lopes · Coordenação Pedagógica</span>
+      </div>
+
+      <div class="screen-header">
+        <div class="breadcrumb">Coordenação Pedagógica &nbsp;›&nbsp; Acompanhamento</div>
+        <div class="screen-head-row">
+          <h1>Ana Beatriz Souza</h1>
+          <span class="turma-tag">8º Ano B</span>
+          <span class="status-pill ativo"><span class="dot"></span>Ativo</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Status do acompanhamento</p>
+        <div class="status-field">
+          <label for="status-a">Status atual</label>
+          <div class="select-wrap">
+            <select id="status-a">
+              <option>Em observação</option>
+              <option selected>Ativo</option>
+              <option>Aguardando retorno</option>
+              <option>Encerrado</option>
+            </select>
+          </div>
+          <p class="select-hint">Conjunto fechado de 4 estados — nunca um quinto estado do tipo "crítico".</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Ações registradas</p>
+        <ul class="action-list">
+          <li>
+            <span class="action-date">16/09</span>
+            <span>
+              <p class="action-desc">Conversamos com a família sobre a mudança na rotina de casa e organizamos juntos um plano de acompanhamento das tarefas.</p>
+              <span class="action-author">Registrado por Fernanda Lopes</span>
+            </span>
+          </li>
+          <li>
+            <span class="action-date">18/09</span>
+            <span>
+              <p class="action-desc">Combinamos com a professora de Matemática um reforço extra às terças-feiras, no contraturno.</p>
+              <span class="action-author">Registrado por Fernanda Lopes</span>
+            </span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Evidências vinculadas</p>
+        <div class="evidence-card">
+          <div class="evidence-head">
+            <span class="attention-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 3L2 21h20L12 3z" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="#FFFFFF"/></svg>
+            </span>
+            <strong>Queda de frequência e aumento de atividades pendentes — 3º bimestre</strong>
+          </div>
+          <p class="desc">Mudança de trajetória que originou este acompanhamento, identificada a partir de faltas e atividades não entregues no 3º bimestre.</p>
+          <a class="evidence-link" href="#">Ver na trajetória de Ana Beatriz Souza →</a>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Registrar ação</p>
+        <div class="form-field">
+          <label for="acao-a">Descreva a ação tomada</label>
+          <textarea id="acao-a" placeholder="Ex.: Conversamos com o aluno sobre..."></textarea>
+        </div>
+        <div class="form-row">
+          <button class="btn-send" disabled>Registrar ação</button>
+        </div>
+        <p class="form-hint">Botão fica desabilitado enquanto o campo estiver vazio — não existe registro em branco.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============================= ESTADO B — ENCERRADO ============================= -->
+<div class="state-block">
+  <div class="state-label b"><span class="dot"></span>Estado B — Logo após encerrar (histórico e evidências permanecem visíveis)</div>
+  <div class="browser-frame">
+    <div class="browser-topbar">
+      <span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span>
+      <div class="browser-url">sinaliza.app/acompanhamentos/ana-beatriz-souza</div>
+    </div>
+    <div class="browser-content">
+
+      <div class="app-header">
+        <span class="app-name">Sinaliza</span>
+        <span><a href="#">← Voltar à Home</a> &nbsp;·&nbsp; Fernanda Lopes · Coordenação Pedagógica</span>
+      </div>
+
+      <div class="screen-header">
+        <div class="breadcrumb">Coordenação Pedagógica &nbsp;›&nbsp; Acompanhamento</div>
+        <div class="screen-head-row">
+          <h1>Ana Beatriz Souza</h1>
+          <span class="turma-tag">8º Ano B</span>
+          <span class="status-pill encerrado"><span class="dot"></span>Encerrado</span>
+        </div>
+      </div>
+
+      <div class="closure-note">
+        <span class="badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        Acompanhamento encerrado.
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Status do acompanhamento</p>
+        <div class="status-field">
+          <label for="status-b">Status atual</label>
+          <div class="select-wrap">
+            <select id="status-b">
+              <option>Em observação</option>
+              <option>Ativo</option>
+              <option>Aguardando retorno</option>
+              <option selected>Encerrado</option>
+            </select>
+          </div>
+          <p class="select-hint">Conjunto fechado de 4 estados — nunca um quinto estado do tipo "crítico".</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Ações registradas</p>
+        <ul class="action-list">
+          <li>
+            <span class="action-date">16/09</span>
+            <span>
+              <p class="action-desc">Conversamos com a família sobre a mudança na rotina de casa e organizamos juntos um plano de acompanhamento das tarefas.</p>
+              <span class="action-author">Registrado por Fernanda Lopes</span>
+            </span>
+          </li>
+          <li>
+            <span class="action-date">18/09</span>
+            <span>
+              <p class="action-desc">Combinamos com a professora de Matemática um reforço extra às terças-feiras, no contraturno.</p>
+              <span class="action-author">Registrado por Fernanda Lopes</span>
+            </span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Evidências vinculadas</p>
+        <div class="evidence-card">
+          <div class="evidence-head">
+            <span class="attention-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 3L2 21h20L12 3z" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="#FFFFFF"/></svg>
+            </span>
+            <strong>Queda de frequência e aumento de atividades pendentes — 3º bimestre</strong>
+          </div>
+          <p class="desc">Mudança de trajetória que originou este acompanhamento, identificada a partir de faltas e atividades não entregues no 3º bimestre.</p>
+          <a class="evidence-link" href="#">Ver na trajetória de Ana Beatriz Souza →</a>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Registrar ação</p>
+        <div class="form-field">
+          <label for="acao-b">Descreva a ação tomada</label>
+          <textarea id="acao-b" placeholder="Ex.: Conversamos com o aluno sobre..."></textarea>
+        </div>
+        <div class="form-row">
+          <button class="btn-send" disabled>Registrar ação</button>
+        </div>
+        <p class="form-hint">Formulário continua disponível mesmo após o encerramento — nada é bloqueado.</p>
+      </div>
+
+    </div>
+  </div>
+</div>

@@ -1,0 +1,340 @@
+<title>Sinaliza — Mock: Home (RF-18)</title>
+<meta charset="UTF-8">
+<style>
+/* ==========================================================================
+   SINALIZA — MOCK 1:1 — HOME (RF-18)
+   Ilustra:
+   - DESIGN.md.colors (tokens finais pós-correção de contraste: text-secondary #57746E)
+   - DESIGN.md.Components: home-change-row, followup-card, followup-status-pill,
+     search-input, button
+   - EXPERIENCE.md.Component Patterns: "Linha de mudança recente" (Home),
+     "Card de acompanhamento em andamento" (Home), "Busca de aluno" (Home)
+   - EXPERIENCE.md.State Patterns: "Sem mudanças recentes" (Home),
+     "Sem acompanhamentos ativos" (Home, mencionado por contraste)
+   - EXPERIENCE.md.Accessibility Floor: foco visível, labels sempre visíveis,
+     nenhuma informação só por cor
+   - EXPERIENCE.md.Interaction Primitives: banido ranking/ordenação por gravidade
+     (linhas ordenadas por data de detecção, não por "severidade")
+
+   Tokens (Clínico calmo, light — DESIGN.md, text-secondary já corrigido para AA):
+   --bg:#F5F9F8; --surface:#FFFFFF; --text:#1E3A36; --text-secondary:#57746E;
+   --border:#D3E4E0; --primary:#2C6E63; --attention:#C97A3D; --success:#4C9A7A;
+   ========================================================================== */
+:root {
+  --bg:#F5F9F8; --surface:#FFFFFF; --text:#1E3A36; --text-secondary:#57746E;
+  --border:#D3E4E0; --primary:#2C6E63; --attention:#C97A3D; --success:#4C9A7A;
+  --on-primary:#FFFFFF;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: #E7EEEC;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #1A1A1A;
+  padding: 36px 20px 96px;
+}
+
+.page-head { max-width: 900px; margin: 0 auto 26px; }
+.page-head h1 { font-size: 24px; margin: 0 0 6px; }
+.page-head .sub { font-size: 14px; color: #555; margin: 0; }
+
+.state-block { max-width: 900px; margin: 0 auto 64px; }
+.state-label {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-secondary); margin: 0 0 16px;
+}
+.state-label .dot { width: 9px; height: 9px; border-radius: 50%; }
+.state-label.a .dot { background: var(--attention); }
+.state-label.b .dot { background: var(--success); }
+
+/* ---- browser frame ---- */
+.browser-frame { background: #DCE6E3; border-radius: 16px; box-shadow: 0 12px 32px rgba(20,40,36,0.12); overflow: hidden; }
+.browser-topbar { display: flex; align-items: center; gap: 7px; padding: 12px 18px; background: #CBD9D5; }
+.browser-topbar .tl-dot { width: 10px; height: 10px; border-radius: 50%; background: #AFC2BC; }
+.browser-url {
+  margin-left: 14px; font-size: 12px; color: #4E625D; background: #FFFFFF;
+  border-radius: 6px; padding: 5px 14px; flex: 1; max-width: 420px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.browser-content { background: var(--bg); color: var(--text); padding: 40px 56px 56px; }
+
+/* ---- app header (nome do usuário autenticado, sem sidebar) ---- */
+.app-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding-bottom: 20px; margin-bottom: 36px; border-bottom: 1px solid var(--border);
+  font-size: 13px; color: var(--text-secondary);
+}
+.app-header .app-name { font-weight: 700; color: var(--text); font-size: 15px; letter-spacing: 0.01em; }
+
+/* ---- home title ---- */
+.home-head { margin-bottom: 44px; }
+.eyebrow-top {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-secondary); margin: 0 0 8px;
+}
+.home-head h1 { font-size: 24px; font-weight: 700; margin: 0; color: var(--text); }
+
+/* ---- vertical rhythm sections ---- */
+.section { margin-bottom: 52px; }
+.section:last-child { margin-bottom: 0; }
+.section-eyebrow {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--text-secondary); font-weight: 700; margin: 0 0 16px;
+}
+
+/* ---- search-input (DESIGN.md.components.search-input) ---- */
+.search-field { margin-bottom: 8px; }
+.search-field label {
+  display: block; font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px;
+}
+.search-field .input-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  min-height: 44px; padding: 0 14px;
+}
+.search-field input {
+  border: none; outline: none; background: transparent; flex: 1;
+  font-size: 15px; color: var(--text); font-family: inherit; min-height: 44px;
+}
+.search-field input::placeholder { color: var(--text-secondary); }
+.search-hint { font-size: 12.5px; color: var(--text-secondary); margin: 8px 0 0; }
+/* aria-live region: existiria vazio até haver uma busca; mock ilustra a estrutura, sem JS */
+.sr-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---- home-change-row (DESIGN.md.components.home-change-row) ---- */
+.change-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.change-row {
+  display: flex; align-items: flex-start; gap: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 18px 20px; text-decoration: none; color: inherit;
+}
+.change-row:focus-visible, .followup-card a:focus-visible, .btn-primary:focus-visible,
+.btn-secondary:focus-visible, .search-field input:focus, select:focus-visible,
+.btn-send:focus-visible, textarea:focus {
+  outline: 3px solid var(--primary); outline-offset: 2px;
+}
+.change-marker {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+  background: var(--attention); display: flex; align-items: center; justify-content: center;
+  margin-top: 2px;
+}
+.change-marker svg { width: 16px; height: 16px; }
+.change-body { flex: 1; min-width: 0; }
+.change-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.change-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.change-turma {
+  font-size: 12px; color: var(--text-secondary); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 10px;
+}
+.change-desc { font-size: 14px; line-height: 1.6; color: var(--text-secondary); margin: 0; }
+.change-date { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; margin-left: auto; padding-top: 2px; }
+
+/* focus demo: simulacao estatica de foco visivel, sem precisar de Tab */
+.change-row.focus-demo { outline: 3px solid var(--primary); outline-offset: 2px; }
+.focus-demo-caption { font-size: 12.5px; color: var(--text-secondary); margin: 10px 0 0; font-style: italic; }
+
+/* ---- followup-card + followup-status-pill ---- */
+.followup-list { display: flex; flex-direction: column; gap: 12px; }
+.followup-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 18px 22px; text-decoration: none; color: inherit;
+}
+.followup-name { font-size: 15px; font-weight: 700; color: var(--text); margin: 0 0 3px; }
+.followup-turma { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.status-pill {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 6px 14px;
+  border: 1px solid var(--border); white-space: nowrap;
+}
+.status-pill.observacao { background: var(--bg); color: var(--text-secondary); border-color: var(--border); }
+.status-pill.ativo { background: rgba(44,110,99,0.13); color: var(--primary); border-color: var(--primary); }
+.status-pill.aguardando { background: var(--surface); color: var(--text-secondary); border: 1.5px dashed var(--border); }
+.status-pill.encerrado { background: rgba(76,154,122,0.16); color: #2E6E52; border-color: var(--success); }
+.status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+/* ---- "sem novidades" message (State Patterns; sem componente nomeado dedicado) ---- */
+.no-change-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 30px 34px; display: flex; gap: 16px; align-items: flex-start;
+}
+.no-change-badge {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--success); display: flex; align-items: center; justify-content: center;
+}
+.no-change-badge svg { width: 16px; height: 16px; }
+.no-change-card h2 { font-size: 17px; margin: 0 0 8px; color: var(--text); }
+.no-change-card p { font-size: 14.5px; line-height: 1.65; color: var(--text-secondary); margin: 0; max-width: 58ch; }
+</style>
+
+<div class="page-head">
+  <h1>Sinaliza — Mock: Home (RF-18)</h1>
+  <p class="sub">Ilustra EXPERIENCE.md.Component Patterns (linha de mudança recente, card de acompanhamento, busca de aluno) e State Patterns ("sem mudanças recentes"); visual de DESIGN.md.Components (home-change-row, followup-card).</p>
+</div>
+
+<!-- ============================= ESTADO A — CANÔNICO ============================= -->
+<div class="state-block">
+  <div class="state-label a"><span class="dot"></span>Estado A — Mudanças recentes + acompanhamentos em andamento</div>
+  <div class="browser-frame">
+    <div class="browser-topbar">
+      <span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span>
+      <div class="browser-url">sinaliza.app/</div>
+    </div>
+    <div class="browser-content">
+
+      <div class="app-header">
+        <span class="app-name">Sinaliza</span>
+        <span>Fernanda Lopes · Coordenação Pedagógica</span>
+      </div>
+
+      <div class="home-head">
+        <p class="eyebrow-top">Coordenação Pedagógica</p>
+        <h1>Início</h1>
+      </div>
+
+      <div class="section">
+        <div class="search-field">
+          <label for="busca-a">Buscar aluno por nome ou turma</label>
+          <div class="input-row">
+            <input id="busca-a" type="text" placeholder="Ex.: Ana Beatriz ou 8º Ano B" aria-describedby="busca-a-hint">
+          </div>
+        </div>
+        <p class="search-hint" id="busca-a-hint">Necessário para chegar a um aluno sem mudança recente ou acompanhamento ativo — a home não lista todos os ~200 estudantes.</p>
+        <div class="sr-status" aria-live="polite"><!-- ex.: "3 estudantes encontrados." anunciado ao vivo após digitar --></div>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Mudanças recentes</p>
+        <ul class="change-list">
+          <li>
+            <a class="change-row focus-demo" href="#">
+              <span class="change-marker" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 3L2 21h20L12 3z" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="#FFFFFF"/></svg>
+              </span>
+              <span class="change-body">
+                <span class="change-top">
+                  <span class="change-name">Ana Beatriz Souza</span>
+                  <span class="change-turma">8º Ano B</span>
+                </span>
+                <p class="change-desc">Queda de frequência e aumento de atividades pendentes — 3º bimestre.</p>
+              </span>
+              <span class="change-date">Detectado 15/09</span>
+            </a>
+            <p class="focus-demo-caption">↑ exemplo de foco visível ao navegar por teclado (Tab)</p>
+          </li>
+          <li>
+            <a class="change-row" href="#">
+              <span class="change-marker" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 3L2 21h20L12 3z" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="#FFFFFF"/></svg>
+              </span>
+              <span class="change-body">
+                <span class="change-top">
+                  <span class="change-name">Rafael Augusto Mendes</span>
+                  <span class="change-turma">6º Ano A</span>
+                </span>
+                <p class="change-desc">Redução nas entregas de atividades de Português — 3º bimestre.</p>
+              </span>
+              <span class="change-date">Detectado 12/09</span>
+            </a>
+          </li>
+          <li>
+            <a class="change-row" href="#">
+              <span class="change-marker" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 3L2 21h20L12 3z" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="#FFFFFF"/></svg>
+              </span>
+              <span class="change-body">
+                <span class="change-top">
+                  <span class="change-name">Larissa Cristina Ferreira</span>
+                  <span class="change-turma">9º Ano C</span>
+                </span>
+                <p class="change-desc">Queda nas notas de Matemática — 2º bimestre.</p>
+              </span>
+              <span class="change-date">Detectado 05/09</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Acompanhamentos em andamento</p>
+        <div class="followup-list">
+          <a class="followup-card" href="#">
+            <span>
+              <p class="followup-name">Ana Beatriz Souza</p>
+              <p class="followup-turma">8º Ano B</p>
+            </span>
+            <span class="status-pill observacao"><span class="dot"></span>Em observação</span>
+          </a>
+          <a class="followup-card" href="#">
+            <span>
+              <p class="followup-name">Bruno Henrique Tavares</p>
+              <p class="followup-turma">7º Ano B</p>
+            </span>
+            <span class="status-pill ativo"><span class="dot"></span>Ativo</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============================= ESTADO B — SEM NOVIDADES ============================= -->
+<div class="state-block">
+  <div class="state-label b"><span class="dot"></span>Estado B — Sem mudanças recentes (com acompanhamento ativo ainda visível)</div>
+  <div class="browser-frame">
+    <div class="browser-topbar">
+      <span class="tl-dot"></span><span class="tl-dot"></span><span class="tl-dot"></span>
+      <div class="browser-url">sinaliza.app/</div>
+    </div>
+    <div class="browser-content">
+
+      <div class="app-header">
+        <span class="app-name">Sinaliza</span>
+        <span>Fernanda Lopes · Coordenação Pedagógica</span>
+      </div>
+
+      <div class="home-head">
+        <p class="eyebrow-top">Coordenação Pedagógica</p>
+        <h1>Início</h1>
+      </div>
+
+      <div class="section">
+        <div class="search-field">
+          <label for="busca-b">Buscar aluno por nome ou turma</label>
+          <div class="input-row">
+            <input id="busca-b" type="text" placeholder="Ex.: Ana Beatriz ou 8º Ano B">
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Mudanças recentes</p>
+        <div class="no-change-card">
+          <span class="no-change-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span>
+            <h2>Nenhuma mudança para revisar hoje</h2>
+            <p>Todos os estudantes com atividade recente seguem dentro da própria faixa habitual. Você tem 1 acompanhamento em andamento — veja abaixo.</p>
+          </span>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-eyebrow">Acompanhamentos em andamento</p>
+        <div class="followup-list">
+          <a class="followup-card" href="#">
+            <span>
+              <p class="followup-name">Bruno Henrique Tavares</p>
+              <p class="followup-turma">7º Ano B</p>
+            </span>
+            <span class="status-pill aguardando"><span class="dot"></span>Aguardando retorno</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

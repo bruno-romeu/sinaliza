@@ -1,0 +1,81 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 09-17-2026 20:30
+last_updated: 09-17-2026 20:30
+project: Sinaliza
+project_key: NOKEY
+tracking_system: file-system
+story_location: docs
+development_status:
+  epic-1: backlog
+  1-1-autenticação-da-coordenação-pedagógica: backlog
+  1-2-registro-de-presença-falta-por-turma-e-data: backlog
+  1-3-registro-de-notas-por-disciplina-e-período-letivo: backlog
+  1-4-cadastro-de-atividades-e-registro-de-status-de-entrega: backlog
+  1-5-registro-de-observação-pedagógica-em-texto-livre: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-geração-determinística-de-estudantes-turmas-e-matrículas: backlog
+  2-2-perfis-de-trajetória-sintética-conhecidos-aplicados-aos-fato: backlog
+  2-3-split-de-dataset-em-recorte-de-treino-e-recorte-de-avaliação: backlog
+  2-4-calibração-de-parâmetros-por-referência-a-base-pública-de-da: backlog
+  2-5-registros-pedagógicos-sintéticos-coerentes-com-o-perfil-do-e: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-cálculo-de-indicadores-de-trajetória-em-janela-rolante: backlog
+  3-2-detecção-de-mudança-relevante-por-convergência-de-sinais: backlog
+  3-3-página-inicial-com-mudanças-recentes: backlog
+  3-4-trajetória-do-estudante-gráfico-evidências-e-fator-preocupan: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-abertura-de-acompanhamento-vinculado-a-evidências: backlog
+  4-2-registro-de-ações-e-mudança-de-status-de-um-acompanhamento: backlog
+  4-3-histórico-completo-de-ações-e-evidências-de-um-acompanhament: backlog
+  4-4-escopo-de-acesso-ao-registro-pedagógico-vinculado-a-um-acomp: backlog
+  4-5-acompanhamentos-em-andamento-na-página-inicial: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-pipeline-de-pré-processamento-e-treino-do-modelo-offline: backlog
+  5-2-geração-de-score-experimental-como-dado-de-pesquisa: backlog
+  5-3-avaliação-do-modelo-com-split-de-dataset-sem-vazamento: backlog
+  5-4-demonstração-ao-vivo-truncada-em-hoje-sem-vazamento-de-futur: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-empacotamento-containerizado-dos-três-serviços: backlog
+  6-2-provisionamento-da-vm-sempre-ativa-plano-a-b: backlog
+  6-3-plano-de-contingência-de-hospedagem-plano-c-documentado: backlog
+  6-4-sistema-hospedado-e-acessível-para-avaliação: backlog
+  epic-6-retrospective: optional
