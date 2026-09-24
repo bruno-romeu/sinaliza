@@ -1,0 +1,29 @@
+"""SQLAlchemy engine/session plumbing shared by the whole `infrastructure`
+layer. Schema changes only ever happen via Alembic migrations — nothing here
+calls `Base.metadata.create_all()` against a real database."""
+
+from __future__ import annotations
+
+from collections.abc import Generator
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+from app.config import get_settings
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+_settings = get_settings()
+engine = create_engine(_settings.database_url, pool_pre_ping=True)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+def get_db() -> Generator[Session, None, None]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
