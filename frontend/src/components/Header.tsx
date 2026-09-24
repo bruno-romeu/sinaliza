@@ -36,6 +36,21 @@ export function Header() {
       </Link>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        {/* "Lançamento" is reached from a global navigation action, not
+            contextually per-screen (spec Code Map / EXPERIENCE.md IA). */}
+        <Link
+          to="/lancamento/presenca"
+          style={{
+            color: 'var(--color-text)',
+            textDecoration: 'none',
+            fontSize: 14,
+            minHeight: 'var(--min-hit-target)',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          Lançamento
+        </Link>
         <span>{user?.name}</span>
         <button
           type="button"
