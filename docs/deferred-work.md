@@ -15,3 +15,11 @@
 - source_spec: `docs/spec-1-2-registro-de-presenca-falta-por-turma-e-data.md`
   summary: No automated frontend test exercises `Presenca.tsx`'s per-row "Registro salvo." confirmation or the field-adjacent duplicate-attendance message — the frontend-observable half of the story's I/O Matrix.
   evidence: `backend/tests/test_attendance.py` covers every I/O Matrix row at the HTTP/DB layer with exact-body assertions; no Vitest/RTL test renders `Presenca.tsx` itself. Same precedent as the Login-form deferral above (Story 1.1) — the underlying behavior is proven correct at the HTTP contract level, and a rendered-component test is a reasonable follow-up once the app has more surface to test end-to-end against.
+
+- source_spec: `docs/spec-1-3-registro-de-notas-por-disciplina-e-periodo-letivo.md`
+  summary: There is no `GET /grades` (or any read-back) endpoint or UI — once a coordenação leaves "Lançamento de notas," there is no way to review which grades were already entered for a turma/disciplina/período.
+  evidence: Confirmed no listing/read endpoint exists anywhere in `backend/app/presentation/grades/router.py`. Not required by any of Story 1.3's ACs; `docs/epic-1-context.md`'s Goal frames Epic 1 as capturing raw facts for Epic 3's later consumption/analysis, and Story 1.2 shipped the identical shape (no `GET /attendance` listing endpoint either). Consistent epic-wide write-now/read-later precedent — revisit once a story actually needs to display recorded grades (Epic 3, or a future "consultar lançamentos" story).
+
+- source_spec: `docs/spec-1-3-registro-de-notas-por-disciplina-e-periodo-letivo.md`
+  summary: `seed_dev_fixtures.py`'s new `_seed_academic_periods` idempotency path (re-running the script when periods already exist is a no-op) has no automated test.
+  evidence: No test in `backend/tests/` imports or calls `seed_dev_fixtures()`/`_seed_academic_periods` — the `seeded_academic_period` fixture in `conftest.py` builds the row directly via SQLAlchemy, bypassing the script entirely. Dev-only tooling with no production request path; a regression here would only surface on a developer's manual re-run, not via the automated suite. A follow-up test would import the module and call it twice against the test DB, asserting row counts stay stable on the second call.

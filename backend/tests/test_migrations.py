@@ -44,12 +44,15 @@ def migration_engine(engine: Engine) -> Engine:
     # already ran. It leaves the schema at "head" afterwards — column-for-
     # column identical to what `Base.metadata.create_all()` produces — so
     # other tests in the session are unaffected regardless of run order.
-    # Drop order respects FKs: attendance_records/enrollments (children)
-    # before students/classrooms (parents), then both native enum types.
+    # Drop order respects FKs: grades/attendance_records/enrollments
+    # (children) before students/classrooms/academic_periods (parents), then
+    # native enum types (grades/academic_periods use no new enum, Story 1.3).
     with engine.connect() as connection:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        connection.execute(text("DROP TABLE IF EXISTS grades"))
         connection.execute(text("DROP TABLE IF EXISTS attendance_records"))
         connection.execute(text("DROP TABLE IF EXISTS enrollments"))
+        connection.execute(text("DROP TABLE IF EXISTS academic_periods"))
         connection.execute(text("DROP TABLE IF EXISTS students"))
         connection.execute(text("DROP TABLE IF EXISTS classrooms"))
         connection.execute(text("DROP TABLE IF EXISTS users"))
@@ -77,5 +80,26 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         attendance_exists = connection.execute(
             text("SELECT to_regclass('public.attendance_records') IS NOT NULL")
         ).scalar_one()
+        academic_periods_exists = connection.execute(
+            text("SELECT to_regclass('public.academic_periods') IS NOT NULL")
+        ).scalar_one()
+        grades_exists = connection.execute(
+            text("SELECT to_regclass('public.grades') IS NOT NULL")
+        ).scalar_one()
     assert users_exists is True
     assert attendance_exists is True
+    assert academic_periods_exists is True
+    assert grades_exists is True
+
+    # `test_grades.py`'s DB-bypass test only proves `ck_grade_value_range`
+    # exists on the schema built by `Base.metadata.create_all()` (conftest's
+    # default). Confirm it also exists on the schema this migration itself
+    # built, not just the ORM model definition.
+    with migration_engine.connect() as connection:
+        constraint_def = connection.execute(
+            text(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                "WHERE conname = 'ck_grade_value_range' AND conrelid = 'grades'::regclass"
+            )
+        ).scalar_one_or_none()
+    assert constraint_def == "CHECK (((value >= (0)::numeric) AND (value <= (10)::numeric)))"
