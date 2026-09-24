@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { Home } from './pages/Home'
+import { Notas } from './pages/Lancamento/Notas'
 import { Presenca } from './pages/Lancamento/Presenca'
 import { Login } from './pages/Login'
 
@@ -24,6 +25,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <Presenca />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/lancamento/notas"
+            element={
+              <ProtectedRoute>
+                <Notas />
               </ProtectedRoute>
             }
           />
