@@ -1,0 +1,614 @@
+<title>Sinaliza — Paletas de Cor</title>
+<meta charset="UTF-8">
+<style>
+/* ==========================================================================
+   SINALIZA — PALETAS DE COR — 3 REGISTROS x LIGHT/DARK
+   Valores hex documentados para reaproveitamento posterior.
+
+   /* 1) CLINICO-CALMO (light):
+      --bg:#F5F9F8; --surface:#FFFFFF; --text:#1E3A36; --text-secondary:#5B7A74;
+      --border:#D3E4E0; --primary:#2C6E63; --warn:#C97A3D; --success:#4C9A7A;
+      --on-primary:#FFFFFF; --band:rgba(44,110,99,0.14)
+   */
+   /* 1) CLINICO-CALMO (dark):
+      --bg:#10201D; --surface:#16302B; --text:#E7F3F0; --text-secondary:#9DBDB5;
+      --border:#244F47; --primary:#5FBFA9; --warn:#E0985A; --success:#6FC79C;
+      --on-primary:#0B1C19; --band:rgba(95,191,169,0.18)
+   */
+
+   /* 2) EDITORIAL-HUMANO (light):
+      --bg:#F7F1E8; --surface:#FCF8F1; --text:#3A2E24; --text-secondary:#7A6A56;
+      --border:#E3D5BE; --primary:#A6462A; --warn:#B8862B; --success:#4F7942;
+      --on-primary:#FFF8EF; --band:rgba(166,70,42,0.14)
+   */
+   /* 2) EDITORIAL-HUMANO (dark):
+      --bg:#241D16; --surface:#2E251C; --text:#EFE6D8; --text-secondary:#B5A78E;
+      --border:#4A3D2C; --primary:#D97854; --warn:#D8AC5C; --success:#7FAF6C;
+      --on-primary:#241C14; --band:rgba(217,120,84,0.18)
+   */
+
+   /* 3) UTILITARIO-NEUTRO (light):
+      --bg:#F4F4F5; --surface:#FFFFFF; --text:#18181B; --text-secondary:#52525B;
+      --border:#D4D4D8; --primary:#2563EB; --warn:#B45309; --success:#15803D;
+      --on-primary:#FFFFFF; --band:rgba(37,99,235,0.12)
+   */
+   /* 3) UTILITARIO-NEUTRO (dark):
+      --bg:#18181B; --surface:#232326; --text:#F4F4F5; --text-secondary:#A1A1AA;
+      --border:#3F3F46; --primary:#60A5FA; --warn:#F59E0B; --success:#4ADE80;
+      --on-primary:#101014; --band:rgba(96,165,250,0.16)
+   */
+   ========================================================================== */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 32px 24px 64px;
+  background: #ECECEE;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #1A1A1A;
+}
+
+.page-header {
+  max-width: 1100px;
+  margin: 0 auto 40px;
+}
+.page-header h1 {
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+.page-header p {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #454545;
+  max-width: 760px;
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+}
+
+.registro-header h2 {
+  font-size: 21px;
+  margin: 0 0 4px;
+}
+.registro-header .frase {
+  margin: 0 0 18px;
+  font-size: 14px;
+  font-style: italic;
+  color: #5A5A5A;
+}
+
+.modes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 780px) {
+  .modes-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- generic mode-panel shell (colors set per variant below) ---- */
+.mode-panel {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 20px 24px;
+}
+.mode-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+/* ---- token chips ---- */
+.tokens {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px 8px;
+  margin-bottom: 20px;
+}
+@media (max-width: 480px) {
+  .tokens { grid-template-columns: repeat(2, 1fr); }
+}
+.chip { display: flex; flex-direction: column; gap: 5px; }
+.swatch {
+  width: 100%;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.chip-label {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+.chip-label code {
+  display: block;
+  font-size: 10px;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.chip-note {
+  grid-column: span 2;
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: -2px;
+}
+
+/* ---- status pills ---- */
+.status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.pill {
+  font-size: 10.5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: var(--surface);
+}
+.pill.ativo {
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* ---- mini card: mudanca recente ---- */
+.mini-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warn);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.mini-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.warn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--on-primary);
+  background: var(--warn);
+  flex-shrink: 0;
+}
+.mini-card-header strong {
+  font-size: 14px;
+}
+.mini-card p {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+.btn-primary {
+  font-size: 12.5px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: var(--primary);
+  color: var(--on-primary);
+  cursor: default;
+}
+
+/* ---- trajectory mini chart ---- */
+.trajectory-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.trajectory svg { width: 100%; height: auto; display: block; }
+.trajectory-legend {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.chart-band { fill: var(--band); }
+.chart-line { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-linecap: round; }
+.chart-ring { fill: none; stroke: var(--warn); stroke-width: 2; }
+.chart-point { fill: var(--warn); }
+.chart-label { font-size: 8px; fill: var(--text-secondary); font-family: system-ui, sans-serif; }
+
+/* ==========================================================================
+   1. CLINICO CALMO — inspirado em apps de saude bem feitos.
+   ========================================================================== */
+.clinico-light {
+  --bg:#F5F9F8; --surface:#FFFFFF; --text:#1E3A36; --text-secondary:#5B7A74;
+  --border:#D3E4E0; --primary:#2C6E63; --warn:#C97A3D; --success:#4C9A7A;
+  --on-primary:#FFFFFF; --band: rgba(44,110,99,0.14);
+}
+.clinico-dark {
+  --bg:#10201D; --surface:#16302B; --text:#E7F3F0; --text-secondary:#9DBDB5;
+  --border:#244F47; --primary:#5FBFA9; --warn:#E0985A; --success:#6FC79C;
+  --on-primary:#0B1C19; --band: rgba(95,191,169,0.18);
+}
+.clinico-light, .clinico-dark { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+/* ==========================================================================
+   2. EDITORIAL HUMANO — caderno pedagogico / diario de bordo.
+   ========================================================================== */
+.editorial-light {
+  --bg:#F7F1E8; --surface:#FCF8F1; --text:#3A2E24; --text-secondary:#7A6A56;
+  --border:#E3D5BE; --primary:#A6462A; --warn:#B8862B; --success:#4F7942;
+  --on-primary:#FFF8EF; --band: rgba(166,70,42,0.14);
+}
+.editorial-dark {
+  --bg:#241D16; --surface:#2E251C; --text:#EFE6D8; --text-secondary:#B5A78E;
+  --border:#4A3D2C; --primary:#D97854; --warn:#D8AC5C; --success:#7FAF6C;
+  --on-primary:#241C14; --band: rgba(217,120,84,0.18);
+}
+.editorial-light, .editorial-dark {
+  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+}
+.editorial-light .mini-card, .editorial-dark .mini-card,
+.editorial-light .mode-label, .editorial-dark .mode-label,
+.editorial-light .chip-label, .editorial-dark .chip-label,
+.editorial-light .status-pills, .editorial-dark .status-pills,
+.editorial-light .trajectory-legend, .editorial-dark .trajectory-legend,
+.editorial-light .btn-primary, .editorial-dark .btn-primary {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.editorial-light .mode-panel-inner, .editorial-dark .mode-panel-inner { }
+.editorial-light.mode-panel, .editorial-dark.mode-panel {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    var(--border) 28px
+  );
+  background-size: 100% 28px;
+}
+.editorial-light .mini-card, .editorial-dark .mini-card { background-image: none; }
+
+/* ==========================================================================
+   3. UTILITARIO NEUTRO — cinzas neutros, alto contraste, sem personalidade.
+   ========================================================================== */
+.utilitario-light {
+  --bg:#F4F4F5; --surface:#FFFFFF; --text:#18181B; --text-secondary:#52525B;
+  --border:#D4D4D8; --primary:#2563EB; --warn:#B45309; --success:#15803D;
+  --on-primary:#FFFFFF; --band: rgba(37,99,235,0.12);
+}
+.utilitario-dark {
+  --bg:#18181B; --surface:#232326; --text:#F4F4F5; --text-secondary:#A1A1AA;
+  --border:#3F3F46; --primary:#60A5FA; --warn:#F59E0B; --success:#4ADE80;
+  --on-primary:#101014; --band: rgba(96,165,250,0.16);
+}
+.utilitario-light, .utilitario-dark { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.utilitario-light.mode-panel, .utilitario-dark.mode-panel { border-radius: 4px; }
+.utilitario-light .swatch, .utilitario-dark .swatch { border-radius: 2px; }
+.utilitario-light .mini-card, .utilitario-dark .mini-card { border-radius: 4px; }
+.utilitario-light .btn-primary, .utilitario-dark .btn-primary { border-radius: 3px; }
+.utilitario-light .pill, .utilitario-dark .pill { border-radius: 3px; }
+</style>
+
+<header class="page-header">
+  <h1>Sinaliza — Paletas de Cor</h1>
+  <p>Três registros emocionais distintos para o mesmo produto, cada um em modo claro e escuro,
+  lado a lado. O objetivo é comparar o "clima" de cada paleta — nunca alarmante, nunca parecida
+  com um CRM de risco — antes de escolher uma direção. Em todas as variações, a cor de atenção
+  nunca é usada sozinha: sempre combinada com ícone, borda ou texto.</p>
+</header>
+
+<main>
+
+  <!-- ============================= REGISTRO 1 ============================= -->
+  <section class="registro" id="clinico">
+    <div class="registro-header">
+      <h2>1. Clínico calmo</h2>
+      <p class="frase">"Um espaço de cuidado profissional — como uma boa consulta pediátrica, não uma sala de urgência."</p>
+    </div>
+    <div class="modes-grid">
+
+      <!-- LIGHT -->
+      <div class="mode-panel clinico-light">
+        <div class="mode-label">Light mode</div>
+        <div class="tokens">
+          <div class="chip"><span class="swatch" style="background:#F5F9F8"></span><span class="chip-label">background<code>#F5F9F8</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#FFFFFF"></span><span class="chip-label">surface<code>#FFFFFF</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#1E3A36"></span><span class="chip-label">texto primário<code>#1E3A36</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#5B7A74"></span><span class="chip-label">texto secundário<code>#5B7A74</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#D3E4E0"></span><span class="chip-label">borda<code>#D3E4E0</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#2C6E63"></span><span class="chip-label">destaque / ação<code>#2C6E63</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#C97A3D"></span><span class="chip-label">atenção<code>#C97A3D</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#4C9A7A"></span><span class="chip-label">sucesso / recuperação<code>#4C9A7A</code></span></div>
+          <div class="chip-note">a cor de atenção nunca aparece sozinha — sempre com ícone/borda/texto.</div>
+        </div>
+
+        <div class="status-pills">
+          <span class="pill">Em observação</span>
+          <span class="pill ativo">Ativo</span>
+          <span class="pill">Aguardando retorno</span>
+          <span class="pill">Encerrado</span>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-card-header">
+            <span class="warn-icon">!</span>
+            <strong>Ana Beatriz Souza</strong>
+          </div>
+          <p>Queda de frequência e atividades pendentes no 3º bimestre.</p>
+          <button class="btn-primary">Abrir acompanhamento</button>
+        </div>
+
+        <div class="trajectory">
+          <p class="trajectory-title">Trajetória — Lucas Tavares Ribeiro</p>
+          <svg viewBox="0 0 300 120">
+            <path class="chart-band" d="M0,70 C60,50 100,80 150,55 C200,35 250,60 300,45 L300,85 C250,95 200,80 150,95 C100,105 60,90 0,100 Z" />
+            <path class="chart-line" d="M0,90 C50,85 90,40 140,50 C180,58 220,20 300,30" />
+            <circle class="chart-ring" cx="220" cy="21" r="7" />
+            <circle class="chart-point" cx="220" cy="21" r="3" />
+            <text class="chart-label" x="150" y="14">Falta em 12/09</text>
+          </svg>
+          <p class="trajectory-legend">zona sombreada = faixa habitual do aluno · linha = trajetória real · ponto = mudança detectada</p>
+        </div>
+      </div>
+
+      <!-- DARK -->
+      <div class="mode-panel clinico-dark">
+        <div class="mode-label">Dark mode</div>
+        <div class="tokens">
+          <div class="chip"><span class="swatch" style="background:#10201D"></span><span class="chip-label">background<code>#10201D</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#16302B"></span><span class="chip-label">surface<code>#16302B</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#E7F3F0"></span><span class="chip-label">texto primário<code>#E7F3F0</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#9DBDB5"></span><span class="chip-label">texto secundário<code>#9DBDB5</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#244F47"></span><span class="chip-label">borda<code>#244F47</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#5FBFA9"></span><span class="chip-label">destaque / ação<code>#5FBFA9</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#E0985A"></span><span class="chip-label">atenção<code>#E0985A</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#6FC79C"></span><span class="chip-label">sucesso / recuperação<code>#6FC79C</code></span></div>
+          <div class="chip-note">a cor de atenção nunca aparece sozinha — sempre com ícone/borda/texto.</div>
+        </div>
+
+        <div class="status-pills">
+          <span class="pill">Em observação</span>
+          <span class="pill ativo">Ativo</span>
+          <span class="pill">Aguardando retorno</span>
+          <span class="pill">Encerrado</span>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-card-header">
+            <span class="warn-icon">!</span>
+            <strong>Ana Beatriz Souza</strong>
+          </div>
+          <p>Queda de frequência e atividades pendentes no 3º bimestre.</p>
+          <button class="btn-primary">Abrir acompanhamento</button>
+        </div>
+
+        <div class="trajectory">
+          <p class="trajectory-title">Trajetória — Lucas Tavares Ribeiro</p>
+          <svg viewBox="0 0 300 120">
+            <path class="chart-band" d="M0,70 C60,50 100,80 150,55 C200,35 250,60 300,45 L300,85 C250,95 200,80 150,95 C100,105 60,90 0,100 Z" />
+            <path class="chart-line" d="M0,90 C50,85 90,40 140,50 C180,58 220,20 300,30" />
+            <circle class="chart-ring" cx="220" cy="21" r="7" />
+            <circle class="chart-point" cx="220" cy="21" r="3" />
+            <text class="chart-label" x="150" y="14">Falta em 12/09</text>
+          </svg>
+          <p class="trajectory-legend">zona sombreada = faixa habitual do aluno · linha = trajetória real · ponto = mudança detectada</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================= REGISTRO 2 ============================= -->
+  <section class="registro" id="editorial">
+    <div class="registro-header">
+      <h2>2. Editorial humano</h2>
+      <p class="frase">"A sensação de folhear um caderno de bordo pedagógico, escrito à mão — não abrir um painel de software."</p>
+    </div>
+    <div class="modes-grid">
+
+      <!-- LIGHT -->
+      <div class="mode-panel editorial-light">
+        <div class="mode-label">Light mode</div>
+        <div class="tokens">
+          <div class="chip"><span class="swatch" style="background:#F7F1E8"></span><span class="chip-label">background<code>#F7F1E8</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#FCF8F1"></span><span class="chip-label">surface<code>#FCF8F1</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#3A2E24"></span><span class="chip-label">texto primário<code>#3A2E24</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#7A6A56"></span><span class="chip-label">texto secundário<code>#7A6A56</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#E3D5BE"></span><span class="chip-label">borda<code>#E3D5BE</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#A6462A"></span><span class="chip-label">destaque / ação<code>#A6462A</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#B8862B"></span><span class="chip-label">atenção<code>#B8862B</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#4F7942"></span><span class="chip-label">sucesso / recuperação<code>#4F7942</code></span></div>
+          <div class="chip-note">a cor de atenção nunca aparece sozinha — sempre com ícone/borda/texto.</div>
+        </div>
+
+        <div class="status-pills">
+          <span class="pill">Em observação</span>
+          <span class="pill ativo">Ativo</span>
+          <span class="pill">Aguardando retorno</span>
+          <span class="pill">Encerrado</span>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-card-header">
+            <span class="warn-icon">!</span>
+            <strong>Mariana Costa Pereira</strong>
+          </div>
+          <p>Queda de frequência e atividades pendentes no 3º bimestre.</p>
+          <button class="btn-primary">Abrir acompanhamento</button>
+        </div>
+
+        <div class="trajectory">
+          <p class="trajectory-title">Trajetória — João Pedro Almeida</p>
+          <svg viewBox="0 0 300 120">
+            <path class="chart-band" d="M0,70 C60,50 100,80 150,55 C200,35 250,60 300,45 L300,85 C250,95 200,80 150,95 C100,105 60,90 0,100 Z" />
+            <path class="chart-line" d="M0,90 C50,85 90,40 140,50 C180,58 220,20 300,30" />
+            <circle class="chart-ring" cx="220" cy="21" r="7" />
+            <circle class="chart-point" cx="220" cy="21" r="3" />
+            <text class="chart-label" x="130" y="14">Observação pedagógica de 10/09</text>
+          </svg>
+          <p class="trajectory-legend">zona sombreada = faixa habitual do aluno · linha = trajetória real · ponto = mudança detectada</p>
+        </div>
+      </div>
+
+      <!-- DARK -->
+      <div class="mode-panel editorial-dark">
+        <div class="mode-label">Dark mode</div>
+        <div class="tokens">
+          <div class="chip"><span class="swatch" style="background:#241D16"></span><span class="chip-label">background<code>#241D16</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#2E251C"></span><span class="chip-label">surface<code>#2E251C</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#EFE6D8"></span><span class="chip-label">texto primário<code>#EFE6D8</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#B5A78E"></span><span class="chip-label">texto secundário<code>#B5A78E</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#4A3D2C"></span><span class="chip-label">borda<code>#4A3D2C</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#D97854"></span><span class="chip-label">destaque / ação<code>#D97854</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#D8AC5C"></span><span class="chip-label">atenção<code>#D8AC5C</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#7FAF6C"></span><span class="chip-label">sucesso / recuperação<code>#7FAF6C</code></span></div>
+          <div class="chip-note">a cor de atenção nunca aparece sozinha — sempre com ícone/borda/texto.</div>
+        </div>
+
+        <div class="status-pills">
+          <span class="pill">Em observação</span>
+          <span class="pill ativo">Ativo</span>
+          <span class="pill">Aguardando retorno</span>
+          <span class="pill">Encerrado</span>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-card-header">
+            <span class="warn-icon">!</span>
+            <strong>Mariana Costa Pereira</strong>
+          </div>
+          <p>Queda de frequência e atividades pendentes no 3º bimestre.</p>
+          <button class="btn-primary">Abrir acompanhamento</button>
+        </div>
+
+        <div class="trajectory">
+          <p class="trajectory-title">Trajetória — João Pedro Almeida</p>
+          <svg viewBox="0 0 300 120">
+            <path class="chart-band" d="M0,70 C60,50 100,80 150,55 C200,35 250,60 300,45 L300,85 C250,95 200,80 150,95 C100,105 60,90 0,100 Z" />
+            <path class="chart-line" d="M0,90 C50,85 90,40 140,50 C180,58 220,20 300,30" />
+            <circle class="chart-ring" cx="220" cy="21" r="7" />
+            <circle class="chart-point" cx="220" cy="21" r="3" />
+            <text class="chart-label" x="130" y="14">Observação pedagógica de 10/09</text>
+          </svg>
+          <p class="trajectory-legend">zona sombreada = faixa habitual do aluno · linha = trajetória real · ponto = mudança detectada</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================= REGISTRO 3 ============================= -->
+  <section class="registro" id="utilitario">
+    <div class="registro-header">
+      <h2>3. Utilitário neutro</h2>
+      <p class="frase">"Nenhuma personalidade de marca no caminho — só a informação, lida o mais rápido possível."</p>
+    </div>
+    <div class="modes-grid">
+
+      <!-- LIGHT -->
+      <div class="mode-panel utilitario-light">
+        <div class="mode-label">Light mode</div>
+        <div class="tokens">
+          <div class="chip"><span class="swatch" style="background:#F4F4F5"></span><span class="chip-label">background<code>#F4F4F5</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#FFFFFF"></span><span class="chip-label">surface<code>#FFFFFF</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#18181B"></span><span class="chip-label">texto primário<code>#18181B</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#52525B"></span><span class="chip-label">texto secundário<code>#52525B</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#D4D4D8"></span><span class="chip-label">borda<code>#D4D4D8</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#2563EB"></span><span class="chip-label">destaque / ação<code>#2563EB</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#B45309"></span><span class="chip-label">atenção<code>#B45309</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#15803D"></span><span class="chip-label">sucesso / recuperação<code>#15803D</code></span></div>
+          <div class="chip-note">a cor de atenção nunca aparece sozinha — sempre com ícone/borda/texto.</div>
+        </div>
+
+        <div class="status-pills">
+          <span class="pill">Em observação</span>
+          <span class="pill ativo">Ativo</span>
+          <span class="pill">Aguardando retorno</span>
+          <span class="pill">Encerrado</span>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-card-header">
+            <span class="warn-icon">!</span>
+            <strong>Beatriz Fernandes Lima</strong>
+          </div>
+          <p>Queda de frequência e atividades pendentes no 3º bimestre.</p>
+          <button class="btn-primary">Abrir acompanhamento</button>
+        </div>
+
+        <div class="trajectory">
+          <p class="trajectory-title">Trajetória — Rafael Souza Martins</p>
+          <svg viewBox="0 0 300 120">
+            <path class="chart-band" d="M0,70 C60,50 100,80 150,55 C200,35 250,60 300,45 L300,85 C250,95 200,80 150,95 C100,105 60,90 0,100 Z" />
+            <path class="chart-line" d="M0,90 C50,85 90,40 140,50 C180,58 220,20 300,30" />
+            <circle class="chart-ring" cx="220" cy="21" r="7" />
+            <circle class="chart-point" cx="220" cy="21" r="3" />
+            <text class="chart-label" x="150" y="14">Nota 4.5 em Matemática</text>
+          </svg>
+          <p class="trajectory-legend">zona sombreada = faixa habitual do aluno · linha = trajetória real · ponto = mudança detectada</p>
+        </div>
+      </div>
+
+      <!-- DARK -->
+      <div class="mode-panel utilitario-dark">
+        <div class="mode-label">Dark mode</div>
+        <div class="tokens">
+          <div class="chip"><span class="swatch" style="background:#18181B"></span><span class="chip-label">background<code>#18181B</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#232326"></span><span class="chip-label">surface<code>#232326</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#F4F4F5"></span><span class="chip-label">texto primário<code>#F4F4F5</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#A1A1AA"></span><span class="chip-label">texto secundário<code>#A1A1AA</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#3F3F46"></span><span class="chip-label">borda<code>#3F3F46</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#60A5FA"></span><span class="chip-label">destaque / ação<code>#60A5FA</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#F59E0B"></span><span class="chip-label">atenção<code>#F59E0B</code></span></div>
+          <div class="chip"><span class="swatch" style="background:#4ADE80"></span><span class="chip-label">sucesso / recuperação<code>#4ADE80</code></span></div>
+          <div class="chip-note">a cor de atenção nunca aparece sozinha — sempre com ícone/borda/texto.</div>
+        </div>
+
+        <div class="status-pills">
+          <span class="pill">Em observação</span>
+          <span class="pill ativo">Ativo</span>
+          <span class="pill">Aguardando retorno</span>
+          <span class="pill">Encerrado</span>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-card-header">
+            <span class="warn-icon">!</span>
+            <strong>Beatriz Fernandes Lima</strong>
+          </div>
+          <p>Queda de frequência e atividades pendentes no 3º bimestre.</p>
+          <button class="btn-primary">Abrir acompanhamento</button>
+        </div>
+
+        <div class="trajectory">
+          <p class="trajectory-title">Trajetória — Rafael Souza Martins</p>
+          <svg viewBox="0 0 300 120">
+            <path class="chart-band" d="M0,70 C60,50 100,80 150,55 C200,35 250,60 300,45 L300,85 C250,95 200,80 150,95 C100,105 60,90 0,100 Z" />
+            <path class="chart-line" d="M0,90 C50,85 90,40 140,50 C180,58 220,20 300,30" />
+            <circle class="chart-ring" cx="220" cy="21" r="7" />
+            <circle class="chart-point" cx="220" cy="21" r="3" />
+            <text class="chart-label" x="150" y="14">Nota 4.5 em Matemática</text>
+          </svg>
+          <p class="trajectory-legend">zona sombreada = faixa habitual do aluno · linha = trajetória real · ponto = mudança detectada</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
