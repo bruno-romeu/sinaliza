@@ -30,9 +30,15 @@ from sqlalchemy.engine import Connection, Engine  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
 from app.config import Settings, get_settings  # noqa: E402
+from app.domain.student import DatasetSplit  # noqa: E402
 from app.domain.user import UserRole  # noqa: E402
 from app.infrastructure.db.base import Base, get_db  # noqa: E402
-from app.infrastructure.db.models import UserModel  # noqa: E402
+from app.infrastructure.db.models import (  # noqa: E402
+    ClassroomModel,
+    EnrollmentModel,
+    StudentModel,
+    UserModel,
+)
 from app.infrastructure.security.bcrypt_hasher import BcryptPasswordHasher  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -80,15 +86,25 @@ def db_session(db_connection: Connection) -> Generator[Session, None, None]:
     SAVEPOINT, so route/service code can call `session.commit()` normally
     (as it does in production) while the whole test still rolls back at the
     end — see SQLAlchemy's "Joining a Session into an External Transaction"
-    recipe."""
+    recipe (2.0-style: track the SAVEPOINT on the `Connection`, not on the
+    `Session`). Restarting the SAVEPOINT via `session.begin_nested()`
+    instead (checking `transaction.nested`/`transaction._parent.nested`) only
+    survives a single commit-then-fail cycle — a second successful
+    `session.commit()` after the first SAVEPOINT restart silently stops being
+    scoped to any SAVEPOINT at all, so a later failed `commit()` +
+    `rollback()` (Story 1.2's duplicate-attendance path) rolls back the
+    *entire* outer transaction, wiping out everything committed earlier in
+    the same test, not just the failed statement."""
     session_factory = sessionmaker(bind=db_connection)
     session = session_factory()
-    session.begin_nested()
+
+    nested = db_connection.begin_nested()
 
     @event.listens_for(session, "after_transaction_end")
     def _restart_savepoint(sess: Session, transaction) -> None:
-        if transaction.nested and not transaction._parent.nested:
-            sess.begin_nested()
+        nonlocal nested
+        if not nested.is_active:
+            nested = db_connection.begin_nested()
 
     yield session
     session.close()
@@ -122,3 +138,24 @@ def seeded_user(db_session: Session) -> UserModel:
     db_session.commit()
     db_session.refresh(user)
     return user
+
+
+@pytest.fixture()
+def seeded_classroom(db_session: Session) -> ClassroomModel:
+    classroom = ClassroomModel(name="Turma Teste", academic_year=2026)
+    db_session.add(classroom)
+    db_session.commit()
+    db_session.refresh(classroom)
+    return classroom
+
+
+@pytest.fixture()
+def seeded_enrolled_student(db_session: Session, seeded_classroom: ClassroomModel) -> StudentModel:
+    """A student enrolled in `seeded_classroom`, `EVAL_DEMO` split."""
+    student = StudentModel(name="Estudante Teste", dataset_split=DatasetSplit.EVAL_DEMO)
+    db_session.add(student)
+    db_session.flush()
+    db_session.add(EnrollmentModel(student_id=student.id, classroom_id=seeded_classroom.id))
+    db_session.commit()
+    db_session.refresh(student)
+    return student

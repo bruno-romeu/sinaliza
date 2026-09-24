@@ -6,6 +6,15 @@ export type LoginRequest = paths['/auth/login']['post']['requestBody']['content'
 export type LoginResponse =
   paths['/auth/login']['post']['responses'][200]['content']['application/json']
 
+export type Classroom =
+  paths['/classrooms']['get']['responses'][200]['content']['application/json'][number]
+export type Student =
+  paths['/classrooms/{classroom_id}/students']['get']['responses'][200]['content']['application/json'][number]
+export type AttendanceCreateRequest =
+  paths['/attendance']['post']['requestBody']['content']['application/json']
+export type AttendanceRecord =
+  paths['/attendance']['post']['responses'][201]['content']['application/json']
+
 interface ErrorEnvelope {
   error: {
     code: string
@@ -36,13 +45,24 @@ function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
   )
 }
 
-export async function login(payload: LoginRequest): Promise<LoginResponse> {
+interface RequestOptions {
+  method: 'GET' | 'POST'
+  path: string
+  body?: unknown
+  token?: string
+  fallbackMessage: string
+}
+
+async function request<T>({ method, path, body, token, fallbackMessage }: RequestOptions): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+    response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
   } catch (caught) {
@@ -53,12 +73,55 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
   }
 
   if (!response.ok) {
-    const body: unknown = await response.json().catch(() => null)
-    if (isErrorEnvelope(body)) {
-      throw new ApiError(response.status, body.error.code, body.error.message)
+    const errorBody: unknown = await response.json().catch(() => null)
+    if (isErrorEnvelope(errorBody)) {
+      throw new ApiError(response.status, errorBody.error.code, errorBody.error.message)
     }
-    throw new ApiError(response.status, 'unknown_error', 'Não foi possível fazer login agora.')
+    throw new ApiError(response.status, 'unknown_error', fallbackMessage)
   }
 
-  return (await response.json()) as LoginResponse
+  if (response.status === 204) {
+    return undefined as T
+  }
+  return (await response.json()) as T
+}
+
+export async function login(payload: LoginRequest): Promise<LoginResponse> {
+  return request<LoginResponse>({
+    method: 'POST',
+    path: '/auth/login',
+    body: payload,
+    fallbackMessage: 'Não foi possível fazer login agora.',
+  })
+}
+
+export async function listClassrooms(token: string): Promise<Classroom[]> {
+  return request<Classroom[]>({
+    method: 'GET',
+    path: '/classrooms',
+    token,
+    fallbackMessage: 'Não foi possível carregar as turmas agora.',
+  })
+}
+
+export async function listEnrolledStudents(token: string, classroomId: string): Promise<Student[]> {
+  return request<Student[]>({
+    method: 'GET',
+    path: `/classrooms/${classroomId}/students`,
+    token,
+    fallbackMessage: 'Não foi possível carregar os estudantes agora.',
+  })
+}
+
+export async function registerAttendance(
+  token: string,
+  payload: AttendanceCreateRequest,
+): Promise<AttendanceRecord> {
+  return request<AttendanceRecord>({
+    method: 'POST',
+    path: '/attendance',
+    body: payload,
+    token,
+    fallbackMessage: 'Não foi possível salvar o registro agora.',
+  })
 }
