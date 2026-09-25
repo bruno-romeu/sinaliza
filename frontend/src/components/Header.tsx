@@ -77,6 +77,19 @@ export function Header() {
         >
           Lançamento de atividades
         </Link>
+        <Link
+          to="/lancamento/observacoes"
+          style={{
+            color: 'var(--color-text)',
+            textDecoration: 'none',
+            fontSize: 14,
+            minHeight: 'var(--min-hit-target)',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          Lançamento de observações
+        </Link>
         <span>{user?.name}</span>
         <button
           type="button"
