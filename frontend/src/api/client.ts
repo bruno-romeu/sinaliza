@@ -21,6 +21,15 @@ export type GradeCreateRequest =
   paths['/grades']['post']['requestBody']['content']['application/json']
 export type Grade = paths['/grades']['post']['responses'][201]['content']['application/json']
 
+export type AssignmentCreateRequest =
+  paths['/assignments']['post']['requestBody']['content']['application/json']
+export type Assignment =
+  paths['/assignments']['post']['responses'][201]['content']['application/json']
+export type AssignmentSubmissionCreateRequest =
+  paths['/assignment-submissions']['post']['requestBody']['content']['application/json']
+export type AssignmentSubmission =
+  paths['/assignment-submissions']['post']['responses'][201]['content']['application/json']
+
 interface ErrorEnvelope {
   error: {
     code: string
@@ -148,5 +157,43 @@ export async function registerGrade(token: string, payload: GradeCreateRequest):
     body: payload,
     token,
     fallbackMessage: 'Não foi possível salvar a nota agora.',
+  })
+}
+
+export async function registerAssignment(
+  token: string,
+  payload: AssignmentCreateRequest,
+): Promise<Assignment> {
+  return request<Assignment>({
+    method: 'POST',
+    path: '/assignments',
+    body: payload,
+    token,
+    fallbackMessage: 'Não foi possível cadastrar a atividade agora.',
+  })
+}
+
+export async function listAssignmentsByClassroom(
+  token: string,
+  classroomId: string,
+): Promise<Assignment[]> {
+  return request<Assignment[]>({
+    method: 'GET',
+    path: `/classrooms/${classroomId}/assignments`,
+    token,
+    fallbackMessage: 'Não foi possível carregar as atividades agora.',
+  })
+}
+
+export async function registerAssignmentSubmission(
+  token: string,
+  payload: AssignmentSubmissionCreateRequest,
+): Promise<AssignmentSubmission> {
+  return request<AssignmentSubmission>({
+    method: 'POST',
+    path: '/assignment-submissions',
+    body: payload,
+    token,
+    fallbackMessage: 'Não foi possível salvar o registro agora.',
   })
 }
