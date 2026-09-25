@@ -44,11 +44,13 @@ def migration_engine(engine: Engine) -> Engine:
     # already ran. It leaves the schema at "head" afterwards — column-for-
     # column identical to what `Base.metadata.create_all()` produces — so
     # other tests in the session are unaffected regardless of run order.
-    # Drop order respects FKs: grades/attendance_records/enrollments
-    # (children) before students/classrooms/academic_periods (parents), then
-    # native enum types (grades/academic_periods use no new enum, Story 1.3).
+    # Drop order respects FKs: assignment_submissions/assignments/grades/
+    # attendance_records/enrollments (children) before
+    # students/classrooms/academic_periods (parents), then native enum types.
     with engine.connect() as connection:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        connection.execute(text("DROP TABLE IF EXISTS assignment_submissions"))
+        connection.execute(text("DROP TABLE IF EXISTS assignments"))
         connection.execute(text("DROP TABLE IF EXISTS grades"))
         connection.execute(text("DROP TABLE IF EXISTS attendance_records"))
         connection.execute(text("DROP TABLE IF EXISTS enrollments"))
@@ -56,6 +58,7 @@ def migration_engine(engine: Engine) -> Engine:
         connection.execute(text("DROP TABLE IF EXISTS students"))
         connection.execute(text("DROP TABLE IF EXISTS classrooms"))
         connection.execute(text("DROP TABLE IF EXISTS users"))
+        connection.execute(text("DROP TYPE IF EXISTS assignment_submission_status"))
         connection.execute(text("DROP TYPE IF EXISTS attendance_status"))
         connection.execute(text("DROP TYPE IF EXISTS dataset_split"))
         connection.execute(text("DROP TYPE IF EXISTS user_role"))
@@ -86,10 +89,18 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         grades_exists = connection.execute(
             text("SELECT to_regclass('public.grades') IS NOT NULL")
         ).scalar_one()
+        assignments_exists = connection.execute(
+            text("SELECT to_regclass('public.assignments') IS NOT NULL")
+        ).scalar_one()
+        assignment_submissions_exists = connection.execute(
+            text("SELECT to_regclass('public.assignment_submissions') IS NOT NULL")
+        ).scalar_one()
     assert users_exists is True
     assert attendance_exists is True
     assert academic_periods_exists is True
     assert grades_exists is True
+    assert assignments_exists is True
+    assert assignment_submissions_exists is True
 
     # `test_grades.py`'s DB-bypass test only proves `ck_grade_value_range`
     # exists on the schema built by `Base.metadata.create_all()` (conftest's

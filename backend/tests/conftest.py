@@ -36,6 +36,7 @@ from app.domain.user import UserRole  # noqa: E402
 from app.infrastructure.db.base import Base, get_db  # noqa: E402
 from app.infrastructure.db.models import (  # noqa: E402
     AcademicPeriodModel,
+    AssignmentModel,
     ClassroomModel,
     EnrollmentModel,
     StudentModel,
@@ -177,3 +178,22 @@ def seeded_academic_period(db_session: Session) -> AcademicPeriodModel:
     db_session.commit()
     db_session.refresh(period)
     return period
+
+
+@pytest.fixture()
+def seeded_assignment(
+    db_session: Session, seeded_classroom: ClassroomModel, seeded_academic_period: AcademicPeriodModel
+) -> AssignmentModel:
+    """Shaped like `seeded_academic_period` (spec Code Map). Built on
+    `seeded_classroom` + `seeded_academic_period` so submission tests have an
+    atividade already cadastrada against the same turma/período."""
+    assignment = AssignmentModel(
+        classroom_id=seeded_classroom.id,
+        subject="Matemática",
+        period_id=seeded_academic_period.id,
+        due_date=date(2026, 9, 30),
+    )
+    db_session.add(assignment)
+    db_session.commit()
+    db_session.refresh(assignment)
+    return assignment

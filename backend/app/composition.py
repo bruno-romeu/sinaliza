@@ -11,6 +11,9 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.application.academic_periods.list_academic_periods import ListAcademicPeriodsService
+from app.application.assignments.list_assignments import ListAssignmentsByClassroomService
+from app.application.assignments.register_assignment import RegisterAssignmentService
+from app.application.assignments.register_submission import RegisterSubmissionService
 from app.application.attendance.list_classrooms import ListClassroomsService
 from app.application.attendance.list_enrolled_students import ListEnrolledStudentsService
 from app.application.attendance.register_attendance import RegisterAttendanceService
@@ -20,6 +23,12 @@ from app.config import Settings, get_settings
 from app.infrastructure.db.base import get_db
 from app.infrastructure.repositories.sqlalchemy_academic_period_repository import (
     SqlAlchemyAcademicPeriodRepository,
+)
+from app.infrastructure.repositories.sqlalchemy_assignment_repository import (
+    SqlAlchemyAssignmentRepository,
+)
+from app.infrastructure.repositories.sqlalchemy_assignment_submission_repository import (
+    SqlAlchemyAssignmentSubmissionRepository,
 )
 from app.infrastructure.repositories.sqlalchemy_attendance_repository import (
     SqlAlchemyAttendanceRepository,
@@ -82,4 +91,29 @@ def get_register_grade_service(db: Session = Depends(get_db)) -> RegisterGradeSe
         student_repository=SqlAlchemyStudentRepository(db),
         academic_period_repository=SqlAlchemyAcademicPeriodRepository(db),
         grade_repository=SqlAlchemyGradeRepository(db),
+    )
+
+
+def get_register_assignment_service(db: Session = Depends(get_db)) -> RegisterAssignmentService:
+    return RegisterAssignmentService(
+        classroom_repository=SqlAlchemyClassroomRepository(db),
+        academic_period_repository=SqlAlchemyAcademicPeriodRepository(db),
+        assignment_repository=SqlAlchemyAssignmentRepository(db),
+    )
+
+
+def get_list_assignments_by_classroom_service(
+    db: Session = Depends(get_db),
+) -> ListAssignmentsByClassroomService:
+    return ListAssignmentsByClassroomService(
+        classroom_repository=SqlAlchemyClassroomRepository(db),
+        assignment_repository=SqlAlchemyAssignmentRepository(db),
+    )
+
+
+def get_register_submission_service(db: Session = Depends(get_db)) -> RegisterSubmissionService:
+    return RegisterSubmissionService(
+        assignment_repository=SqlAlchemyAssignmentRepository(db),
+        student_repository=SqlAlchemyStudentRepository(db),
+        assignment_submission_repository=SqlAlchemyAssignmentSubmissionRepository(db),
     )
