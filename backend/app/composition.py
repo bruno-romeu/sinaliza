@@ -19,6 +19,7 @@ from app.application.attendance.list_enrolled_students import ListEnrolledStuden
 from app.application.attendance.register_attendance import RegisterAttendanceService
 from app.application.auth.authenticate_user import AuthenticateUserService
 from app.application.grades.register_grade import RegisterGradeService
+from app.application.observations.register_observation import RegisterObservationService
 from app.config import Settings, get_settings
 from app.infrastructure.db.base import get_db
 from app.infrastructure.repositories.sqlalchemy_academic_period_repository import (
@@ -37,6 +38,9 @@ from app.infrastructure.repositories.sqlalchemy_classroom_repository import (
     SqlAlchemyClassroomRepository,
 )
 from app.infrastructure.repositories.sqlalchemy_grade_repository import SqlAlchemyGradeRepository
+from app.infrastructure.repositories.sqlalchemy_pedagogical_observation_repository import (
+    SqlAlchemyPedagogicalObservationRepository,
+)
 from app.infrastructure.repositories.sqlalchemy_student_repository import SqlAlchemyStudentRepository
 from app.infrastructure.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.infrastructure.security.bcrypt_hasher import BcryptPasswordHasher
@@ -116,4 +120,12 @@ def get_register_submission_service(db: Session = Depends(get_db)) -> RegisterSu
         assignment_repository=SqlAlchemyAssignmentRepository(db),
         student_repository=SqlAlchemyStudentRepository(db),
         assignment_submission_repository=SqlAlchemyAssignmentSubmissionRepository(db),
+    )
+
+
+def get_register_observation_service(db: Session = Depends(get_db)) -> RegisterObservationService:
+    return RegisterObservationService(
+        classroom_repository=SqlAlchemyClassroomRepository(db),
+        student_repository=SqlAlchemyStudentRepository(db),
+        observation_repository=SqlAlchemyPedagogicalObservationRepository(db),
     )
