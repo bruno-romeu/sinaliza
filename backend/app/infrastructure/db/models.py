@@ -13,6 +13,7 @@ from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.domain.assignment_submission import AssignmentSubmissionStatus
 from app.domain.attendance import AttendanceStatus
 from app.domain.student import DatasetSplit
 from app.domain.user import UserRole
@@ -22,6 +23,12 @@ user_role_enum = SAEnum(UserRole, name="user_role", native_enum=True, validate_s
 dataset_split_enum = SAEnum(DatasetSplit, name="dataset_split", native_enum=True, validate_strings=True)
 attendance_status_enum = SAEnum(
     AttendanceStatus, name="attendance_status", native_enum=True, validate_strings=True
+)
+assignment_submission_status_enum = SAEnum(
+    AssignmentSubmissionStatus,
+    name="assignment_submission_status",
+    native_enum=True,
+    validate_strings=True,
 )
 
 
@@ -125,3 +132,40 @@ class GradeModel(Base):
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
     value: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
+
+
+class AssignmentModel(Base):
+    """No CHECK/UNIQUE beyond FK integrity — mirrors `GradeModel`'s
+    precedent, no AC requires dedup (spec Boundaries & Constraints)."""
+
+    __tablename__ = "assignments"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    classroom_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False, index=True
+    )
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    period_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("academic_periods.id"), nullable=False, index=True
+    )
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class AssignmentSubmissionModel(Base):
+    """No UNIQUE constraint — a corrected/updated status is simply a new row
+    (spec Boundaries & Constraints, mirrors `Grade`'s already-accepted
+    no-dedup precedent)."""
+
+    __tablename__ = "assignment_submissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    assignment_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("assignments.id"), nullable=False, index=True
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+    )
+    status: Mapped[AssignmentSubmissionStatus] = mapped_column(
+        assignment_submission_status_enum, nullable=False
+    )
+    date: Mapped[date] = mapped_column(Date, nullable=False)
