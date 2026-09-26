@@ -4,6 +4,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { Home } from './pages/Home'
 import { Atividades } from './pages/Lancamento/Atividades'
 import { Notas } from './pages/Lancamento/Notas'
+import { Observacoes } from './pages/Lancamento/Observacoes'
 import { Presenca } from './pages/Lancamento/Presenca'
 import { Login } from './pages/Login'
 
@@ -42,6 +43,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <Atividades />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/lancamento/observacoes"
+            element={
+              <ProtectedRoute>
+                <Observacoes />
               </ProtectedRoute>
             }
           />

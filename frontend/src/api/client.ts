@@ -30,6 +30,11 @@ export type AssignmentSubmissionCreateRequest =
 export type AssignmentSubmission =
   paths['/assignment-submissions']['post']['responses'][201]['content']['application/json']
 
+export type PedagogicalObservationCreateRequest =
+  paths['/pedagogical-observations']['post']['requestBody']['content']['application/json']
+export type PedagogicalObservation =
+  paths['/pedagogical-observations']['post']['responses'][201]['content']['application/json']
+
 interface ErrorEnvelope {
   error: {
     code: string
@@ -195,5 +200,18 @@ export async function registerAssignmentSubmission(
     body: payload,
     token,
     fallbackMessage: 'Não foi possível salvar o registro agora.',
+  })
+}
+
+export async function registerPedagogicalObservation(
+  token: string,
+  payload: PedagogicalObservationCreateRequest,
+): Promise<PedagogicalObservation> {
+  return request<PedagogicalObservation>({
+    method: 'POST',
+    path: '/pedagogical-observations',
+    body: payload,
+    token,
+    fallbackMessage: 'Não foi possível salvar a observação agora.',
   })
 }
