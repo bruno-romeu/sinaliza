@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import String
+from sqlalchemy import String, Text
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -169,3 +169,24 @@ class AssignmentSubmissionModel(Base):
         assignment_submission_status_enum, nullable=False
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class PedagogicalObservationModel(Base):
+    """No `follow_up_id`/FK to `FollowUp`/`TrajectoryChange` (data-model.md:
+    it belongs to the student, not to a follow-up). No UNIQUE constraint —
+    multiple observations per student are expected and valid, each a new row
+    (spec Boundaries & Constraints, UX-DR13: "toda ação registrada entra no
+    histórico, nunca substitui uma anterior"), mirroring `Grade`/
+    `AssignmentSubmission`'s already-accepted no-dedup precedent."""
+
+    __tablename__ = "pedagogical_observations"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+    )
+    author_user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

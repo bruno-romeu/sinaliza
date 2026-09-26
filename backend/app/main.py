@@ -7,6 +7,7 @@ from app.presentation.attendance.router import router as attendance_router
 from app.presentation.auth.router import router as auth_router
 from app.presentation.errors import register_error_handlers
 from app.presentation.grades.router import router as grades_router
+from app.presentation.observations.router import router as observations_router
 
 
 def create_app() -> FastAPI:
@@ -16,6 +17,7 @@ def create_app() -> FastAPI:
     app.include_router(attendance_router)
     app.include_router(grades_router)
     app.include_router(assignments_router)
+    app.include_router(observations_router)
     return app
 
 

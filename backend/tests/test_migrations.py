@@ -45,13 +45,15 @@ def migration_engine(engine: Engine) -> Engine:
     # column identical to what `Base.metadata.create_all()` produces — so
     # other tests in the session are unaffected regardless of run order.
     # Drop order respects FKs: assignment_submissions/assignments/grades/
-    # attendance_records/enrollments (children) before
-    # students/classrooms/academic_periods (parents), then native enum types.
+    # attendance_records/pedagogical_observations/enrollments (children)
+    # before students/classrooms/academic_periods/users (parents), then
+    # native enum types.
     with engine.connect() as connection:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
         connection.execute(text("DROP TABLE IF EXISTS assignment_submissions"))
         connection.execute(text("DROP TABLE IF EXISTS assignments"))
         connection.execute(text("DROP TABLE IF EXISTS grades"))
+        connection.execute(text("DROP TABLE IF EXISTS pedagogical_observations"))
         connection.execute(text("DROP TABLE IF EXISTS attendance_records"))
         connection.execute(text("DROP TABLE IF EXISTS enrollments"))
         connection.execute(text("DROP TABLE IF EXISTS academic_periods"))
@@ -95,12 +97,16 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         assignment_submissions_exists = connection.execute(
             text("SELECT to_regclass('public.assignment_submissions') IS NOT NULL")
         ).scalar_one()
+        pedagogical_observations_exists = connection.execute(
+            text("SELECT to_regclass('public.pedagogical_observations') IS NOT NULL")
+        ).scalar_one()
     assert users_exists is True
     assert attendance_exists is True
     assert academic_periods_exists is True
     assert grades_exists is True
     assert assignments_exists is True
     assert assignment_submissions_exists is True
+    assert pedagogical_observations_exists is True
 
     # `test_grades.py`'s DB-bypass test only proves `ck_grade_value_range`
     # exists on the schema built by `Base.metadata.create_all()` (conftest's
