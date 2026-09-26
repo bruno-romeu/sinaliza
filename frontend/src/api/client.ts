@@ -15,6 +15,12 @@ export type AttendanceCreateRequest =
 export type AttendanceRecord =
   paths['/attendance']['post']['responses'][201]['content']['application/json']
 
+export type AcademicPeriod =
+  paths['/academic-periods']['get']['responses'][200]['content']['application/json'][number]
+export type GradeCreateRequest =
+  paths['/grades']['post']['requestBody']['content']['application/json']
+export type Grade = paths['/grades']['post']['responses'][201]['content']['application/json']
+
 interface ErrorEnvelope {
   error: {
     code: string
@@ -123,5 +129,24 @@ export async function registerAttendance(
     body: payload,
     token,
     fallbackMessage: 'Não foi possível salvar o registro agora.',
+  })
+}
+
+export async function listAcademicPeriods(token: string): Promise<AcademicPeriod[]> {
+  return request<AcademicPeriod[]>({
+    method: 'GET',
+    path: '/academic-periods',
+    token,
+    fallbackMessage: 'Não foi possível carregar os períodos letivos agora.',
+  })
+}
+
+export async function registerGrade(token: string, payload: GradeCreateRequest): Promise<Grade> {
+  return request<Grade>({
+    method: 'POST',
+    path: '/grades',
+    body: payload,
+    token,
+    fallbackMessage: 'Não foi possível salvar a nota agora.',
   })
 }

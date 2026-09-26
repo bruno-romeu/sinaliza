@@ -22,6 +22,7 @@ os.environ.setdefault(
 os.environ.setdefault("JWT_SECRET", "test-only-secret-do-not-use-in-prod")
 
 from collections.abc import Generator  # noqa: E402
+from datetime import date  # noqa: E402
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -34,6 +35,7 @@ from app.domain.student import DatasetSplit  # noqa: E402
 from app.domain.user import UserRole  # noqa: E402
 from app.infrastructure.db.base import Base, get_db  # noqa: E402
 from app.infrastructure.db.models import (  # noqa: E402
+    AcademicPeriodModel,
     ClassroomModel,
     EnrollmentModel,
     StudentModel,
@@ -159,3 +161,19 @@ def seeded_enrolled_student(db_session: Session, seeded_classroom: ClassroomMode
     db_session.commit()
     db_session.refresh(student)
     return student
+
+
+@pytest.fixture()
+def seeded_academic_period(db_session: Session) -> AcademicPeriodModel:
+    """Shaped like `seeded_classroom` (spec Code Map). Its window contains
+    2026-09-24 so it can stand in for "período letivo vigente"."""
+    period = AcademicPeriodModel(
+        label="3º Bimestre Teste",
+        start_date=date(2026, 7, 27),
+        end_date=date(2026, 9, 25),
+        order_index=3,
+    )
+    db_session.add(period)
+    db_session.commit()
+    db_session.refresh(period)
+    return period

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Integer
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import String
 from sqlalchemy import UniqueConstraint
@@ -83,3 +84,44 @@ class AttendanceRecordModel(Base):
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[AttendanceStatus] = mapped_column(attendance_status_enum, nullable=False)
+
+
+class AcademicPeriodModel(Base):
+    """Dev-fixture seeded only (`seed_dev_fixtures.py`) — no registration
+    screen (spec Boundaries & Constraints)."""
+
+    __tablename__ = "academic_periods"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class GradeModel(Base):
+    """`value` is `Numeric(4,2)` on a fixed 0.0–10.0 scale, structurally
+    bounded by `ck_grade_value_range` — a DB-level CHECK, not just an
+    application-layer/Pydantic check (spec Boundaries & Constraints, mirrors
+    AD-7's "structural, not just app-checked" philosophy). No UNIQUE
+    constraint — a student may legitimately receive multiple assessments in
+    the same período (spec Boundaries & Constraints)."""
+
+    __tablename__ = "grades"
+    __table_args__ = (
+        CheckConstraint("value >= 0 AND value <= 10", name="ck_grade_value_range"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+    )
+    classroom_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False, index=True
+    )
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    period_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("academic_periods.id"), nullable=False, index=True
+    )
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    value: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
