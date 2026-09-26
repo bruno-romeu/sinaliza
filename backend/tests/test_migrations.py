@@ -44,9 +44,17 @@ def migration_engine(engine: Engine) -> Engine:
     # already ran. It leaves the schema at "head" afterwards — column-for-
     # column identical to what `Base.metadata.create_all()` produces — so
     # other tests in the session are unaffected regardless of run order.
+    # Drop order respects FKs: attendance_records/enrollments (children)
+    # before students/classrooms (parents), then both native enum types.
     with engine.connect() as connection:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        connection.execute(text("DROP TABLE IF EXISTS attendance_records"))
+        connection.execute(text("DROP TABLE IF EXISTS enrollments"))
+        connection.execute(text("DROP TABLE IF EXISTS students"))
+        connection.execute(text("DROP TABLE IF EXISTS classrooms"))
         connection.execute(text("DROP TABLE IF EXISTS users"))
+        connection.execute(text("DROP TYPE IF EXISTS attendance_status"))
+        connection.execute(text("DROP TYPE IF EXISTS dataset_split"))
         connection.execute(text("DROP TYPE IF EXISTS user_role"))
         connection.commit()
     yield engine
@@ -63,7 +71,11 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
     command.upgrade(cfg, "head")
 
     with migration_engine.connect() as connection:
-        table_exists = connection.execute(
+        users_exists = connection.execute(
             text("SELECT to_regclass('public.users') IS NOT NULL")
         ).scalar_one()
-    assert table_exists is True
+        attendance_exists = connection.execute(
+            text("SELECT to_regclass('public.attendance_records') IS NOT NULL")
+        ).scalar_one()
+    assert users_exists is True
+    assert attendance_exists is True
