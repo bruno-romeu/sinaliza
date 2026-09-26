@@ -7,3 +7,15 @@ _bmad-output/
 
 .env
 
+# Backend (Python)
+backend/.venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+backend/.pytest_cache/
+backend/openapi.json
+
+# Frontend (Node)
+frontend/node_modules/
+frontend/dist/
+frontend/src/api/schema.d.ts
