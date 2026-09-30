@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 09-30-2026 20:20
+last_updated: 09-30-2026 20:24
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -43,11 +43,11 @@ development_status:
   1-5-registro-de-observação-pedagógica-em-texto-livre: done
   epic-1-retrospective: done
 
-  epic-2: backlog
-  2-1-geração-determinística-de-estudantes-turmas-e-matrículas: backlog
+  epic-2: in-progress
+  2-1-geração-determinística-de-estudantes-turmas-e-matrículas: in-progress
   2-2-perfis-de-trajetória-sintética-conhecidos-aplicados-aos-fato: backlog
   2-3-split-de-dataset-em-recorte-de-treino-e-recorte-de-avaliação: backlog
-  2-4-calibração-de-parâmetros-por-referência-a-base-pública-de-da: backlog
+  2-4-calibração-de-parâmetros-por-referência-a-base-pública-de-da: in-progress
   2-5-registros-pedagógicos-sintéticos-coerentes-com-o-perfil-do-e: backlog
   epic-2-retrospective: optional
 
