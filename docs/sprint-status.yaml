@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 09-26-2026 00:22
+last_updated: 09-30-2026 20:20
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -87,7 +87,7 @@ action_items:
       matching AssignmentCreateRequest/PedagogicalObservationCreateRequest so a whitespace-only
       subject is rejected consistently."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-1-retro-2026-09-26.md"
   - id: "epic-1-retro-item-2-401-session-expiry-redirect"
     epic: 1
@@ -96,7 +96,7 @@ action_items:
       stored session and redirect to /login, in frontend/src/api/client.ts's request()
       plus AuthContext/ProtectedRoute wiring."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-1-retro-2026-09-26.md"
   - id: "epic-1-retro-item-3-extract-lancamento-boilerplate"
     epic: 1
