@@ -45,9 +45,9 @@ development_status:
 
   epic-2: in-progress
   2-1-geração-determinística-de-estudantes-turmas-e-matrículas: done
-  2-2-perfis-de-trajetória-sintética-conhecidos-aplicados-aos-fato: backlog
+  2-2-perfis-de-trajetória-sintética-conhecidos-aplicados-aos-fato: in-progress
   2-3-split-de-dataset-em-recorte-de-treino-e-recorte-de-avaliação: backlog
-  2-4-calibração-de-parâmetros-por-referência-a-base-pública-de-da: review
+  2-4-calibração-de-parâmetros-por-referência-a-base-pública-de-da: done
   2-5-registros-pedagógicos-sintéticos-coerentes-com-o-perfil-do-e: backlog
   epic-2-retrospective: optional
 
