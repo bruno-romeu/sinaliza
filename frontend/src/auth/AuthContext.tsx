@@ -2,11 +2,16 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
-import { login as loginRequest, type LoginResponse } from '../api/client'
+import {
+  login as loginRequest,
+  setUnauthorizedHandler,
+  type LoginResponse,
+} from '../api/client'
 
 type SessionUser = LoginResponse['user']
 
@@ -69,6 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY)
     setSession(null)
   }, [])
+
+  // Spec-1-1 I/O Matrix, "Stale/invalid bearer token": when any protected
+  // call is rejected with `invalid_token`, the session is cleared here and
+  // `ProtectedRoute` takes the user to /login on the resulting re-render.
+  // Registered once for the provider's lifetime and torn down on unmount, so
+  // a stale provider (e.g. between tests) can never keep handling responses.
+  useEffect(() => {
+    setUnauthorizedHandler(logout)
+    return () => setUnauthorizedHandler(null)
+  }, [logout])
 
   const value = useMemo<AuthContextValue>(
     () => ({

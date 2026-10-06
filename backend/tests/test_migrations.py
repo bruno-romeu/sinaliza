@@ -50,6 +50,7 @@ def migration_engine(engine: Engine) -> Engine:
     # native enum types.
     with engine.connect() as connection:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        connection.execute(text("DROP TABLE IF EXISTS synthetic_generation_runs"))
         connection.execute(text("DROP TABLE IF EXISTS assignment_submissions"))
         connection.execute(text("DROP TABLE IF EXISTS assignments"))
         connection.execute(text("DROP TABLE IF EXISTS grades"))
@@ -60,6 +61,7 @@ def migration_engine(engine: Engine) -> Engine:
         connection.execute(text("DROP TABLE IF EXISTS students"))
         connection.execute(text("DROP TABLE IF EXISTS classrooms"))
         connection.execute(text("DROP TABLE IF EXISTS users"))
+        connection.execute(text("DROP TYPE IF EXISTS synthetic_profile"))
         connection.execute(text("DROP TYPE IF EXISTS assignment_submission_status"))
         connection.execute(text("DROP TYPE IF EXISTS attendance_status"))
         connection.execute(text("DROP TYPE IF EXISTS dataset_split"))
@@ -100,6 +102,18 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         pedagogical_observations_exists = connection.execute(
             text("SELECT to_regclass('public.pedagogical_observations') IS NOT NULL")
         ).scalar_one()
+        synthetic_generation_runs_exists = connection.execute(
+            text("SELECT to_regclass('public.synthetic_generation_runs') IS NOT NULL")
+        ).scalar_one()
+        synthetic_profile_type_exists = connection.execute(
+            text("SELECT to_regtype('synthetic_profile') IS NOT NULL")
+        ).scalar_one()
+        synthetic_profile_column_exists = connection.execute(
+            text(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = 'students' AND column_name = 'synthetic_profile')"
+            )
+        ).scalar_one()
     assert users_exists is True
     assert attendance_exists is True
     assert academic_periods_exists is True
@@ -107,6 +121,9 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
     assert assignments_exists is True
     assert assignment_submissions_exists is True
     assert pedagogical_observations_exists is True
+    assert synthetic_generation_runs_exists is True
+    assert synthetic_profile_type_exists is True
+    assert synthetic_profile_column_exists is True
 
     # `test_grades.py`'s DB-bypass test only proves `ck_grade_value_range`
     # exists on the schema built by `Base.metadata.create_all()` (conftest's

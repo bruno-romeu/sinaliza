@@ -56,6 +56,25 @@ export class ApiError extends Error {
 const API_BASE = '/api'
 const REQUEST_TIMEOUT_MS = 10_000
 
+/**
+ * Invoked whenever the backend rejects a bearer token as stale/invalid
+ * (spec-1-1 I/O Matrix, "Stale/invalid bearer token": *frontend clears
+ * session, redirects to /login*).
+ *
+ * This module is plain TypeScript — it cannot call `useAuth()` or
+ * `useNavigate()`. So instead of reaching into React from here, `AuthProvider`
+ * registers its own `logout` below; clearing the session flips
+ * `isAuthenticated` to false and the existing `ProtectedRoute` performs the
+ * redirect. One redirect mechanism, not two.
+ */
+type UnauthorizedHandler = () => void
+
+let unauthorizedHandler: UnauthorizedHandler | null = null
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler
+}
+
 function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
   return (
     typeof value === 'object' &&
@@ -95,6 +114,12 @@ async function request<T>({ method, path, body, token, fallbackMessage }: Reques
   if (!response.ok) {
     const errorBody: unknown = await response.json().catch(() => null)
     if (isErrorEnvelope(errorBody)) {
+      // Gated on `invalid_token` specifically, not on the 401 status: a failed
+      // login also answers 401, with code `invalid_credentials`, and that must
+      // not clear a session or bounce the user mid-login.
+      if (response.status === 401 && errorBody.error.code === 'invalid_token') {
+        unauthorizedHandler?.()
+      }
       throw new ApiError(response.status, errorBody.error.code, errorBody.error.message)
     }
     throw new ApiError(response.status, 'unknown_error', fallbackMessage)
