@@ -14,13 +14,15 @@ Este modelo cobre dados sintéticos, conforme definido no README e no AGENTS.md.
 User            { id, name, email, role: COORDENACAO_PEDAGOGICA }
 Classroom       { id, name, academic_year }
 AcademicPeriod  { id, label, start_date, end_date, order_index }
-Student         { id, name, dataset_split: TRAIN | EVAL_DEMO }
+Student         { id, name, dataset_split: TRAIN | EVAL_DEMO, synthetic_profile: SyntheticProfile | null }
 Enrollment      { id, student_id, classroom_id }
 ```
 
 `role` tem um único valor possível hoje (perfil único, RF-02) — mantido como enum só por extensibilidade estrutural futura, nunca um segundo valor "professor" (proibido em nomenclatura de produto/código, ver PRD §2.1 e addendum do brief).
 
 `dataset_split` decide, na geração sintética (nunca em query time), se o estudante pertence ao recorte de treino ou de avaliação/operação/demo (RF-23) — nunca três bases separadas.
+
+`synthetic_profile` é nullable: um estudante criado pelo fixture de desenvolvimento não tem perfil, e um estudante gerado pelo gerador sintético (Epic 2) sempre tem. Ver "Geração sintética" abaixo.
 
 `AcademicPeriod` representa o período letivo oficial (ex: bimestre/trimestre). É o contexto usado por `Grade` e por matrícula — não é a granularidade usada para calcular trajetória (ver seção seguinte).
 
@@ -39,6 +41,21 @@ Estes são fatos registrados pela coordenação pedagógica na rotina (chamada, 
 `AttendanceRecord.status` distingue falta justificada de não justificada (resolve o `[NOTE FOR PM]` do RF-03); RF-11 conta as duas igualmente no cálculo de tendência no MVP, por simplicidade — o campo fica gravado para uso futuro. A constraint `UNIQUE(student_id, classroom_id, date)` impede duplicidade de registro em nível de banco (RF-04, RNF-11) — não apenas checagem de aplicação. `Grade.value` é fixado em escala 0.0–10.0 (resolve o `[NOTE FOR PM]` do RF-05); nenhum RF exige semântica de aprovação/reprovação, então não há campo derivado para isso.
 
 `PedagogicalObservation` é o registro em texto livre (RF-08); não tem `follow_up_id` — é sobre o estudante, não sobre um acompanhamento específico (RF-08 diz "sobre um estudante"; RF-09 só exige referência ao registro original em qualquer sinal derivado). Antes de ser citado como fonte de uma `TrajectoryChange` evidenciada por um `FollowUp`, é visível a qualquer usuário autenticado (perfil único); depois disso, sua exibição fica escopada pela regra de AD-8 (arquitetura) — nunca um filtro na própria tabela.
+
+## Geração sintética
+
+```
+SyntheticGenerationRun { id, seed, generator_version, executed_at, student_count, train_ratio }
+SyntheticProfile       -- enum: STABLE | FALLING_ATTENDANCE | COMBINED_DETERIORATION | ...
+```
+
+`SyntheticGenerationRun` é a única entidade nova da Epic 2. Registra a proveniência de cada execução do gerador — a seed usada, a versão do gerador e a data de execução — para que qualquer base sintética possa ser reproduzida ou auditada depois (RNF-13, AC de Story 2.1). `train_ratio` fica persistido junto porque a proporção entre os dois recortes é uma decisão de geração, não uma constante global: uma base gerada com uma proporção diferente precisa ser identificável como tal.
+
+`SyntheticProfile` não é uma tabela — é um enum persistido em `Student.synthetic_profile`. Cada valor corresponde a uma regra determinística e documentada de evolução de frequência/notas/atividades ao longo do ano letivo (Story 2.2), nunca geração aleatória opaca. O conjunto inclui obrigatoriamente ao menos um perfil estável (sem mudança) e um de deterioração combinada (frequência + nota + atividades juntos), que é o espectro que a regra de convergência do RF-11 precisa conseguir distinguir.
+
+**O perfil vive em `Student`, não numa tabela de rótulos à parte**, porque a Epic 5 precisa validar a detecção de mudança estudante a estudante contra o desfecho conhecido — um JOIN a mais em toda validação não paga o isolamento que ele compraria. Em troca, vale a mesma regra do score de ML (AD-3): `synthetic_profile` **nunca** aparece em endpoint ou schema de resposta do produto (`/students/*`, `/follow-ups/*`, páginas de lançamento). É rótulo de pesquisa, não dado de produto — expô-lo na aplicação web transformaria a demonstração numa profecia auto-realizável, além de vazar o gabarito da avaliação.
+
+Nenhuma tabela paralela existe para dado sintético: presença, notas, atividades e observações geradas são linhas das mesmas tabelas de "Fatos observáveis" acima, sujeitas às mesmas constraints de integridade (`UNIQUE(student_id, classroom_id, date)`, `CHECK` de 0–10 em `Grade.value`). O gerador nunca produz dado que a aplicação não produziria.
 
 ## Trajetória
 
@@ -109,6 +126,8 @@ Não existe estado `HIGH_RISK` nem substituto — acompanhamento é processo hum
 - **Split de dataset:** `Student.dataset_split` (arquitetura, AD-4) — decidido na geração sintética, nunca em query time.
 - **`PedagogicalObservation` trazida para o MVP:** definida acima (arquitetura, AD-8/AD-11) — corrige a agregação anterior com entidades de NLP (Etapa 5), que era um erro de escopo deste rascunho.
 - **Duplicidade de presença em nível de banco:** `UNIQUE(student_id, classroom_id, date)` em `AttendanceRecord` (arquitetura, AD-7) — resolve RF-04/RNF-11.
+- **Proveniência de geração persistida:** `SyntheticGenerationRun` (seed + versão do gerador + data) — sem ela o determinismo do gerador é inverificável depois do fato (RNF-13, Epic 2).
+- **Perfil sintético em `Student`, fora da API do produto:** `Student.synthetic_profile` nullable, consultável pela avaliação offline e nunca exposto em schema de resposta do produto — mesma fronteira que AD-3 impõe ao score de ML.
 - **"Fator Preocupante" nunca persistido:** puramente computado por requisição (arquitetura, AD-1) — nenhuma tabela nova para ele.
 
 ## Fora deste rascunho (etapas futuras)

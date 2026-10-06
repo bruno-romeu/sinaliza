@@ -147,6 +147,16 @@ export function Notas() {
     }
   }, [token, selectedClassroomId])
 
+  useEffect(() => {
+    setRowStates((prev) => {
+      const next: Record<string, RowState> = {}
+      for (const studentId of Object.keys(prev)) {
+        next[studentId] = { value: '', saving: false, message: null, isError: false }
+      }
+      return next
+    })
+  }, [selectedPeriodId, subject, date])
+
   function updateRow(studentId: string, patch: Partial<RowState>) {
     setRowStates((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }))
   }
@@ -313,7 +323,7 @@ export function Notas() {
 
         {students.length > 0 && !canSave && (
           <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Selecione disciplina e período letivo para lançar notas.
+            Selecione disciplina, período letivo e data para lançar notas.
           </p>
         )}
 

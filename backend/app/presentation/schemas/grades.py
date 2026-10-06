@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 
 class AcademicPeriodOut(BaseModel):
@@ -23,7 +23,12 @@ class GradeCreateRequest(BaseModel):
     student_id: uuid.UUID
     classroom_id: uuid.UUID
     # Bounds mirror `GradeModel.subject`'s `String(255)` column.
-    subject: Annotated[str, Field(min_length=1, max_length=255)]
+    # `strip_whitespace=True` runs before `min_length` is checked, so a
+    # whitespace-only value (e.g. a single space) is rejected as empty
+    # rather than persisted as a blank disciplina — matching
+    # `AssignmentCreateRequest.subject` and
+    # `PedagogicalObservationCreateRequest.text`.
+    subject: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
     period_id: uuid.UUID
     date: date
     # `Field(ge=0, le=10)` is the API-boundary half of the double validation

@@ -29,19 +29,19 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 09-25-2026 18:27
+last_updated: 09-30-2026 20:20
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
 story_location: docs
 development_status:
-  epic-1: in-progress
-  1-1-autenticação-da-coordenação-pedagógica: review
-  1-2-registro-de-presença-falta-por-turma-e-data: review
-  1-3-registro-de-notas-por-disciplina-e-período-letivo: review
-  1-4-cadastro-de-atividades-e-registro-de-status-de-entrega: review
-  1-5-registro-de-observação-pedagógica-em-texto-livre: review
-  epic-1-retrospective: optional
+  epic-1: done
+  1-1-autenticação-da-coordenação-pedagógica: done
+  1-2-registro-de-presença-falta-por-turma-e-data: done
+  1-3-registro-de-notas-por-disciplina-e-período-letivo: done
+  1-4-cadastro-de-atividades-e-registro-de-status-de-entrega: done
+  1-5-registro-de-observação-pedagógica-em-texto-livre: done
+  epic-1-retrospective: done
 
   epic-2: backlog
   2-1-geração-determinística-de-estudantes-turmas-e-matrículas: backlog
@@ -79,3 +79,79 @@ development_status:
   6-3-plano-de-contingência-de-hospedagem-plano-c-documentado: backlog
   6-4-sistema-hospedado-e-acessível-para-avaliação: backlog
   epic-6-retrospective: optional
+action_items:
+  - id: "epic-1-retro-item-1-grade-subject-strip-whitespace"
+    epic: 1
+    action: "[fix-now] Add StringConstraints(strip_whitespace=True, min_length=1,
+      max_length=255) to GradeCreateRequest.subject (backend/app/presentation/schemas/grades.py:26),
+      matching AssignmentCreateRequest/PedagogicalObservationCreateRequest so a whitespace-only
+      subject is rejected consistently."
+    owner: "dev"
+    status: done
+    ref: "docs/epic-1-retro-2026-09-26.md"
+  - id: "epic-1-retro-item-2-401-session-expiry-redirect"
+    epic: 1
+    action: "[fix-now] Implement Story 1.1's frozen I/O Matrix contract (spec-1-1:43,
+      Stale/invalid bearer token row): on a 401 invalid_token response, clear the
+      stored session and redirect to /login, in frontend/src/api/client.ts's request()
+      plus AuthContext/ProtectedRoute wiring."
+    owner: "dev"
+    status: done
+    ref: "docs/epic-1-retro-2026-09-26.md"
+  - id: "epic-1-retro-item-3-extract-lancamento-boilerplate"
+    epic: 1
+    action: "[defer] Extract the duplicated Lancamento-page boilerplate (fieldStyle,
+      todayIsoDate, row-list/row-component shape) shared by Presenca.tsx, Notas.tsx,
+      Atividades.tsx, and Observacoes.tsx into a common module."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-1-retro-2026-09-26.md"
+  - id: "epic-1-retro-item-4-migration-enum-drop-assertions"
+    epic: 1
+    action: "[defer] Backfill to_regtype enum-drop assertions in backend/tests/test_migrations.py
+      for the 3 pre-existing native enums (user_role, dataset_split, attendance_status),
+      matching the pattern needed for assignment_submission_status."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-1-retro-2026-09-26.md"
+  - id: "epic-1-retro-item-5-auth-dependencies-layering"
+    epic: 1
+    action: "[defer] Route backend/app/presentation/auth/dependencies.py's JWT decode
+      through an application-layer port instead of importing app.infrastructure.security.jwt_issuer
+      directly, resolving the residual presentation-to-infrastructure layering violation."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-1-retro-2026-09-26.md"
+  - id: "epic-1-retro-item-6-stale-auth-docstrings"
+    epic: 1
+    action: "[defer] Fix stale docstrings claiming get_current_user is unused/scaffolded-only
+      in backend/app/presentation/auth/dependencies.py:1-5 and backend/tests/test_auth_login.py:1-2
+      - it has been enforced by 4 routers since Story 1.2."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-1-retro-2026-09-26.md"
+  - id: "epic-1-retro-item-7-atividades-submission-reset"
+    epic: 1
+    action: "[defer] Mirror Notas.tsx's split-reset-effect pattern in frontend/src/pages/Lancamento/Atividades.tsx
+      so a submissionDate/assignment change no longer silently discards unsaved per-student
+      delivery-status selections."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-1-retro-2026-09-26.md"
+  - id: "epic-1-retro-item-8-shared-classroom-module"
+    epic: 1
+    action: "[defer] Extract ListClassroomsService/ListEnrolledStudentsService out
+      of app/application/attendance/ into a shared module, since all 4 Lancamento
+      pages depend on them (list_academic_periods is already correctly separated -
+      not part of this item)."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-1-retro-2026-09-26.md"
+  - id: "epic-1-retro-item-9-api-types-build-wiring"
+    epic: 1
+    action: "[defer] Wire frontend/src/api/schema.d.ts and backend/openapi.json generation
+      into a prebuild/CI step so npm ci && npm run build succeeds unaided from a fresh
+      clone; revisit alongside Epic 6's CI/build scope."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-1-retro-2026-09-26.md"

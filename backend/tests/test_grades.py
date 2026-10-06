@@ -49,11 +49,12 @@ def _grade_payload(
     classroom_id: uuid.UUID,
     period_id: uuid.UUID,
     value: str = "8.50",
+    subject: str = "Matemática",
 ) -> dict:
     return {
         "student_id": str(student_id),
         "classroom_id": str(classroom_id),
-        "subject": "Matemática",
+        "subject": subject,
         "period_id": str(period_id),
         "date": "2026-09-24",
         "value": value,
@@ -180,6 +181,61 @@ def test_register_grade_out_of_range_value_returns_standard_422(
     # Standard FastAPI/Pydantic validation body, not the `AppError` envelope.
     assert "detail" in body
     assert "error" not in body
+
+
+# --- Whitespace-only / padded subject (API bypass) ----------------------------
+
+
+def test_register_grade_whitespace_only_subject_returns_standard_422(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+) -> None:
+    """`subject` carries the same `strip_whitespace=True, min_length=1`
+    contract as `AssignmentCreateRequest.subject` — a whitespace-only
+    disciplina is rejected, never persisted as a blank string."""
+    response = client.post(
+        "/grades",
+        json=_grade_payload(
+            seeded_enrolled_student.id,
+            seeded_classroom.id,
+            seeded_academic_period.id,
+            subject="   ",
+        ),
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    # Standard FastAPI/Pydantic validation body, not the `AppError` envelope.
+    assert "detail" in body
+    assert "error" not in body
+
+
+def test_register_grade_strips_surrounding_whitespace_from_subject(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+) -> None:
+    """A padded-but-non-empty subject is accepted with the padding stripped,
+    so the same disciplina never lands in the table under two spellings."""
+    response = client.post(
+        "/grades",
+        json=_grade_payload(
+            seeded_enrolled_student.id,
+            seeded_classroom.id,
+            seeded_academic_period.id,
+            subject="  Matemática  ",
+        ),
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["subject"] == "Matemática"
 
 
 # --- DB-level bypass ----------------------------------------------------------

@@ -49,7 +49,7 @@ export function Header() {
             alignItems: 'center',
           }}
         >
-          Lançamento
+          Lançamento de presença
         </Link>
         <Link
           to="/lancamento/notas"
