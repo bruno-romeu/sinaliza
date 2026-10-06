@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric
+from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import String, Text
 from sqlalchemy import UniqueConstraint
@@ -15,7 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.assignment_submission import AssignmentSubmissionStatus
 from app.domain.attendance import AttendanceStatus
-from app.domain.student import DatasetSplit
+from app.domain.student import DatasetSplit, SyntheticProfile
 from app.domain.user import UserRole
 from app.infrastructure.db.base import Base
 
@@ -29,6 +29,9 @@ assignment_submission_status_enum = SAEnum(
     name="assignment_submission_status",
     native_enum=True,
     validate_strings=True,
+)
+synthetic_profile_enum = SAEnum(
+    SyntheticProfile, name="synthetic_profile", native_enum=True, validate_strings=True
 )
 
 
@@ -54,11 +57,21 @@ class ClassroomModel(Base):
 
 
 class StudentModel(Base):
+    """`synthetic_profile` is nullable by design: a student created by
+    `seed_dev_fixtures.py` has no profile, a student created by the synthetic
+    generator eventually does (`data-model.md` §Geração sintética). Story 2.1
+    ships the column always NULL — Story 2.2 owns populating it. It is the
+    only in-code carrier of the research label and is never mapped into any
+    Pydantic response schema (D2, AD-3's boundary)."""
+
     __tablename__ = "students"
 
     id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     dataset_split: Mapped[DatasetSplit] = mapped_column(dataset_split_enum, nullable=False)
+    synthetic_profile: Mapped[SyntheticProfile | None] = mapped_column(
+        synthetic_profile_enum, nullable=True
+    )
 
 
 class EnrollmentModel(Base):
@@ -190,3 +203,25 @@ class PedagogicalObservationModel(Base):
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class SyntheticGenerationRunModel(Base):
+    """One row per execution of `python -m app.synthetic.generate` — the
+    persisted provenance RNF-13 requires (logging it would not survive the
+    run). No UNIQUE on `seed`: the same seed may legitimately be re-run, and
+    each execution is its own audit record.
+
+    `seed` is `BigInteger` so a seed wider than 32 bits is still recordable;
+    `train_ratio` is `Numeric(4,3)` rather than a float so the persisted
+    proportion is exact — provenance that drifts by a float epsilon is not
+    provenance.
+    """
+
+    __tablename__ = "synthetic_generation_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    generator_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    student_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    train_ratio: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)
