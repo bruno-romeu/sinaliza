@@ -156,3 +156,18 @@ new files plus this spec.
 - `cd backend && ./.venv/Scripts/python.exe -c "import app.synthetic.calibration"` -- expected: exits 0 with no `DATABASE_URL`/`JWT_SECRET` set and no Postgres reachable
 - `wc -c backend/app/synthetic/__init__.py` -- expected: exactly `0`
 - `git status --short` -- expected: only `backend/app/synthetic/{__init__,calibration}.py`, `backend/tests/test_synthetic_calibration.py` and this spec
+
+### Review Findings
+
+4 lenses ran (blind-hunter, edge-case-hunter, verification-gap, intent-alignment). Triage: 0 decision-needed, 3 patch, 0 defer, 5 rejected.
+
+- [x] [Review][Patch] `GRADE_DISTRIBUTION.definition` overclaimed an exhaustive partition of the 0–10 scale [backend/app/synthetic/calibration.py] — the bands leave small gaps (4.9|5.0, 6.9|7.0, 8.4|8.5) that a two-decimal `grades.value` (Numeric 4,2) could land in; clarified the definition text to state the gaps are deliberate rather than claiming full coverage.
+- [x] [Review][Patch] Wrong year and malformed grammar in `test_no_parameter_carries_person_level_data`'s docstring [backend/tests/test_synthetic_calibration.py:363-368] — said "Censo Escolar 2021" and mixed "Since... so..."; fixed to "Censo Escolar 2023" with a single clean sentence.
+- [x] [Review][Patch] The `CALIBRATED`/`PUBLIC_REFERENCE` parametrized test suites would silently collect zero cases (pass, not fail) if every parameter of that kind were ever removed [backend/tests/test_synthetic_calibration.py] — added `test_calibrated_kind_is_not_an_empty_class` and `test_public_reference_kind_is_not_an_empty_class` guard assertions.
+
+**Rejected:**
+- `false` — No `__post_init__` runtime validation on `CalibrationParameter`/`GradeBand`: correctness is delegated to the test suite by design (module-level singletons, CI-gated); no reachable path ships an invalid constant without the test suite also failing.
+- `false` — Ambiguous 2-tuple semantics (year-range vs. measurement-range) could mislead a consumer: no consumer of `value` exists yet (confirmed by intent-alignment and verification-gap) — nothing currently reads these tuples at all.
+- `low` — `source_refs` citations could go stale if `research.md` is renumbered: true but pre-existing risk of the citation scheme used across the epic; fix would require parsing `research.md`'s appendix, out of proportion to the risk.
+- `false` — `GENERATOR_PARAMETERS` lacks a pinned consumer-side contract: intentional and documented — this story is explicitly the generator's input, not its consumer (deferred to Story 2.2/2.5 by `epic-2-plan.md`).
+- `false` — `docs/sprint-status.yaml` not updated by this diff: intentional per this spec's own Assumption 3 and the project convention that only the orchestrating session writes that file.

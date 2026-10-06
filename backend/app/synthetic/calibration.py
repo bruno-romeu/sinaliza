@@ -339,8 +339,12 @@ GRADE_DISTRIBUTION = CalibrationParameter(
     unit="grade_band_distribution",
     definition=(
         "Distribuição sintética de notas na escala 0–10, em 4 faixas "
-        "nomeadas segundo os níveis de proficiência do SAEB. As faixas "
-        "particionam [0, 10] sem sobreposição e as frações somam 1,0."
+        "nomeadas segundo os níveis de proficiência do SAEB. As faixas não "
+        "se sobrepõem e as frações somam 1,0; os limites são "
+        "deliberadamente separados por 0,1 (4.9|5.0, 6.9|7.0, 8.4|8.5) para "
+        "que cada faixa seja inequívoca mesmo que `grades.value` (Numeric "
+        "4,2) um dia receba um valor sintético com duas casas decimais — "
+        "não é uma partição exaustiva de toda a escala em duas casas."
     ),
     source=(
         "SAEB 2023 usado como PROXY CATEGÓRICO (~59% em 'Insuficiente' em "
