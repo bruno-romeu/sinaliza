@@ -151,6 +151,14 @@ def test_grade_distribution_is_a_documented_proxy_not_calibrated_data() -> None:
     assert insufficient.share == anchor.value, "only the anchored share may come from SAEB"
 
 
+def test_calibrated_kind_is_not_an_empty_class() -> None:
+    """Guards the parametrize filter below: an empty list is 0 passing
+    cases, not a failure, so a kind that silently lost every member would
+    read as a clean run instead of breaking RNF-13's provenance coverage.
+    """
+    assert any(p.kind is ParameterKind.CALIBRATED for p in ALL_PARAMETERS)
+
+
 @pytest.mark.parametrize(
     "parameter",
     [p for p in ALL_PARAMETERS if p.kind is ParameterKind.CALIBRATED],
@@ -182,6 +190,14 @@ def test_sourced_values_match_the_published_statistics(name: str, expected: obje
     the value no longer reports.
     """
     assert PARAMETERS_BY_NAME[name].value == pytest.approx(expected)
+
+
+def test_public_reference_kind_is_not_an_empty_class() -> None:
+    """Same guard as `test_calibrated_kind_is_not_an_empty_class`, for the
+    other filtered kind: without it, every PUBLIC_REFERENCE parameter being
+    removed would silently stop verifying `used_by_generator=False`.
+    """
+    assert any(p.kind is ParameterKind.PUBLIC_REFERENCE for p in ALL_PARAMETERS)
 
 
 @pytest.mark.parametrize(
@@ -362,9 +378,9 @@ def test_parameters_are_frozen() -> None:
 def test_no_parameter_carries_person_level_data(parameter: CalibrationParameter) -> None:
     """AC 4 / RNF-07: aggregate rates only, never a student-level datum.
 
-    Since Censo Escolar 2021 INEP publishes school-aggregated microdata, so
-    there is nothing per-student to leak in the first place — this asserts
-    the module stayed that way.
+    Censo Escolar 2023 publishes school-aggregated microdata, so there is
+    nothing per-student to leak in the first place — this asserts the
+    module stayed that way.
     """
     leaves = _numeric_leaves(parameter.value)
     assert leaves, f"{parameter.name} has no numeric content"
