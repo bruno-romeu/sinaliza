@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.infrastructure.db.base import SessionLocal
 from app.infrastructure.db.models import (
+    AcademicPeriodModel,
     AssignmentModel,
     AssignmentSubmissionModel,
     AttendanceRecordModel,
@@ -28,18 +29,29 @@ from app.infrastructure.db.models import (
     StudentModel,
     SyntheticGenerationRunModel,
 )
+from app.synthetic import facts
+from app.synthetic.facts import PeriodWindow
 from app.synthetic.fingerprint import population_fingerprint
 from app.synthetic.population import GenerationConfig, build_population
 
 #: Hand-maintained — bumped by any story that changes what the generator
 #: emits, so an old `synthetic_generation_runs` row stays interpretable after
 #: the generator evolves (RNF-13, Assumption 4).
-GENERATOR_VERSION = "2.1.0"
+GENERATOR_VERSION = "2.2.0"
 
 
 class DatabasePopulatedError(RuntimeError):
     """Raised when the database already holds generated data and `--reset`
     was not passed. The message is also what the CLI prints to stderr."""
+
+
+class MissingAcademicPeriodsError(RuntimeError):
+    """Raised when no `academic_periods` row exists for `config.academic_year`.
+
+    The generator never creates or modifies `academic_periods` (owned by
+    `seed_dev_fixtures.py`) — it fails clearly instead of silently writing
+    an incomplete or inconsistent base (spec Boundaries & Constraints, I/O
+    Matrix "No periods seeded" row)."""
 
 
 def is_populated(session: Session) -> bool:
@@ -86,12 +98,54 @@ def run_generation(
     `(fingerprint, run)`. Takes a `Session` parameter (not `SessionLocal`
     directly) so the test suite can drive it inside its own rolled-back
     transaction."""
+    # The school calendar is built strictly from existing `AcademicPeriod`
+    # rows for `config.academic_year` — queried, never created or modified
+    # here (spec Boundaries & Constraints). `AcademicPeriodModel` has no
+    # `academic_year` column of its own (data-model.md), so "for
+    # config.academic_year" is read as "whose start_date falls in that
+    # calendar year" — true of every period `seed_dev_fixtures.py` seeds.
+    #
+    # Checked *before* `is_populated`/`reset_generated_data` below: a
+    # populated database + `--reset` + periods missing/wrong-year must still
+    # write nothing, not leave the session holding uncommitted deletes from
+    # a reset that started before this validation ran.
+    period_rows = (
+        session.query(AcademicPeriodModel).order_by(AcademicPeriodModel.order_index).all()
+    )
+    matching_periods = [p for p in period_rows if p.start_date.year == config.academic_year]
+    if not matching_periods:
+        raise MissingAcademicPeriodsError(
+            f"No academic_periods rows found for academic_year={config.academic_year}. "
+            "Run `python -m app.infrastructure.db.seed_dev_fixtures` first to seed them."
+        )
+
+    order_indexes = [period.order_index for period in matching_periods]
+    if len(order_indexes) != len(set(order_indexes)):
+        duplicates = sorted({i for i in order_indexes if order_indexes.count(i) > 1})
+        raise ValueError(
+            f"Duplicate academic_periods.order_index values for academic_year="
+            f"{config.academic_year}: {duplicates}. Each period must have a unique "
+            "order_index — the generator uses it to attribute grades/assignments to "
+            "the correct period."
+        )
+
     if is_populated(session):
         if not reset:
             raise DatabasePopulatedError(
                 "Database already populated — pass --reset to wipe and regenerate."
             )
         reset_generated_data(session)
+
+    period_windows = tuple(
+        PeriodWindow(
+            id_label=f"period-{period.order_index}",
+            start_date=period.start_date,
+            end_date=period.end_date,
+            order_index=period.order_index,
+        )
+        for period in matching_periods
+    )
+    period_id_by_order_index = {period.order_index: period.id for period in matching_periods}
 
     population = build_population(config)
 
@@ -104,14 +158,12 @@ def run_generation(
     session.flush()
 
     for student in population.students:
-        # `synthetic_profile` is left NULL — Story 2.2 owns populating it
-        # (spec Boundaries & Constraints).
         session.add(
             StudentModel(
                 id=student.id,
                 name=student.name,
                 dataset_split=student.dataset_split,
-                synthetic_profile=None,
+                synthetic_profile=student.synthetic_profile,
             )
         )
     session.flush()
@@ -122,6 +174,58 @@ def run_generation(
                 id=enrollment.id,
                 student_id=enrollment.student_id,
                 classroom_id=enrollment.classroom_id,
+            )
+        )
+    session.flush()
+
+    generated_facts = facts.build_facts(population, period_windows, config)
+
+    for record in generated_facts.attendance_records:
+        session.add(
+            AttendanceRecordModel(
+                id=record.id,
+                student_id=record.student_id,
+                classroom_id=record.classroom_id,
+                date=record.date,
+                status=record.status,
+            )
+        )
+    session.flush()
+
+    for grade in generated_facts.grades:
+        session.add(
+            GradeModel(
+                id=grade.id,
+                student_id=grade.student_id,
+                classroom_id=grade.classroom_id,
+                subject=grade.subject,
+                period_id=period_id_by_order_index[grade.period_order_index],
+                date=grade.date,
+                value=grade.value,
+            )
+        )
+    session.flush()
+
+    for assignment in generated_facts.assignments:
+        session.add(
+            AssignmentModel(
+                id=assignment.id,
+                classroom_id=assignment.classroom_id,
+                subject=assignment.subject,
+                period_id=period_id_by_order_index[assignment.period_order_index],
+                due_date=assignment.due_date,
+            )
+        )
+    session.flush()
+
+    for submission in generated_facts.assignment_submissions:
+        session.add(
+            AssignmentSubmissionModel(
+                id=submission.id,
+                assignment_id=submission.assignment_id,
+                student_id=submission.student_id,
+                status=submission.status,
+                date=submission.date,
             )
         )
     session.flush()
@@ -196,6 +300,9 @@ def main(argv: list[str] | None = None) -> None:
         try:
             fingerprint, run = run_generation(session, config, reset=args.reset)
         except DatabasePopulatedError as exc:
+            print(str(exc), file=sys.stderr)
+            sys.exit(1)
+        except MissingAcademicPeriodsError as exc:
             print(str(exc), file=sys.stderr)
             sys.exit(1)
 

@@ -33,10 +33,13 @@ class SyntheticProfile(str, Enum):
     (`data-model.md` §Geração sintética) — never opaque randomness. The set
     brackets the spectrum RF-11's convergence rule has to distinguish: one
     profile with no change at all, one combining attendance + grade +
-    assignment deterioration."""
+    assignment deterioration. Its 4 members are exactly the 4 string keys
+    of `calibration.SYNTHETIC_PROFILE_PROPORTIONS` — asserted by a parity
+    test owned by Story 2.2 (`tests/test_synthetic_profiles.py`)."""
 
     STABLE = "STABLE"
     FALLING_ATTENDANCE = "FALLING_ATTENDANCE"
+    FALLING_GRADES = "FALLING_GRADES"
     COMBINED_DETERIORATION = "COMBINED_DETERIORATION"
 
 
