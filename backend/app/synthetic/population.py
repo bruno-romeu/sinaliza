@@ -16,8 +16,9 @@ import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 
-from app.domain.student import DatasetSplit
+from app.domain.student import DatasetSplit, SyntheticProfile
 from app.synthetic.names import compose_classroom_name, compose_name
+from app.synthetic.profiles import assign_profile
 from app.synthetic.rng import derived_key, stable_uuid
 
 
@@ -52,6 +53,7 @@ class GeneratedStudent:
     id: uuid.UUID
     name: str
     dataset_split: DatasetSplit
+    synthetic_profile: SyntheticProfile
 
 
 @dataclass(frozen=True)
@@ -157,6 +159,7 @@ def build_population(config: GenerationConfig) -> GeneratedPopulation:
                     id=student_id,
                     name=compose_name(name_index),
                     dataset_split=split,
+                    synthetic_profile=assign_profile(seed, student_id),
                 )
             )
             enrollment_id = stable_uuid(seed, "enrollment", str(name_index))
