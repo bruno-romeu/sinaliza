@@ -21,6 +21,8 @@ from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from app.domain.student import SyntheticProfile
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -124,6 +126,23 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
     assert synthetic_generation_runs_exists is True
     assert synthetic_profile_type_exists is True
     assert synthetic_profile_column_exists is True
+
+    # The migration hardcodes the enum's member labels independently of
+    # `SyntheticProfile` — asserting the type/column exist isn't enough to
+    # catch the two definitions drifting apart (as happened when
+    # `FALLING_GRADES` was added to the domain enum but not to 0006's
+    # `ENUM(...)` literal list). Compare the actual Postgres labels.
+    with migration_engine.connect() as connection:
+        synthetic_profile_labels = set(
+            connection.execute(
+                text(
+                    "SELECT e.enumlabel FROM pg_enum e "
+                    "JOIN pg_type t ON e.enumtypid = t.oid "
+                    "WHERE t.typname = 'synthetic_profile'"
+                )
+            ).scalars()
+        )
+    assert synthetic_profile_labels == {member.value for member in SyntheticProfile}
 
     # `test_grades.py`'s DB-bypass test only proves `ck_grade_value_range`
     # exists on the schema built by `Base.metadata.create_all()` (conftest's

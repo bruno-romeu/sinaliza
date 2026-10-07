@@ -13,13 +13,15 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from datetime import date
 from decimal import Decimal
 
 import pytest
 from sqlalchemy.orm import Session
 
-from app.domain.student import DatasetSplit
+from app.domain.student import DatasetSplit, SyntheticProfile
 from app.infrastructure.db.models import (
+    AcademicPeriodModel,
     ClassroomModel,
     EnrollmentModel,
     StudentModel,
@@ -42,6 +44,30 @@ _REDUCED_CONFIG = GenerationConfig(
 )
 
 
+def _seed_academic_periods(db_session: Session, academic_year: int = 2026) -> None:
+    """A small local helper (not a `conftest.py` fixture — spec Code Map) so
+    every test that calls `run_generation` has a school calendar to build
+    facts from. Two bimesters are enough for these generation-shape tests;
+    `test_synthetic_facts_generation.py` owns exercising fact volume/content."""
+    db_session.add_all(
+        [
+            AcademicPeriodModel(
+                label="1º Bimestre",
+                start_date=date(academic_year, 2, 2),
+                end_date=date(academic_year, 4, 17),
+                order_index=1,
+            ),
+            AcademicPeriodModel(
+                label="2º Bimestre",
+                start_date=date(academic_year, 4, 20),
+                end_date=date(academic_year, 6, 26),
+                order_index=2,
+            ),
+        ]
+    )
+    db_session.commit()
+
+
 def _no_real_data_pattern() -> re.Pattern[str]:
     # Digits, '@', or anything CPF/phone-shaped (runs of digits with optional
     # separators) — RNF-07.
@@ -49,6 +75,7 @@ def _no_real_data_pattern() -> re.Pattern[str]:
 
 
 def test_first_run_clean_database_creates_expected_rows(db_session: Session) -> None:
+    _seed_academic_periods(db_session)
     fingerprint, run = run_generation(db_session, _REDUCED_CONFIG, reset=False)
 
     classrooms = db_session.query(ClassroomModel).all()
@@ -67,11 +94,12 @@ def test_first_run_clean_database_creates_expected_rows(db_session: Session) -> 
     assert run.train_ratio == Decimal("0.5")
     assert run.executed_at is not None
 
-    assert all(s.synthetic_profile is None for s in students)
+    assert all(s.synthetic_profile in set(SyntheticProfile) for s in students)
     assert isinstance(fingerprint, str) and len(fingerprint) == 64  # sha256 hex digest
 
 
 def test_same_seed_twice_produces_byte_identical_fingerprint(db_session: Session) -> None:
+    _seed_academic_periods(db_session)
     fingerprint_1, _ = run_generation(db_session, _REDUCED_CONFIG, reset=False)
     fingerprint_2, _ = run_generation(db_session, _REDUCED_CONFIG, reset=True)
 
@@ -84,6 +112,7 @@ def test_same_seed_twice_produces_byte_identical_fingerprint(db_session: Session
 
 
 def test_different_seed_produces_different_fingerprint(db_session: Session) -> None:
+    _seed_academic_periods(db_session)
     fingerprint_42, _ = run_generation(db_session, _REDUCED_CONFIG, reset=False)
 
     other_config = GenerationConfig(
@@ -95,6 +124,7 @@ def test_different_seed_produces_different_fingerprint(db_session: Session) -> N
 
 
 def test_populated_database_without_reset_raises_and_writes_nothing(db_session: Session) -> None:
+    _seed_academic_periods(db_session)
     run_generation(db_session, _REDUCED_CONFIG, reset=False)
     student_count_before = db_session.query(StudentModel).count()
     run_count_before = db_session.query(SyntheticGenerationRunModel).count()
@@ -107,6 +137,7 @@ def test_populated_database_without_reset_raises_and_writes_nothing(db_session: 
 
 
 def test_populated_database_with_reset_regenerates(db_session: Session) -> None:
+    _seed_academic_periods(db_session)
     run_generation(db_session, _REDUCED_CONFIG, reset=False)
 
     other_config = GenerationConfig(
@@ -120,6 +151,7 @@ def test_populated_database_with_reset_regenerates(db_session: Session) -> None:
 
 
 def test_reduced_volume_matches_requested_counts(db_session: Session) -> None:
+    _seed_academic_periods(db_session)
     config = GenerationConfig(seed=7, student_count=12, students_per_classroom=4)
     _, run = run_generation(db_session, config, reset=False)
 
@@ -152,6 +184,7 @@ def test_invalid_arguments_rejected_by_argparse_before_touching_db() -> None:
 def test_every_student_has_dataset_split_and_every_classroom_has_both(
     db_session: Session,
 ) -> None:
+    _seed_academic_periods(db_session)
     run_generation(db_session, _REDUCED_CONFIG, reset=False)
 
     students = db_session.query(StudentModel).all()
@@ -178,6 +211,7 @@ def test_every_student_has_dataset_split_and_every_classroom_has_both(
 
 
 def test_no_real_data_in_generated_text_fields(db_session: Session) -> None:
+    _seed_academic_periods(db_session)
     run_generation(db_session, _REDUCED_CONFIG, reset=False)
     pattern = _no_real_data_pattern()
 
@@ -208,6 +242,7 @@ def test_is_populated_false_on_clean_database(db_session: Session) -> None:
 def test_fingerprint_function_used_directly_matches_generation_return_value(
     db_session: Session,
 ) -> None:
+    _seed_academic_periods(db_session)
     fingerprint, _ = run_generation(db_session, _REDUCED_CONFIG, reset=False)
     assert population_fingerprint(db_session) == fingerprint
 

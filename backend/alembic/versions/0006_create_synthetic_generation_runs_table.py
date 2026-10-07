@@ -22,7 +22,11 @@ depends_on: Union[str, Sequence[str], None] = None
 # `op.drop_table` reliably reverses a `CREATE TYPE`, so `downgrade` drops the
 # enum explicitly after the column that uses it is gone.
 synthetic_profile_enum = postgresql.ENUM(
-    "STABLE", "FALLING_ATTENDANCE", "COMBINED_DETERIORATION", name="synthetic_profile"
+    "STABLE",
+    "FALLING_ATTENDANCE",
+    "FALLING_GRADES",
+    "COMBINED_DETERIORATION",
+    name="synthetic_profile",
 )
 
 
@@ -40,6 +44,7 @@ def upgrade() -> None:
             postgresql.ENUM(
                 "STABLE",
                 "FALLING_ATTENDANCE",
+                "FALLING_GRADES",
                 "COMBINED_DETERIORATION",
                 name="synthetic_profile",
                 create_type=False,
