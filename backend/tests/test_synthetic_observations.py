@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import UTC, date, datetime, time
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy.orm import Session
@@ -403,6 +404,41 @@ def test_missing_author_user_raises_before_any_row_written(db_session: Session) 
     assert db_session.query(PedagogicalObservationModel).count() == 0
 
 
+def test_populated_db_with_reset_but_author_user_missing_writes_nothing(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Regression: `_resolve_author_user_id` must run *before*
+    # `is_populated`/`reset_generated_data` wipe anything (generate.py's own
+    # comment on the call site), so a populated database + `--reset` + a
+    # coordination-user lookup that no longer resolves still writes nothing —
+    # the deletes must never start before the validation that can abort the
+    # whole generation. Mirrors
+    # `test_populated_db_with_reset_but_periods_missing_writes_nothing` in
+    # `test_synthetic_generation.py`.
+    _seed_academic_periods(db_session)
+    _seed_coordination_user(db_session)
+    run_generation(db_session, _REDUCED_CONFIG, reset=False)
+
+    student_count_before = db_session.query(StudentModel).count()
+    observation_count_before = db_session.query(PedagogicalObservationModel).count()
+
+    # Simulate the lookup no longer resolving, without touching the already
+    #-seeded user row (it is a real FK target of the first run's
+    # observations, so deleting it would just hit a different constraint).
+    monkeypatch.setattr(
+        "app.synthetic.generate.get_settings",
+        lambda: SimpleNamespace(dev_seed_email="outro-email@sinaliza.dev"),
+    )
+
+    with pytest.raises(MissingAuthorUserError):
+        run_generation(db_session, _REDUCED_CONFIG, reset=True)
+
+    # Nothing was wiped or regenerated: the pre-existing rows from the first
+    # successful run are untouched.
+    assert db_session.query(StudentModel).count() == student_count_before
+    assert db_session.query(PedagogicalObservationModel).count() == observation_count_before
+
+
 def test_reset_rerun_regenerates_observations_identically(db_session: Session) -> None:
     _seed_academic_periods(db_session)
     _seed_coordination_user(db_session)
@@ -465,5 +501,5 @@ def test_fingerprint_changes_when_observation_text_changes(db_session: Session) 
     assert fingerprint_1 != fingerprint_2
 
 
-def test_generator_version_bumped_for_story_2_5(db_session: Session) -> None:
+def test_generator_version_bumped_for_story_2_5() -> None:
     assert GENERATOR_VERSION == "2.5.0"

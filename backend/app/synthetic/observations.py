@@ -2,10 +2,12 @@
 2.5).
 
 Pure module: zero I/O, zero SQLAlchemy imports (AD-2's spirit, `profiles.py`/
-`facts.py`'s precedent). Every observation's id, selected template and
-timestamp is derived only from `(seed, student_id, period)` via
-`app.synthetic.rng` — never ambient randomness or wall-clock time — so the
-same seed reproduces a byte-identical base (RNF-13).
+`facts.py`'s precedent). Every observation's id and selected template are
+derived from `(seed, student_id, period)` via `app.synthetic.rng` — never
+ambient randomness or wall-clock time — so the same seed reproduces a
+byte-identical base (RNF-13). `created_at` is derived from the period alone
+(`period.end_date` at noon UTC): every observation in the same period shares
+one timestamp, regardless of seed or student.
 
 Every template below is a plain literal string, never an f-string that
 embeds a fabricated statistic: no invented absence counts, no percentages,
