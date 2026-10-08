@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from app.domain.student import DatasetSplit, SyntheticProfile
+from app.synthetic.calibration import TRAIN_EVAL_SPLIT_RATIO
 from app.synthetic.names import compose_classroom_name, compose_name
 from app.synthetic.profiles import assign_profile
 from app.synthetic.rng import derived_key, stable_uuid
@@ -27,7 +28,11 @@ class GenerationConfig:
     seed: int
     student_count: int = 200
     students_per_classroom: int = 25
-    train_ratio: float | Decimal = 0.7
+    #: Named, documented constant (Story 2.3) — see
+    #: `calibration.TRAIN_EVAL_SPLIT_RATIO` for provenance/rationale. Never
+    #: redeclare the bare number here; change the calibration constant
+    #: instead if the default proportion ever needs to move.
+    train_ratio: float | Decimal = TRAIN_EVAL_SPLIT_RATIO.value
     academic_year: int = 2026
 
     def __post_init__(self) -> None:

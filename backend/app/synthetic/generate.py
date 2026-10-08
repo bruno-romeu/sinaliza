@@ -30,6 +30,7 @@ from app.infrastructure.db.models import (
     SyntheticGenerationRunModel,
 )
 from app.synthetic import facts
+from app.synthetic.calibration import TRAIN_EVAL_SPLIT_RATIO
 from app.synthetic.facts import PeriodWindow
 from app.synthetic.fingerprint import population_fingerprint
 from app.synthetic.population import GenerationConfig, build_population
@@ -37,7 +38,7 @@ from app.synthetic.population import GenerationConfig, build_population
 #: Hand-maintained — bumped by any story that changes what the generator
 #: emits, so an old `synthetic_generation_runs` row stays interpretable after
 #: the generator evolves (RNF-13, Assumption 4).
-GENERATOR_VERSION = "2.2.0"
+GENERATOR_VERSION = "2.3.0"
 
 
 class DatabasePopulatedError(RuntimeError):
@@ -276,7 +277,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--students-per-classroom", type=_positive_int, default=25, dest="students_per_classroom"
     )
     parser.add_argument(
-        "--train-ratio", type=_open_unit_interval, default=0.7, dest="train_ratio"
+        "--train-ratio",
+        type=_open_unit_interval,
+        default=TRAIN_EVAL_SPLIT_RATIO.value,
+        dest="train_ratio",
     )
     parser.add_argument(
         "--academic-year", type=_positive_int, default=2026, dest="academic_year"
