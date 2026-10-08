@@ -22,6 +22,12 @@ e chegou a **três veredictos distintos**, que este módulo mantém distintos:
    não-entrega de atividades. Nenhuma base pública brasileira mede nem uma
    nem outra. `ParameterKind.DESIGN_ASSUMPTION` com `Confidence.NONE`.
 
+`TRAIN_EVAL_SPLIT_RATIO` (Story 2.3) não é um quarto veredicto da mesma
+pesquisa — não vem de `research.md` e nenhuma base pública, de nenhum país,
+mediria uma proporção de split de treino/avaliação de ML: isso é decisão de
+metodologia, não fenômeno pedagógico a calibrar. Fica neste módulo pela
+mesma disciplina de proveniência, não porque a pesquisa o origina.
+
 Regra de leitura: `kind` diz *o que o número é*; `confidence` diz *quanto
 confiar na fonte*. Um número pode ter confiança média e ainda assim ser uma
 suposição de design (é o caso de `GRADE_DISTRIBUTION`).
@@ -534,7 +540,55 @@ SYNTHETIC_PROFILE_PROPORTIONS = CalibrationParameter(
 )
 
 # ---------------------------------------------------------------------------
-# 6. Invariantes do próprio sistema — não são calibração
+# 6. Proporção do split TRAIN/EVAL_DEMO — SUPOSIÇÃO DE DESIGN PURA (Story 2.3)
+#
+# Nenhuma base pública mede "proporção ideal de treino/avaliação para um
+# dataset escolar sintético" — não é um fenômeno pedagógico a calibrar, é uma
+# decisão de metodologia de machine learning. Fica registrada aqui, com a
+# mesma disciplina de proveniência dos demais parâmetros, em vez de viver
+# como um número mágico embutido em `GenerationConfig`/no `argparse` do CLI
+# (epic-2-context.md AD-4; `docs/epics.md` Story 2.3, AC "proporção...
+# documentada explicitamente... como constante nomeada").
+# ---------------------------------------------------------------------------
+
+TRAIN_EVAL_SPLIT_RATIO = CalibrationParameter(
+    name="TRAIN_EVAL_SPLIT_RATIO",
+    value=0.7,
+    unit="proportion",
+    definition=(
+        "Fração da base sintética atribuída ao recorte TRAIN; o restante "
+        "(1 - este valor) vai para EVAL_DEMO (AD-4). TRAIN alimenta somente "
+        "o treino offline do modelo do Epic 5 e nunca é servido pela "
+        "aplicação web; EVAL_DEMO recebe trajetória completa ao longo de "
+        "todo o ano letivo sintético e é o único recorte lido em tempo de "
+        "execução (home/trajetória/lançamento), via o filtro "
+        "`dataset_split = EVAL_DEMO` de `repositories/base.py` (AD-11)."
+    ),
+    source=(
+        "Não é um fenômeno pedagógico com fonte pública em potencial: nenhuma "
+        "base educacional, brasileira ou estrangeira, mede proporção de split "
+        "treino/avaliação de um pipeline de ML — isso é decisão de "
+        "metodologia, não dado observável. Valor é escolha de design."
+    ),
+    source_refs=(),
+    confidence=Confidence.NONE,
+    kind=ParameterKind.DESIGN_ASSUMPTION,
+    used_by_generator=True,
+    rationale=(
+        "Decisão de modelagem de ML, não dado calibrado. 0.7/0.3 é a "
+        "convenção usual de split de dataset (maioria dos dados para "
+        "treino, uma fatia substancial reservada para avaliação), aplicada "
+        "a uma base de ~200 estudantes: ~140 em TRAIN dão ao Epic 5 volume "
+        "suficiente para treinar um classificador, e ~60 em EVAL_DEMO "
+        "bastam tanto para uma avaliação estatisticamente informativa "
+        "quanto para popular a demonstração ao vivo do produto sem esvaziar "
+        "o treino. `population.py`/`generate.py` consomem este valor como "
+        "seu default — nunca redeclaram o número 0.7 por conta própria."
+    ),
+)
+
+# ---------------------------------------------------------------------------
+# 7. Invariantes do próprio sistema — não são calibração
 # ---------------------------------------------------------------------------
 
 GRADE_SCALE_MIN = CalibrationParameter(

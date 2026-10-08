@@ -33,6 +33,7 @@ from app.infrastructure.db.models import (
     UserModel,
 )
 from app.synthetic import facts, observations
+from app.synthetic.calibration import TRAIN_EVAL_SPLIT_RATIO
 from app.synthetic.facts import PeriodWindow
 from app.synthetic.fingerprint import population_fingerprint
 from app.synthetic.population import GenerationConfig, build_population
@@ -337,7 +338,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--students-per-classroom", type=_positive_int, default=25, dest="students_per_classroom"
     )
     parser.add_argument(
-        "--train-ratio", type=_open_unit_interval, default=0.7, dest="train_ratio"
+        "--train-ratio",
+        type=_open_unit_interval,
+        default=TRAIN_EVAL_SPLIT_RATIO.value,
+        dest="train_ratio",
     )
     parser.add_argument(
         "--academic-year", type=_positive_int, default=2026, dest="academic_year"
