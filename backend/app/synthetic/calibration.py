@@ -22,6 +22,12 @@ e chegou a **três veredictos distintos**, que este módulo mantém distintos:
    não-entrega de atividades. Nenhuma base pública brasileira mede nem uma
    nem outra. `ParameterKind.DESIGN_ASSUMPTION` com `Confidence.NONE`.
 
+`TRAIN_EVAL_SPLIT_RATIO` (Story 2.3) não é um quarto veredicto da mesma
+pesquisa — não vem de `research.md` e nenhuma base pública, de nenhum país,
+mediria uma proporção de split de treino/avaliação de ML: isso é decisão de
+metodologia, não fenômeno pedagógico a calibrar. Fica neste módulo pela
+mesma disciplina de proveniência, não porque a pesquisa o origina.
+
 Regra de leitura: `kind` diz *o que o número é*; `confidence` diz *quanto
 confiar na fonte*. Um número pode ter confiança média e ainda assim ser uma
 suposição de design (é o caso de `GRADE_DISTRIBUTION`).
@@ -558,7 +564,12 @@ TRAIN_EVAL_SPLIT_RATIO = CalibrationParameter(
         "execução (home/trajetória/lançamento), via o filtro "
         "`dataset_split = EVAL_DEMO` de `repositories/base.py` (AD-11)."
     ),
-    source=NO_PUBLIC_SOURCE,
+    source=(
+        "Não é um fenômeno pedagógico com fonte pública em potencial: nenhuma "
+        "base educacional, brasileira ou estrangeira, mede proporção de split "
+        "treino/avaliação de um pipeline de ML — isso é decisão de "
+        "metodologia, não dado observável. Valor é escolha de design."
+    ),
     source_refs=(),
     confidence=Confidence.NONE,
     kind=ParameterKind.DESIGN_ASSUMPTION,
