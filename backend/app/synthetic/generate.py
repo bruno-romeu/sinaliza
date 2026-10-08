@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import argparse
 import sys
+import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.infrastructure.db.base import SessionLocal
 from app.infrastructure.db.models import (
     AcademicPeriodModel,
@@ -28,8 +30,9 @@ from app.infrastructure.db.models import (
     PedagogicalObservationModel,
     StudentModel,
     SyntheticGenerationRunModel,
+    UserModel,
 )
-from app.synthetic import facts
+from app.synthetic import facts, observations
 from app.synthetic.calibration import TRAIN_EVAL_SPLIT_RATIO
 from app.synthetic.facts import PeriodWindow
 from app.synthetic.fingerprint import population_fingerprint
@@ -38,7 +41,7 @@ from app.synthetic.population import GenerationConfig, build_population
 #: Hand-maintained — bumped by any story that changes what the generator
 #: emits, so an old `synthetic_generation_runs` row stays interpretable after
 #: the generator evolves (RNF-13, Assumption 4).
-GENERATOR_VERSION = "2.3.0"
+GENERATOR_VERSION = "2.5.0"
 
 
 class DatabasePopulatedError(RuntimeError):
@@ -53,6 +56,15 @@ class MissingAcademicPeriodsError(RuntimeError):
     `seed_dev_fixtures.py`) — it fails clearly instead of silently writing
     an incomplete or inconsistent base (spec Boundaries & Constraints, I/O
     Matrix "No periods seeded" row)."""
+
+
+class MissingAuthorUserError(RuntimeError):
+    """Raised when no `UserModel` row has `email == get_settings().dev_seed_email`.
+
+    Synthetic `PedagogicalObservationModel` rows need a real `author_user_id`
+    FK; the generator never invents a user, so it fails before writing
+    anything instead of silently producing an unattributable observation
+    (spec I/O Matrix "No UserModel row with email == dev_seed_email" row)."""
 
 
 def is_populated(session: Session) -> bool:
@@ -92,6 +104,32 @@ def reset_generated_data(session: Session) -> None:
     session.query(ClassroomModel).delete()
 
 
+def _resolve_author_user_id(session: Session) -> uuid.UUID:
+    """Resolves the single `COORDENACAO_PEDAGOGICA` user seeded by
+    `seed_dev_user.py` to attribute every generated `PedagogicalObservation`
+    to. Looked up by `get_settings().dev_seed_email`, normalized the same
+    way `seed_dev_user.py` normalizes it before storing (`.strip().lower()`)
+    so the lookup matches regardless of how the setting's raw value was
+    cased/spaced. The only place in this module that imports settings or
+    queries `UserModel` (spec Code Map)."""
+    settings = get_settings()
+    if not settings.dev_seed_email:
+        raise MissingAuthorUserError(
+            "DEV_SEED_EMAIL is not configured — cannot resolve the coordination "
+            "user to attribute synthetic observations to. Set DEV_SEED_EMAIL and "
+            "run `python -m app.infrastructure.db.seed_dev_user` first."
+        )
+
+    email = settings.dev_seed_email.strip().lower()
+    user = session.query(UserModel).filter(UserModel.email == email).one_or_none()
+    if user is None:
+        raise MissingAuthorUserError(
+            f"No users row found with email={email!r}. Run "
+            "`python -m app.infrastructure.db.seed_dev_user` first."
+        )
+    return user.id
+
+
 def run_generation(
     session: Session, config: GenerationConfig, reset: bool
 ) -> tuple[str, SyntheticGenerationRunModel]:
@@ -129,6 +167,14 @@ def run_generation(
             "order_index — the generator uses it to attribute grades/assignments to "
             "the correct period."
         )
+
+    # Resolved before `is_populated`/`reset_generated_data` below, for the
+    # same reason the periods check above runs first: a populated database +
+    # `--reset` + no coordination user must still write nothing, not leave
+    # the session holding uncommitted deletes from a reset that started
+    # before this validation ran (spec I/O Matrix "No UserModel row with
+    # email == dev_seed_email" row).
+    author_user_id = _resolve_author_user_id(session)
 
     if is_populated(session):
         if not reset:
@@ -231,6 +277,21 @@ def run_generation(
         )
     session.flush()
 
+    generated_observations = observations.build_observations(
+        population, period_windows, author_user_id, config.seed
+    )
+    for observation in generated_observations:
+        session.add(
+            PedagogicalObservationModel(
+                id=observation.id,
+                student_id=observation.student_id,
+                author_user_id=observation.author_user_id,
+                text=observation.text,
+                created_at=observation.created_at,
+            )
+        )
+    session.flush()
+
     run = SyntheticGenerationRunModel(
         seed=config.seed,
         generator_version=GENERATOR_VERSION,
@@ -307,6 +368,9 @@ def main(argv: list[str] | None = None) -> None:
             print(str(exc), file=sys.stderr)
             sys.exit(1)
         except MissingAcademicPeriodsError as exc:
+            print(str(exc), file=sys.stderr)
+            sys.exit(1)
+        except MissingAuthorUserError as exc:
             print(str(exc), file=sys.stderr)
             sys.exit(1)
 

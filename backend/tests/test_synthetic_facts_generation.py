@@ -16,8 +16,10 @@ from datetime import date
 import pytest
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.domain.attendance import AttendanceStatus
 from app.domain.student import SyntheticProfile
+from app.domain.user import UserRole
 from app.infrastructure.db.models import (
     AcademicPeriodModel,
     AssignmentModel,
@@ -28,7 +30,9 @@ from app.infrastructure.db.models import (
     GradeModel,
     StudentModel,
     SyntheticGenerationRunModel,
+    UserModel,
 )
+from app.infrastructure.security.bcrypt_hasher import BcryptPasswordHasher
 from app.synthetic.facts import SUBJECTS, PeriodWindow, school_days
 from app.synthetic.generate import MissingAcademicPeriodsError, run_generation
 from app.synthetic.population import GenerationConfig
@@ -60,6 +64,28 @@ def _seed_periods(db_session: Session, periods: list[tuple[str, date, date, int]
     db_session.commit()
 
 
+def _seed_coordination_user(db_session: Session) -> None:
+    """A small local helper (not a `conftest.py` fixture — spec Code Map,
+    Spec Change Log), mirroring `_seed_periods`. `run_generation` now has a
+    new precondition (Story 2.5: a resolvable `author_user_id`), so every
+    test here that calls `run_generation` must also seed the coordination
+    user it resolves via `get_settings().dev_seed_email`."""
+    settings = get_settings()
+    assert settings.dev_seed_email, (
+        "DEV_SEED_EMAIL must be configured (via backend/.env) for this test suite to run"
+    )
+    email = settings.dev_seed_email.strip().lower()
+    db_session.add(
+        UserModel(
+            name=settings.dev_seed_name,
+            email=email,
+            password_hash=BcryptPasswordHasher().hash("Senha-Correta-123"),
+            role=UserRole.COORDENACAO_PEDAGOGICA,
+        )
+    )
+    db_session.commit()
+
+
 def _period_windows() -> tuple[PeriodWindow, ...]:
     return tuple(
         PeriodWindow(id_label=f"period-{order}", start_date=start, end_date=end, order_index=order)
@@ -78,6 +104,7 @@ def _total_school_days() -> int:
 
 def test_clean_db_periods_seeded_populates_every_fact_table(db_session: Session) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     fingerprint, run = run_generation(db_session, _CONFIG, reset=False)
 
     students = db_session.query(StudentModel).all()
@@ -147,6 +174,7 @@ def test_populated_db_with_reset_but_periods_missing_writes_nothing(db_session: 
     # writes nothing — the deletes must never start before the validation
     # that can abort the whole generation.
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     student_count_before = db_session.query(StudentModel).count()
@@ -186,6 +214,7 @@ def test_same_seed_twice_produces_byte_identical_fingerprint_covering_facts(
     db_session: Session,
 ) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     fingerprint_1, _ = run_generation(db_session, _CONFIG, reset=False)
     fingerprint_2, _ = run_generation(db_session, _CONFIG, reset=True)
 
@@ -202,6 +231,7 @@ def test_different_seed_produces_different_fingerprint_and_profile_mix(
     db_session: Session,
 ) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     fingerprint_42, _ = run_generation(db_session, _CONFIG, reset=False)
     profiles_42 = Counter(s.synthetic_profile for s in db_session.query(StudentModel).all())
 
@@ -220,6 +250,7 @@ def test_different_seed_produces_different_fingerprint_and_profile_mix(
 
 def test_attendance_records_never_violate_uniqueness(db_session: Session) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     rows = db_session.query(
@@ -236,6 +267,7 @@ def test_attendance_records_never_violate_uniqueness(db_session: Session) -> Non
 
 def test_grade_values_within_scale_in_live_postgres(db_session: Session) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     values = [row[0] for row in db_session.query(GradeModel.value).all()]
@@ -253,6 +285,7 @@ def test_falling_attendance_student_has_lower_presence_rate_later_in_the_year(
     db_session: Session,
 ) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     student = (
@@ -302,6 +335,7 @@ def test_falling_attendance_student_has_lower_presence_rate_later_in_the_year(
 
 def test_combined_deterioration_student_worsens_on_all_three_axes(db_session: Session) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     student = (
@@ -372,6 +406,7 @@ def test_combined_deterioration_student_worsens_on_all_three_axes(db_session: Se
 
 def test_stable_student_attendance_has_no_strong_trend(db_session: Session) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     student = (
