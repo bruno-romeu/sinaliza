@@ -40,10 +40,6 @@ from app.infrastructure.repositories.sqlalchemy_student_repository import (
     SqlAlchemyStudentRepository,
 )
 from app.synthetic import calibration
-from app.synthetic.calibration import (
-    ParameterKind,
-    Confidence,
-)
 from app.synthetic.facts import SUBJECTS, PeriodWindow, build_facts, school_days
 from app.synthetic.generate import _build_arg_parser, run_generation
 from app.synthetic.population import GenerationConfig, build_population
@@ -96,8 +92,8 @@ def test_train_eval_split_ratio_is_a_named_documented_calibration_parameter() ->
     # No Brazilian public base measures an ML train/eval split proportion —
     # this must be flagged as a design assumption, never dressed up as
     # calibrated data (AC 3 of the epic's calibration-honesty constraint).
-    assert parameter.kind is ParameterKind.DESIGN_ASSUMPTION
-    assert parameter.confidence is Confidence.NONE
+    assert parameter.kind is calibration.ParameterKind.DESIGN_ASSUMPTION
+    assert parameter.confidence is calibration.Confidence.NONE
     assert parameter.source.strip()
     assert parameter.definition.strip()
     assert parameter.rationale.strip()
