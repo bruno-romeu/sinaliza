@@ -52,14 +52,14 @@ O walkthrough independente é o passo que pegou os problemas reais na Epic 1: el
 
 Além da DoD normal do projeto:
 
-- [ ] **Determinismo por hash do conteúdo das tabelas**, não por contagem de linhas — duas execuções com a mesma seed produzem o mesmo hash.
-- [ ] **Teste inverso:** seeds diferentes produzem bases diferentes. Sem ele, um gerador constante passa no teste de determinismo.
-- [ ] Toda constante de calibração carrega fonte + confiança, ou marcação explícita de suposição de design.
-- [ ] Round-trip da migration (`upgrade` → `downgrade` → `upgrade`), como nas stories da Epic 1.
-- [ ] Teste de ausência de dado real varrendo os campos textuais gerados.
-- [ ] Geração respeita as constraints de banco da Epic 1 (`UNIQUE` de presença, `CHECK` de 0–10 em nota).
-- [ ] A suíte de testes roda o gerador em **volume reduzido**; o tempo da geração completa é medido e declarado, nunca exercido no CI.
-- [ ] `synthetic_profile` não aparece em `backend/openapi.json`.
+- [x] **Determinismo por hash do conteúdo das tabelas**, não por contagem de linhas — duas execuções com a mesma seed produzem o mesmo hash. Confirmado na retro da Epic 2 (`docs/epic-2-retro-2026-10-08.md`) rodando o gerador duas vezes contra o Postgres de dev real (não só a suíte de testes): fingerprint idêntico.
+- [x] **Teste inverso:** seeds diferentes produzem bases diferentes. `backend/tests/test_synthetic_generation.py::test_different_seed_produces_different_fingerprint`.
+- [x] Toda constante de calibração carrega fonte + confiança, ou marcação explícita de suposição de design. `backend/app/synthetic/calibration.py`, 17 constantes.
+- [x] Round-trip da migration (`upgrade` → `downgrade` → `upgrade`), como nas stories da Epic 1. `backend/tests/test_migrations.py`. Ver ressalva na retro: isso prova o round-trip numa migration *nunca aplicada antes*, não detecta um enum já desatualizado numa base pré-existente (achado F1 da retro).
+- [x] Teste de ausência de dado real varrendo os campos textuais gerados.
+- [x] Geração respeita as constraints de banco da Epic 1 (`UNIQUE` de presença, `CHECK` de 0–10 em nota). Confirmado por behavior check na retro: 200 estudantes gerados sem violação de constraint.
+- [x] A suíte de testes roda o gerador em **volume reduzido**; o tempo da geração completa é medido e declarado, nunca exercido no CI. **Medido na retro da Epic 2 (2026-10-08): ~13.3s para 200 estudantes** (classrooms + students + enrollments + 4 tipos de fato + observações), contra o Postgres de dev local nesta máquina — ordem de grandeza, não uma garantia de SLA.
+- [x] `synthetic_profile` não aparece em `backend/openapi.json`. Teste adicionado na Story 2.1 (PR #6).
 
 ## Infra
 
