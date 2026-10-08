@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 10-08-2026 00:30
+last_updated: 10-07-2026 21:46
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -49,7 +49,7 @@ development_status:
   2-3-split-de-dataset-em-recorte-de-treino-e-recorte-de-avaliação: done
   2-4-calibração-de-parâmetros-por-referência-a-base-pública-de-da: done
   2-5-registros-pedagógicos-sintéticos-coerentes-com-o-perfil-do-e: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   epic-3: backlog
   3-1-cálculo-de-indicadores-de-trajetória-em-janela-rolante: backlog
@@ -155,3 +155,31 @@ action_items:
     owner: "dev"
     status: open
     ref: "docs/epic-1-retro-2026-09-26.md"
+  - id: "epic-2-retro-item-1-migration-enum-self-heal"
+    epic: 2
+    action: "[fix-now] Write a corrective Alembic migration that idempotently adds
+      any missing synthetic_profile enum labels (ALTER TYPE synthetic_profile ADD
+      VALUE IF NOT EXISTS FALLING_GRADES) so a database that ran the original 3-member
+      version of migration 0006 (before Story 2.2 amended it in place) self-heals
+      on its next alembic upgrade head."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-2-retro-2026-10-08.md"
+  - id: "epic-2-retro-item-2-never-amend-applied-migration"
+    epic: 2
+    action: "[defer] Process lesson: never amend an already-applied Alembic migration
+      in place, even for a same-epic fix — add a new migration instead. Unreleased
+      must be judged per-environment (any dev DB that already ran it counts), not
+      per elapsed time within the epic. Record as a durable convention (AGENTS.md
+      or equivalent)."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-2-retro-2026-10-08.md"
+  - id: "epic-2-retro-item-3-generator-version-drift"
+    epic: 2
+    action: "[defer] GENERATOR_VERSION does not track every story that changed generator
+      output (Story 2.4 never bumped it). Low severity, no generated content is wrong.
+      Fix opportunistically next time generate.py changes."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-2-retro-2026-10-08.md"
