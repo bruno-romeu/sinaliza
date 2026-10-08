@@ -10,7 +10,13 @@ extends it to cover `students.synthetic_profile` (now non-NULL) and the four
 fact tables it populates — `grades`/`assignments` hash each row's period by
 `AcademicPeriod.order_index`, never `period_id` (a random `uuid.uuid4()`
 assigned by `seed_dev_fixtures.py`, not derived from the generator's seed;
-Design Notes).
+Design Notes). Story 2.5 extends it to cover `pedagogical_observations`,
+hashing `id|student_id|text|created_at` and deliberately excluding
+`author_user_id` — the same precedent as excluding `period_id`: a real
+DB-assigned id from a different seeding event (`seed_dev_user.py`), not
+derived from the generator's own seed, so including it would break
+cross-machine determinism of the hash even though the FK itself is correct
+in the DB (spec Boundaries & Constraints, Design Notes).
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from app.infrastructure.db.models import (
     ClassroomModel,
     EnrollmentModel,
     GradeModel,
+    PedagogicalObservationModel,
     StudentModel,
 )
 
@@ -34,10 +41,12 @@ from app.infrastructure.db.models import (
 def population_fingerprint(session: Session) -> str:
     """SHA-256 hex digest over `classrooms`, `students` (incl.
     `synthetic_profile`), `enrollments`, `attendance_records`, `grades`,
-    `assignments` and `assignment_submissions`, each read back in a stable
-    `ORDER BY id` and a declared column list. Deliberately excludes
-    `synthetic_generation_runs.executed_at` (wall-clock, never
-    reproducible)."""
+    `assignments`, `assignment_submissions` and `pedagogical_observations`,
+    each read back in a stable `ORDER BY id` and a declared column list.
+    Deliberately excludes `synthetic_generation_runs.executed_at`
+    (wall-clock, never reproducible) and
+    `pedagogical_observations.author_user_id` (a real FK from a different
+    seeding event, not derived from the generator's own seed)."""
     hasher = hashlib.sha256()
 
     for classroom in session.query(ClassroomModel).order_by(ClassroomModel.id).all():
@@ -96,6 +105,16 @@ def population_fingerprint(session: Session) -> str:
             f"assignment_submission|{submission.id}|{submission.assignment_id}|"
             f"{submission.student_id}|{submission.status.value}|"
             f"{submission.date}\n".encode("utf-8")
+        )
+
+    for observation in (
+        session.query(PedagogicalObservationModel)
+        .order_by(PedagogicalObservationModel.id)
+        .all()
+    ):
+        hasher.update(
+            f"pedagogical_observation|{observation.id}|{observation.student_id}|"
+            f"{observation.text}|{observation.created_at}\n".encode("utf-8")
         )
 
     return hasher.hexdigest()
