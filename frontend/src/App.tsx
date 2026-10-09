@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
+import { EstudanteTrajetoria } from './pages/EstudanteTrajetoria'
 import { Home } from './pages/Home'
 import { Atividades } from './pages/Lancamento/Atividades'
 import { Notas } from './pages/Lancamento/Notas'
@@ -51,6 +52,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <Observacoes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estudantes/:studentId"
+            element={
+              <ProtectedRoute>
+                <EstudanteTrajetoria />
               </ProtectedRoute>
             }
           />

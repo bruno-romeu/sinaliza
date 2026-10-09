@@ -19,6 +19,8 @@ from app.application.attendance.list_enrolled_students import ListEnrolledStuden
 from app.application.attendance.register_attendance import RegisterAttendanceService
 from app.application.auth.authenticate_user import AuthenticateUserService
 from app.application.grades.register_grade import RegisterGradeService
+from app.application.home.get_home import GetHomeService
+from app.application.home.search_students import SearchStudentsService
 from app.application.observations.register_observation import RegisterObservationService
 from app.application.trajectory.get_student_trajectory import GetStudentTrajectoryService
 from app.config import Settings, get_settings
@@ -148,3 +150,14 @@ def get_get_student_trajectory_service(
         pedagogical_observation_repository=SqlAlchemyPedagogicalObservationRepository(db),
         trajectory_change_repository=SqlAlchemyTrajectoryChangeRepository(db),
     )
+
+
+def get_get_home_service(db: Session = Depends(get_db)) -> GetHomeService:
+    return GetHomeService(
+        trajectory_change_repository=SqlAlchemyTrajectoryChangeRepository(db),
+        student_repository=SqlAlchemyStudentRepository(db),
+    )
+
+
+def get_search_students_service(db: Session = Depends(get_db)) -> SearchStudentsService:
+    return SearchStudentsService(student_repository=SqlAlchemyStudentRepository(db))

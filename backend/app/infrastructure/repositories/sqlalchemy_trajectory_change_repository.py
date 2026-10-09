@@ -22,7 +22,7 @@ adds the guard once `follow_up_evidence` exists)."""
 
 from __future__ import annotations
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -79,3 +79,25 @@ class SqlAlchemyTrajectoryChangeRepository:
             detected_at=change.detected_at,
             description=change.description,
         )
+
+    def list_recent(self, limit: int) -> list[TrajectoryChange]:
+        """Home's only read of `TrajectoryChange` (spec-3-3 Boundaries &
+        Constraints): the `limit` most recent rows by `detected_at` desc,
+        never a second page, never filtered/sorted any other way."""
+        stmt = (
+            select(TrajectoryChangeModel)
+            .order_by(TrajectoryChangeModel.detected_at.desc(), TrajectoryChangeModel.id.desc())
+            .limit(limit)
+        )
+        models = self._session.execute(stmt).scalars().all()
+        return [
+            TrajectoryChange(
+                id=model.id,
+                student_id=model.student_id,
+                type=model.type,
+                period_id=model.period_id,
+                detected_at=model.detected_at,
+                description=model.description,
+            )
+            for model in models
+        ]
