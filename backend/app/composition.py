@@ -20,6 +20,7 @@ from app.application.attendance.register_attendance import RegisterAttendanceSer
 from app.application.auth.authenticate_user import AuthenticateUserService
 from app.application.grades.register_grade import RegisterGradeService
 from app.application.observations.register_observation import RegisterObservationService
+from app.application.trajectory.get_student_trajectory import GetStudentTrajectoryService
 from app.config import Settings, get_settings
 from app.infrastructure.db.base import get_db
 from app.infrastructure.repositories.sqlalchemy_academic_period_repository import (
@@ -128,4 +129,17 @@ def get_register_observation_service(db: Session = Depends(get_db)) -> RegisterO
         classroom_repository=SqlAlchemyClassroomRepository(db),
         student_repository=SqlAlchemyStudentRepository(db),
         observation_repository=SqlAlchemyPedagogicalObservationRepository(db),
+    )
+
+
+def get_get_student_trajectory_service(
+    db: Session = Depends(get_db),
+) -> GetStudentTrajectoryService:
+    return GetStudentTrajectoryService(
+        student_repository=SqlAlchemyStudentRepository(db),
+        attendance_repository=SqlAlchemyAttendanceRepository(db),
+        grade_repository=SqlAlchemyGradeRepository(db),
+        assignment_repository=SqlAlchemyAssignmentRepository(db),
+        assignment_submission_repository=SqlAlchemyAssignmentSubmissionRepository(db),
+        academic_period_repository=SqlAlchemyAcademicPeriodRepository(db),
     )
