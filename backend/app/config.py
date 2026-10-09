@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     dev_seed_email: str | None = None
     dev_seed_password: str | None = None
 
+    # Default rolling-window size (days) for `GET /students/{id}/trajectory`
+    # (spec Code Map) — overridable per-request via `?window_days=`.
+    # `gt=0` so a misconfigured 0/negative value fails fast rather than
+    # silently producing an empty or inverted window. `le=3650` (10 years)
+    # caps it so `date - timedelta(days=2*window_days)` can never overflow
+    # `datetime.date`'s range and raise an unhandled `OverflowError`.
+    trajectory_window_days: int = Field(default=30, gt=0, le=3650)
+
 
 @lru_cache
 def get_settings() -> Settings:
