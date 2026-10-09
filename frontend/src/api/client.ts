@@ -35,6 +35,12 @@ export type PedagogicalObservationCreateRequest =
 export type PedagogicalObservation =
   paths['/pedagogical-observations']['post']['responses'][201]['content']['application/json']
 
+export type Home = paths['/home']['get']['responses'][200]['content']['application/json']
+export type RecentChange = Home['recent_changes'][number]
+export type StudentSearchResults =
+  paths['/home/search']['get']['responses'][200]['content']['application/json']
+export type StudentSearchResult = StudentSearchResults['results'][number]
+
 interface ErrorEnvelope {
   error: {
     code: string
@@ -225,6 +231,24 @@ export async function registerAssignmentSubmission(
     body: payload,
     token,
     fallbackMessage: 'Não foi possível salvar o registro agora.',
+  })
+}
+
+export async function getHome(token: string): Promise<Home> {
+  return request<Home>({
+    method: 'GET',
+    path: '/home',
+    token,
+    fallbackMessage: 'Não foi possível carregar os dados agora.',
+  })
+}
+
+export async function searchStudents(token: string, query: string): Promise<StudentSearchResults> {
+  return request<StudentSearchResults>({
+    method: 'GET',
+    path: `/home/search?q=${encodeURIComponent(query)}`,
+    token,
+    fallbackMessage: 'Não foi possível buscar estudantes agora.',
   })
 }
 

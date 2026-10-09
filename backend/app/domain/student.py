@@ -48,3 +48,14 @@ class Student:
     id: uuid.UUID
     name: str
     dataset_split: DatasetSplit
+
+
+@dataclass(frozen=True)
+class StudentSearchResult:
+    """One row of a Home search result (spec-3-3): a student plus the
+    classroom name the search matched against/displays alongside — distinct
+    from `Student` itself, which carries no classroom relationship."""
+
+    id: uuid.UUID
+    name: str
+    classroom_name: str
