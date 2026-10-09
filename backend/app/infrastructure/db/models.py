@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.domain.assignment_submission import AssignmentSubmissionStatus
 from app.domain.attendance import AttendanceStatus
 from app.domain.student import DatasetSplit, SyntheticProfile
+from app.domain.trajectory_change import SourceType, TrajectoryChangeType
 from app.domain.user import UserRole
 from app.infrastructure.db.base import Base
 
@@ -32,6 +33,12 @@ assignment_submission_status_enum = SAEnum(
 )
 synthetic_profile_enum = SAEnum(
     SyntheticProfile, name="synthetic_profile", native_enum=True, validate_strings=True
+)
+trajectory_change_type_enum = SAEnum(
+    TrajectoryChangeType, name="trajectory_change_type", native_enum=True, validate_strings=True
+)
+trajectory_change_source_type_enum = SAEnum(
+    SourceType, name="trajectory_change_source_type", native_enum=True, validate_strings=True
 )
 
 
@@ -203,6 +210,53 @@ class PedagogicalObservationModel(Base):
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class TrajectoryChangeModel(Base):
+    """`UniqueConstraint("student_id", "type", "period_id")` is the upsert key
+    (AD-1, spec Boundaries & Constraints) — writes always go through `INSERT
+    ... ON CONFLICT ... DO UPDATE` against this index
+    (`sqlalchemy_trajectory_change_repository.py`), never a `SELECT`-then-
+    write. No `ondelete` on either FK — same unaddressed, already-accepted
+    codebase-wide pattern as every other fact table here (see
+    `deferred-work.md`)."""
+
+    __tablename__ = "trajectory_changes"
+    __table_args__ = (
+        UniqueConstraint(
+            "student_id", "type", "period_id", name="uq_trajectory_change_student_type_period"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+    )
+    type: Mapped[TrajectoryChangeType] = mapped_column(trajectory_change_type_enum, nullable=False)
+    period_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("academic_periods.id"), nullable=False, index=True
+    )
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class TrajectoryChangeSourceModel(Base):
+    """`source_id` is necessarily polymorphic (points at `AttendanceRecord`,
+    `Grade`, `AssignmentSubmission`, or `PedagogicalObservation` depending on
+    `source_type`) so it carries no FK of its own — only `trajectory_change_id`
+    is a real FK (data-model.md). No UNIQUE constraint — a single
+    `TrajectoryChange` legitimately cites several source rows."""
+
+    __tablename__ = "trajectory_change_sources"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trajectory_change_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("trajectory_changes.id"), nullable=False, index=True
+    )
+    source_type: Mapped[SourceType] = mapped_column(
+        trajectory_change_source_type_enum, nullable=False
+    )
+    source_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
 
 
 class SyntheticGenerationRunModel(Base):

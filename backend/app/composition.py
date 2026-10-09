@@ -43,6 +43,9 @@ from app.infrastructure.repositories.sqlalchemy_pedagogical_observation_reposito
     SqlAlchemyPedagogicalObservationRepository,
 )
 from app.infrastructure.repositories.sqlalchemy_student_repository import SqlAlchemyStudentRepository
+from app.infrastructure.repositories.sqlalchemy_trajectory_change_repository import (
+    SqlAlchemyTrajectoryChangeRepository,
+)
 from app.infrastructure.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.infrastructure.security.bcrypt_hasher import BcryptPasswordHasher
 from app.infrastructure.security.jwt_issuer import JwtTokenIssuer
@@ -142,4 +145,6 @@ def get_get_student_trajectory_service(
         assignment_repository=SqlAlchemyAssignmentRepository(db),
         assignment_submission_repository=SqlAlchemyAssignmentSubmissionRepository(db),
         academic_period_repository=SqlAlchemyAcademicPeriodRepository(db),
+        pedagogical_observation_repository=SqlAlchemyPedagogicalObservationRepository(db),
+        trajectory_change_repository=SqlAlchemyTrajectoryChangeRepository(db),
     )
