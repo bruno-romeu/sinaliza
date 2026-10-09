@@ -22,6 +22,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from app.domain.student import SyntheticProfile
+from app.domain.trajectory_change import SourceType, TrajectoryChangeType
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -52,6 +53,8 @@ def migration_engine(engine: Engine) -> Engine:
     # native enum types.
     with engine.connect() as connection:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        connection.execute(text("DROP TABLE IF EXISTS trajectory_change_sources"))
+        connection.execute(text("DROP TABLE IF EXISTS trajectory_changes"))
         connection.execute(text("DROP TABLE IF EXISTS synthetic_generation_runs"))
         connection.execute(text("DROP TABLE IF EXISTS assignment_submissions"))
         connection.execute(text("DROP TABLE IF EXISTS assignments"))
@@ -63,6 +66,8 @@ def migration_engine(engine: Engine) -> Engine:
         connection.execute(text("DROP TABLE IF EXISTS students"))
         connection.execute(text("DROP TABLE IF EXISTS classrooms"))
         connection.execute(text("DROP TABLE IF EXISTS users"))
+        connection.execute(text("DROP TYPE IF EXISTS trajectory_change_source_type"))
+        connection.execute(text("DROP TYPE IF EXISTS trajectory_change_type"))
         connection.execute(text("DROP TYPE IF EXISTS synthetic_profile"))
         connection.execute(text("DROP TYPE IF EXISTS assignment_submission_status"))
         connection.execute(text("DROP TYPE IF EXISTS attendance_status"))
@@ -107,6 +112,12 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         synthetic_generation_runs_exists = connection.execute(
             text("SELECT to_regclass('public.synthetic_generation_runs') IS NOT NULL")
         ).scalar_one()
+        trajectory_changes_exists = connection.execute(
+            text("SELECT to_regclass('public.trajectory_changes') IS NOT NULL")
+        ).scalar_one()
+        trajectory_change_sources_exists = connection.execute(
+            text("SELECT to_regclass('public.trajectory_change_sources') IS NOT NULL")
+        ).scalar_one()
         synthetic_profile_type_exists = connection.execute(
             text("SELECT to_regtype('synthetic_profile') IS NOT NULL")
         ).scalar_one()
@@ -124,6 +135,8 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
     assert assignment_submissions_exists is True
     assert pedagogical_observations_exists is True
     assert synthetic_generation_runs_exists is True
+    assert trajectory_changes_exists is True
+    assert trajectory_change_sources_exists is True
     assert synthetic_profile_type_exists is True
     assert synthetic_profile_column_exists is True
 
@@ -143,6 +156,36 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
             ).scalars()
         )
     assert synthetic_profile_labels == {member.value for member in SyntheticProfile}
+
+    # Same label-drift regression as above, for the two native enums Story
+    # 3.2 added: the migration hardcodes `trajectory_change_type`'s and
+    # `trajectory_change_source_type`'s member labels independently of
+    # `TrajectoryChangeType`/`SourceType`, so a domain enum member added
+    # without updating the migration's literal list would otherwise go
+    # uncaught.
+    with migration_engine.connect() as connection:
+        trajectory_change_type_labels = set(
+            connection.execute(
+                text(
+                    "SELECT e.enumlabel FROM pg_enum e "
+                    "JOIN pg_type t ON e.enumtypid = t.oid "
+                    "WHERE t.typname = 'trajectory_change_type'"
+                )
+            ).scalars()
+        )
+        trajectory_change_source_type_labels = set(
+            connection.execute(
+                text(
+                    "SELECT e.enumlabel FROM pg_enum e "
+                    "JOIN pg_type t ON e.enumtypid = t.oid "
+                    "WHERE t.typname = 'trajectory_change_source_type'"
+                )
+            ).scalars()
+        )
+    assert trajectory_change_type_labels == {
+        member.value for member in TrajectoryChangeType
+    }
+    assert trajectory_change_source_type_labels == {member.value for member in SourceType}
 
     # `test_grades.py`'s DB-bypass test only proves `ck_grade_value_range`
     # exists on the schema built by `Base.metadata.create_all()` (conftest's

@@ -21,7 +21,7 @@ from app.composition import get_get_student_trajectory_service
 from app.config import Settings, get_settings
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.errors import AppError
-from app.presentation.schemas.trajectory import TrajectoryOut
+from app.presentation.schemas.trajectory import ConcerningFactorOut, TrajectoryChangeOut, TrajectoryOut
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -38,13 +38,33 @@ def get_student_trajectory(
     )
 
     try:
-        indicators = service.execute(student_id, effective_window_days)
+        result = service.execute(student_id, effective_window_days)
     except StudentNotFoundError as exc:
         raise AppError(
             status_code=404,
             code="student_not_found",
             message="Estudante não encontrado.",
         ) from exc
+
+    indicators = result.indicators
+    trajectory_change_out = (
+        TrajectoryChangeOut(
+            type=result.trajectory_change.type.value,
+            period_id=result.trajectory_change.period_id,
+            detected_at=result.trajectory_change.detected_at,
+            description=result.trajectory_change.description,
+        )
+        if result.trajectory_change is not None
+        else None
+    )
+    concerning_factor_out = (
+        ConcerningFactorOut(
+            kind=result.concerning_factor.kind.value,
+            description=result.concerning_factor.description,
+        )
+        if result.concerning_factor is not None
+        else None
+    )
 
     return TrajectoryOut(
         attendance_rate=indicators.attendance_rate,
@@ -53,4 +73,6 @@ def get_student_trajectory(
         grade_trend=indicators.grade_trend,
         missing_assignments_count=indicators.missing_assignments_count,
         missing_assignment_delta=indicators.missing_assignment_delta,
+        trajectory_change=trajectory_change_out,
+        concerning_factor=concerning_factor_out,
     )
