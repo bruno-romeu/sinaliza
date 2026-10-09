@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.domain.student import Student
-from app.infrastructure.db.models import EnrollmentModel, StudentModel
+from app.domain.student import Student, StudentSearchResult
+from app.infrastructure.db.models import ClassroomModel, EnrollmentModel, StudentModel
 from app.infrastructure.repositories.base import filter_eval_demo_students
 
 
@@ -57,3 +57,29 @@ class SqlAlchemyStudentRepository:
         if model is None:
             return None
         return Student(id=model.id, name=model.name, dataset_split=model.dataset_split)
+
+    def search(self, query: str) -> list[StudentSearchResult]:
+        """Home's student search (spec-3-3 Boundaries & Constraints):
+        case-insensitive (`ILIKE`) match on either `StudentModel.name` or the
+        joined `ClassroomModel.name`, scoped to `filter_eval_demo_students`
+        (AD-11), same as every other student-facing read."""
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        stmt = (
+            select(StudentModel, ClassroomModel.name)
+            .join(EnrollmentModel, EnrollmentModel.student_id == StudentModel.id)
+            .join(ClassroomModel, ClassroomModel.id == EnrollmentModel.classroom_id)
+            .where(
+                or_(
+                    StudentModel.name.ilike(pattern, escape="\\"),
+                    ClassroomModel.name.ilike(pattern, escape="\\"),
+                )
+            )
+            .order_by(StudentModel.name)
+        )
+        stmt = filter_eval_demo_students(stmt)
+        rows = self._session.execute(stmt).all()
+        return [
+            StudentSearchResult(id=student.id, name=student.name, classroom_name=classroom_name)
+            for student, classroom_name in rows
+        ]
