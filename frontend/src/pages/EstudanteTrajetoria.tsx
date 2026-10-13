@@ -521,7 +521,6 @@ function TrajectoryDetailContent({
         <button
           type="button"
           disabled
-          aria-disabled="true"
           title="Acompanhamento vinculado a evidências chega em uma próxima etapa."
           style={{
             minHeight: 'var(--min-hit-target)',

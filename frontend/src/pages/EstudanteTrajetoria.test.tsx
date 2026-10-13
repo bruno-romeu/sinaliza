@@ -111,6 +111,29 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     expect(screen.queryByText('Fator preocupante')).not.toBeInTheDocument()
   })
 
+  it('renders the chart without a habitual-range band when fewer than 2 history points exist', async () => {
+    fetchMock = vi.fn(async () =>
+      jsonResponse({
+        chart_indicator: 'attendance_rate',
+        series: [{ period_id: 'p1', period_label: '3º Bimestre', value: '0.9000' }],
+        habitual_range: null,
+        trajectory_change: null,
+        evidence: [],
+        concerning_factor: null,
+        observations: [],
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { container } = renderPage()
+
+    await screen.findByText('Trajetória estável')
+    // No fabricated range -> the chart renders the trend line with no band,
+    // never a crash (code review finding, Story 3.4).
+    expect(container.querySelector('rect')).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /Gráfico de frequência por bimestre/ })).toBeInTheDocument()
+  })
+
   it('shows the concerning-factor header closed by default, expandable via keyboard, with no evidence list', async () => {
     fetchMock = vi.fn(async () =>
       jsonResponse({

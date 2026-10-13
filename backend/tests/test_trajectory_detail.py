@@ -153,6 +153,9 @@ def test_detail_calm_state_has_no_change_no_concerning_factor_no_evidence(
     # No history at all -> fewer than 2 non-null points -> no fabricated range.
     assert body["habitual_range"] is None
     assert body["observations"] == []
+    # No `AcademicPeriod`s seeded at all (fresh-environment case) -> empty
+    # series, not an error (code review finding, Story 3.4).
+    assert body["series"] == []
 
 
 # --- Concerning factor only ----------------------------------------------------------
@@ -382,6 +385,17 @@ def test_detail_chart_indicator_follows_missing_assignments_change_type(
     body = response.json()
     assert body["trajectory_change"]["type"] == "MISSING_ASSIGNMENTS_INCREASE"
     assert body["chart_indicator"] == "missing_assignments_count"
+    # ASSIGNMENT_SUBMISSION is the only non-PEDAGOGICAL_OBSERVATION source for
+    # this change type -- resolved into a factual description, never a
+    # free-text-only citation (RNF-11; code review finding, Story 3.4).
+    evidence_source_types = {item["source_type"] for item in body["evidence"]}
+    assert evidence_source_types == {"ASSIGNMENT_SUBMISSION", "PEDAGOGICAL_OBSERVATION"}
+    submission_items = [
+        item for item in body["evidence"] if item["source_type"] == "ASSIGNMENT_SUBMISSION"
+    ]
+    assert len(submission_items) == 2
+    assert submission_items[0]["description"] == "Atividade não entregue em 10/09/2026"
+    assert submission_items[0]["date"] == "2026-09-10"
 
 
 def test_detail_chart_indicator_follows_combined_deterioration_change_type(
@@ -454,6 +468,72 @@ def test_detail_window_days_query_param_overrides_default(
 
     assert default_window.json()["series"][0]["value"] is None
     assert widened_window.json()["series"][0]["value"] == "1.0000"
+    # The override only widens the series' rolling window — it must not
+    # perturb the independent, period-bounded convergence/concerning-factor
+    # read (code review finding, Story 3.4).
+    assert default_window.json()["trajectory_change"] == widened_window.json()["trajectory_change"]
+    assert (
+        default_window.json()["concerning_factor"] == widened_window.json()["concerning_factor"]
+    )
+
+
+# --- Current-period series point anchors on the real clock, not a future end_date ------
+
+
+def test_detail_current_period_series_point_anchors_on_real_clock_not_future_end_date(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mid-period view: `seeded_academic_period` runs 2026-07-27..2026-09-25,
+    but "today" is only 2026-08-10, two weeks in. The series point for this
+    still-open current period must use the default 30-day window ending at
+    `as_of()` (2026-08-10) -- never a window ending at the period's future
+    `end_date` (2026-09-25), which would reach past "today" into dates with
+    no attendance recorded yet and silently yield `None` (code review
+    finding, Story 3.4)."""
+    monkeypatch.setenv("SINALIZA_DEMO_AS_OF", "2026-08-10")
+    db_session.add_all(
+        [
+            AttendanceRecordModel(
+                student_id=seeded_enrolled_student.id,
+                classroom_id=seeded_classroom.id,
+                date=date(2026, 8, 5),
+                status=AttendanceStatus.PRESENT,
+            ),
+            AttendanceRecordModel(
+                student_id=seeded_enrolled_student.id,
+                classroom_id=seeded_classroom.id,
+                date=date(2026, 8, 6),
+                status=AttendanceStatus.PRESENT,
+            ),
+            AttendanceRecordModel(
+                student_id=seeded_enrolled_student.id,
+                classroom_id=seeded_classroom.id,
+                date=date(2026, 8, 7),
+                status=AttendanceStatus.ABSENT_UNJUSTIFIED,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["series"]) == 1
+    # 2/3 present within [as_of() - 30, as_of()] = [2026-07-11, 2026-08-10] --
+    # anchoring on the future end_date instead would place this window at
+    # [2026-08-26, 2026-09-25], excluding all three records and yielding
+    # `None`.
+    assert Decimal(body["series"][0]["value"]) == Decimal("0.6667")
 
 
 # --- Observations timeline ------------------------------------------------------------
