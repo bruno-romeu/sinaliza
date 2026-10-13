@@ -11,12 +11,22 @@ Matrix: "Search no match... Empty results array").
 
 A blank/whitespace-only query short-circuits to an empty result before ever
 reaching the repository: `ILIKE '%%'` would otherwise match every
-`EVAL_DEMO` student unbounded."""
+`EVAL_DEMO` student unbounded.
+
+The query is trimmed before being handed to the repository, so a trailing or
+leading space (e.g. `"Ana "`) still matches a student literally named `"Ana"`
+instead of silently failing to match.
+
+Results are capped at `SEARCH_RESULTS_LIMIT`, mirroring `GetHomeService`'s
+`RECENT_CHANGES_LIMIT` (decision: same cap, no "showing N of M" affordance —
+kept simple and consistent with the recent-changes list's existing display)."""
 
 from __future__ import annotations
 
 from app.application.home.ports import StudentSearchRepositoryPort
 from app.domain.student import StudentSearchResult
+
+SEARCH_RESULTS_LIMIT = 20
 
 
 class SearchStudentsService:
@@ -24,6 +34,7 @@ class SearchStudentsService:
         self._student_repository = student_repository
 
     def execute(self, query: str) -> list[StudentSearchResult]:
-        if not query.strip():
+        trimmed = query.strip()
+        if not trimmed:
             return []
-        return self._student_repository.search(query)
+        return self._student_repository.search(trimmed, SEARCH_RESULTS_LIMIT)
