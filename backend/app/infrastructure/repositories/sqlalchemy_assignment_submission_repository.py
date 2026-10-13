@@ -73,3 +73,22 @@ class SqlAlchemyAssignmentSubmissionRepository:
             )
             for model in models
         ]
+
+    def get_by_ids(self, ids: list[uuid.UUID]) -> list[AssignmentSubmission]:
+        """Story 3.4 — batch resolution of `TrajectoryChangeSource.source_id`
+        rows for the evidence card (RNF-11)."""
+        if not ids:
+            return []
+        stmt = select(AssignmentSubmissionModel).where(AssignmentSubmissionModel.id.in_(ids))
+        stmt = filter_as_of(stmt, AssignmentSubmissionModel.date)
+        models = self._session.execute(stmt).scalars().all()
+        return [
+            AssignmentSubmission(
+                id=model.id,
+                assignment_id=model.assignment_id,
+                student_id=model.student_id,
+                status=model.status,
+                date=model.date,
+            )
+            for model in models
+        ]

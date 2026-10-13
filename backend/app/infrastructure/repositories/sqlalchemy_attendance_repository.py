@@ -82,3 +82,22 @@ class SqlAlchemyAttendanceRepository:
             )
             for model in models
         ]
+
+    def get_by_ids(self, ids: list[uuid.UUID]) -> list[AttendanceRecord]:
+        """Story 3.4 — batch resolution of `TrajectoryChangeSource.source_id`
+        rows for the evidence card (RNF-11)."""
+        if not ids:
+            return []
+        stmt = select(AttendanceRecordModel).where(AttendanceRecordModel.id.in_(ids))
+        stmt = filter_as_of(stmt, AttendanceRecordModel.date)
+        models = self._session.execute(stmt).scalars().all()
+        return [
+            AttendanceRecord(
+                id=model.id,
+                student_id=model.student_id,
+                classroom_id=model.classroom_id,
+                date=model.date,
+                status=model.status,
+            )
+            for model in models
+        ]
