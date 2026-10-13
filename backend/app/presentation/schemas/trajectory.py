@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TrajectoryChangeOut(BaseModel):
@@ -43,7 +43,19 @@ class TrajectoryOut(BaseModel):
     attendance_trend: Decimal | None
     grade_average: Decimal | None
     grade_trend: Decimal | None
-    missing_assignments_count: int
-    missing_assignment_delta: int
+    missing_assignments_count: int = Field(
+        description=(
+            "Total due assignments with no DELIVERED submission. Can legitimately "
+            "disagree with the ASSIGNMENTS signal behind trajectory_change/"
+            "concerning_factor, which counts only assignments with a citable "
+            "registered NOT_DELIVERED/PARTIAL submission."
+        )
+    )
+    missing_assignment_delta: int = Field(
+        description=(
+            "Change in missing_assignments_count vs. the previous period. Subject "
+            "to the same ASSIGNMENTS-signal divergence as missing_assignments_count."
+        )
+    )
     trajectory_change: TrajectoryChangeOut | None
     concerning_factor: ConcerningFactorOut | None
