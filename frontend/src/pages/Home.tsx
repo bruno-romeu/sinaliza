@@ -24,7 +24,14 @@ const CHANGE_TYPE_LABELS: Record<ChangeType, { icon: string; label: string }> = 
 function formatDetectedAt(detectedAt: string): string {
   const date = new Date(detectedAt)
   if (Number.isNaN(date.getTime())) return detectedAt
-  return date.toLocaleDateString('pt-BR')
+  // `detected_at` is a UTC-midnight timestamp (`datetime.combine(as_of_date,
+  // time.min, tzinfo=timezone.utc)`, Story 3.2). Formatting it with
+  // `toLocaleDateString` would convert to the browser's local timezone
+  // first, which for a Brazil-based browser (UTC-3) rolls midnight UTC back
+  // to the previous local day — "today" would display as yesterday. Read
+  // the UTC calendar date directly instead, so the displayed date always
+  // matches the date the backend intended.
+  return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
 }
 
 const rowStyle = {
@@ -78,8 +85,11 @@ export function Home() {
     }
   }, [token, loadAttempt])
 
-  const queryRef = useRef(query)
-  queryRef.current = query
+  // Stores the trimmed query so the staleness check below compares
+  // trimmed-to-trimmed (see `queryAtStart` below); a leading/trailing space
+  // typed after the debounce fired must not be treated as "still stale".
+  const queryRef = useRef(query.trim())
+  queryRef.current = query.trim()
 
   useEffect(() => {
     if (!token || !query.trim()) {
@@ -91,7 +101,9 @@ export function Home() {
     let ignore = false
     setSearching(true)
     setSearchError(null)
-    const queryAtStart = query
+    // Trimmed before being sent (Review patch): a trailing/leading space
+    // (e.g. "Ana ") must still match a student literally named "Ana".
+    const queryAtStart = query.trim()
     const timeoutId = window.setTimeout(() => {
       searchStudents(token, queryAtStart)
         .then((response) => {
