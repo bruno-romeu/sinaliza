@@ -76,3 +76,13 @@ class SqlAlchemyGradeRepository:
         stmt = filter_as_of(stmt, GradeModel.date)
         models = self._session.execute(stmt).scalars().all()
         return [_to_domain(model) for model in models]
+
+    def get_by_ids(self, ids: list[uuid.UUID]) -> list[Grade]:
+        """Story 3.4 — batch resolution of `TrajectoryChangeSource.source_id`
+        rows for the evidence card (RNF-11)."""
+        if not ids:
+            return []
+        stmt = select(GradeModel).where(GradeModel.id.in_(ids))
+        stmt = filter_as_of(stmt, GradeModel.date)
+        models = self._session.execute(stmt).scalars().all()
+        return [_to_domain(model) for model in models]

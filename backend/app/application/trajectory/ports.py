@@ -33,11 +33,22 @@ class AttendanceRepositoryPort(Protocol):
         self, student_id: uuid.UUID, start_date: date, end_date: date
     ) -> list[AttendanceRecord]: ...
 
+    def get_by_ids(self, ids: list[uuid.UUID]) -> list[AttendanceRecord]:
+        """Story 3.4 — batch-resolves `TrajectoryChangeSource.source_id` rows
+        of type `ATTENDANCE_RECORD` into real records for the evidence card
+        (never a free-text-only citation, RNF-11)."""
+        ...
+
 
 class GradeRepositoryPort(Protocol):
     def list_by_student_and_periods(
         self, student_id: uuid.UUID, period_ids: list[uuid.UUID]
     ) -> list[Grade]: ...
+
+    def get_by_ids(self, ids: list[uuid.UUID]) -> list[Grade]:
+        """Story 3.4 — batch-resolves `TrajectoryChangeSource.source_id` rows
+        of type `GRADE` into real records for the evidence card."""
+        ...
 
 
 class AssignmentRepositoryPort(Protocol):
@@ -51,6 +62,12 @@ class AssignmentSubmissionRepositoryPort(Protocol):
         self, student_id: uuid.UUID, assignment_ids: list[uuid.UUID]
     ) -> list[AssignmentSubmission]: ...
 
+    def get_by_ids(self, ids: list[uuid.UUID]) -> list[AssignmentSubmission]:
+        """Story 3.4 — batch-resolves `TrajectoryChangeSource.source_id` rows
+        of type `ASSIGNMENT_SUBMISSION` into real records for the evidence
+        card."""
+        ...
+
 
 class AcademicPeriodRepositoryPort(Protocol):
     def list_all(self) -> list[AcademicPeriod]: ...
@@ -60,6 +77,12 @@ class PedagogicalObservationRepositoryPort(Protocol):
     def list_by_student_in_range(
         self, student_id: uuid.UUID, start_date: date, end_date: date
     ) -> list[PedagogicalObservation]: ...
+
+    def get_by_ids(self, ids: list[uuid.UUID]) -> list[PedagogicalObservation]:
+        """Story 3.4 — batch-resolves `TrajectoryChangeSource.source_id` rows
+        of type `PEDAGOGICAL_OBSERVATION` into real records for the evidence
+        card."""
+        ...
 
 
 class TrajectoryChangeRepositoryPort(Protocol):
@@ -74,4 +97,13 @@ class TrajectoryChangeRepositoryPort(Protocol):
         exists). `sources` fully replaces whatever `TrajectoryChangeSource`
         rows already existed for this change (delete+reinsert), in the same
         transaction as the upsert itself (RNF-11: never without a source)."""
+        ...
+
+
+class TrajectoryChangeSourceRepositoryPort(Protocol):
+    def list_sources_by_change(self, change_id: uuid.UUID) -> list[TrajectoryChangeSource]:
+        """Story 3.4 — every `TrajectoryChangeSource` row attached to one
+        `TrajectoryChange`, used by `GetStudentTrajectoryDetailService` to
+        resolve the evidence card's real source records (RNF-11: never a
+        free-text-only "AI flagged this")."""
         ...

@@ -17,11 +17,26 @@ from fastapi import APIRouter, Depends, Query
 
 from app.application.trajectory.errors import StudentNotFoundError
 from app.application.trajectory.get_student_trajectory import GetStudentTrajectoryService
-from app.composition import get_get_student_trajectory_service
+from app.application.trajectory.get_student_trajectory_detail import (
+    GetStudentTrajectoryDetailService,
+)
+from app.composition import (
+    get_get_student_trajectory_detail_service,
+    get_get_student_trajectory_service,
+)
 from app.config import Settings, get_settings
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.errors import AppError
-from app.presentation.schemas.trajectory import ConcerningFactorOut, TrajectoryChangeOut, TrajectoryOut
+from app.presentation.schemas.trajectory import (
+    ConcerningFactorOut,
+    EvidenceItemOut,
+    HabitualRangeOut,
+    ObservationItemOut,
+    TrajectoryChangeOut,
+    TrajectoryDetailOut,
+    TrajectoryOut,
+    TrajectorySeriesPointOut,
+)
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -75,4 +90,77 @@ def get_student_trajectory(
         missing_assignment_delta=indicators.missing_assignment_delta,
         trajectory_change=trajectory_change_out,
         concerning_factor=concerning_factor_out,
+    )
+
+
+@router.get("/students/{student_id}/trajectory/detail", response_model=TrajectoryDetailOut)
+def get_student_trajectory_detail(
+    student_id: uuid.UUID,
+    window_days: int | None = Query(default=None, gt=0, le=3650),
+    service: GetStudentTrajectoryDetailService = Depends(get_get_student_trajectory_detail_service),
+    settings: Settings = Depends(get_settings),
+) -> TrajectoryDetailOut:
+    """Story 3.4 — additive endpoint: `GET /students/{id}/trajectory`'s
+    response contract above is untouched (spec Boundaries & Constraints)."""
+    effective_window_days = (
+        window_days if window_days is not None else settings.trajectory_window_days
+    )
+
+    try:
+        result = service.execute(student_id, effective_window_days)
+    except StudentNotFoundError as exc:
+        raise AppError(
+            status_code=404,
+            code="student_not_found",
+            message="Estudante não encontrado.",
+        ) from exc
+
+    trajectory_change_out = (
+        TrajectoryChangeOut(
+            type=result.trajectory_change.type.value,
+            period_id=result.trajectory_change.period_id,
+            detected_at=result.trajectory_change.detected_at,
+            description=result.trajectory_change.description,
+        )
+        if result.trajectory_change is not None
+        else None
+    )
+    concerning_factor_out = (
+        ConcerningFactorOut(
+            kind=result.concerning_factor.kind.value,
+            description=result.concerning_factor.description,
+        )
+        if result.concerning_factor is not None
+        else None
+    )
+
+    return TrajectoryDetailOut(
+        chart_indicator=result.chart_indicator,
+        series=[
+            TrajectorySeriesPointOut(
+                period_id=point.period_id,
+                period_label=point.period_label,
+                value=point.value,
+            )
+            for point in result.series
+        ],
+        habitual_range=(
+            HabitualRangeOut(low=result.habitual_range.low, high=result.habitual_range.high)
+            if result.habitual_range is not None
+            else None
+        ),
+        trajectory_change=trajectory_change_out,
+        evidence=[
+            EvidenceItemOut(
+                source_type=item.source_type.value,
+                description=item.description,
+                date=item.date,
+            )
+            for item in result.evidence
+        ],
+        concerning_factor=concerning_factor_out,
+        observations=[
+            ObservationItemOut(date=observation.date, text=observation.text)
+            for observation in result.observations
+        ],
     )

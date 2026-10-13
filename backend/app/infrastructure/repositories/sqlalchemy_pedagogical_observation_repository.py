@@ -74,3 +74,23 @@ class SqlAlchemyPedagogicalObservationRepository:
             )
             for model in models
         ]
+
+    def get_by_ids(self, ids: list[uuid.UUID]) -> list[PedagogicalObservation]:
+        """Story 3.4 — batch resolution of `TrajectoryChangeSource.source_id`
+        rows for the evidence card (RNF-11)."""
+        if not ids:
+            return []
+        created_at_date = cast(PedagogicalObservationModel.created_at, SA_Date)
+        stmt = select(PedagogicalObservationModel).where(PedagogicalObservationModel.id.in_(ids))
+        stmt = filter_as_of(stmt, created_at_date)
+        models = self._session.execute(stmt).scalars().all()
+        return [
+            PedagogicalObservation(
+                id=model.id,
+                student_id=model.student_id,
+                author_user_id=model.author_user_id,
+                text=model.text,
+                created_at=model.created_at,
+            )
+            for model in models
+        ]
