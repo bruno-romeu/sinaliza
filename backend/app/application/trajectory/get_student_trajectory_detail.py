@@ -10,10 +10,16 @@ duplicates it — and layers three new reads on top:
 1. **Series** — the charted indicator's value for each of the last ≤4
    `AcademicPeriod`s (by `start_date`), computed by calling the same pure
    `domain/trajectory.compute_trajectory_indicators` once per period with
-   `as_of_date=period.end_date` (mirrors `get_student_trajectory.py`'s window
-   math, just anchored at a different "now" per period) — this service itself
-   never computes a rate/average/count, only extracts the one field the chart
-   needs from each period's `TrajectoryIndicators`.
+   `as_of_date=min(period.end_date, as_of())` (mirrors `get_student_trajectory.py`'s
+   window math, just anchored at a different "now" per period) — this service
+   itself never computes a rate/average/count, only extracts the one field the
+   chart needs from each period's `TrajectoryIndicators`. Concluded periods
+   (`end_date <= as_of()`) anchor on their own `end_date`, a fixed historical
+   point; the still-open current period anchors on the real clock instead,
+   never a future date — otherwise its rolling window would reach past
+   `as_of()` into dates with no data recorded yet, producing a skewed-or-`None`
+   value for the chart's most relevant point on every mid-period view
+   (code review finding, Story 3.4).
 2. **Evidence** — real `TrajectoryChangeSource` rows for the current
    `trajectory_change` (if any), batch-resolved per `source_type` into
    factual PT-BR descriptions (RNF-11: never a free-text-only "AI flagged
@@ -201,13 +207,18 @@ class GetStudentTrajectoryDetailService:
         window_days: int,
         chart_indicator: ChartIndicator,
     ) -> SeriesPoint:
-        range_start = period.end_date - timedelta(days=2 * window_days)
+        # Concluded periods anchor on their own end_date (a fixed historical
+        # point); the still-open current period anchors on the real clock
+        # instead — never a future date, or its rolling window would reach
+        # into dates with no data recorded yet (code review finding, Story 3.4).
+        point_as_of = min(period.end_date, as_of())
+        range_start = point_as_of - timedelta(days=2 * window_days)
 
         attendance_records = self._attendance_repository.list_by_student_in_range(
-            student_id, range_start, period.end_date
+            student_id, range_start, point_as_of
         )
         assignments = self._assignment_repository.list_due_in_range_for_student(
-            student_id, range_start, period.end_date
+            student_id, range_start, point_as_of
         )
         assignment_ids = [assignment.id for assignment in assignments]
         assignment_submissions = (
@@ -222,12 +233,17 @@ class GetStudentTrajectoryDetailService:
         )
 
         indicators = compute_trajectory_indicators(
-            as_of_date=period.end_date,
+            as_of_date=point_as_of,
             window_days=window_days,
             attendance_records=attendance_records,
             assignments=assignments,
             assignment_submissions=assignment_submissions,
             current_period_grades=current_period_grades,
+            # previous_period_grades is always [] here: this per-period series
+            # point only ever reads `indicators.grade_average` (current-period
+            # grades), never `grade_trend` — harmless today, but a future field
+            # that reads grade_trend from a series point would silently be
+            # wrong (code review finding, Story 3.4).
             previous_period_grades=[],
         )
 
