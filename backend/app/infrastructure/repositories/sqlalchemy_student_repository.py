@@ -58,11 +58,15 @@ class SqlAlchemyStudentRepository:
             return None
         return Student(id=model.id, name=model.name, dataset_split=model.dataset_split)
 
-    def search(self, query: str) -> list[StudentSearchResult]:
+    def search(self, query: str, limit: int) -> list[StudentSearchResult]:
         """Home's student search (spec-3-3 Boundaries & Constraints):
         case-insensitive (`ILIKE`) match on either `StudentModel.name` or the
         joined `ClassroomModel.name`, scoped to `filter_eval_demo_students`
-        (AD-11), same as every other student-facing read."""
+        (AD-11), same as every other student-facing read.
+
+        Capped at `limit` rows (decision: same 20-row cap as `list_recent`,
+        no "showing N of M" count indicator) so a short query can't return
+        the entire matching `EVAL_DEMO` roster unbounded."""
         escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
         stmt = (
@@ -76,6 +80,7 @@ class SqlAlchemyStudentRepository:
                 )
             )
             .order_by(StudentModel.name)
+            .limit(limit)
         )
         stmt = filter_eval_demo_students(stmt)
         rows = self._session.execute(stmt).all()
