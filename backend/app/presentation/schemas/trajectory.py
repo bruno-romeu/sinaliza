@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -47,3 +47,43 @@ class TrajectoryOut(BaseModel):
     missing_assignment_delta: int
     trajectory_change: TrajectoryChangeOut | None
     concerning_factor: ConcerningFactorOut | None
+
+
+# --- Story 3.4: GET /students/{id}/trajectory/detail ------------------------
+
+
+class TrajectorySeriesPointOut(BaseModel):
+    period_id: uuid.UUID
+    period_label: str
+    value: Decimal | None
+
+
+class HabitualRangeOut(BaseModel):
+    low: Decimal
+    high: Decimal
+
+
+class EvidenceItemOut(BaseModel):
+    source_type: Literal[
+        "ATTENDANCE_RECORD", "GRADE", "ASSIGNMENT_SUBMISSION", "PEDAGOGICAL_OBSERVATION"
+    ]
+    description: str
+    date: date
+
+
+class ObservationItemOut(BaseModel):
+    date: date
+    text: str
+
+
+class TrajectoryDetailOut(BaseModel):
+    # `chart_indicator` is chosen deterministically from `trajectory_change`'s
+    # `type` (spec Boundaries & Constraints), defaulting to `attendance_rate`
+    # absent a change.
+    chart_indicator: Literal["attendance_rate", "grade_average", "missing_assignments_count"]
+    series: list[TrajectorySeriesPointOut]
+    habitual_range: HabitualRangeOut | None
+    trajectory_change: TrajectoryChangeOut | None
+    evidence: list[EvidenceItemOut]
+    concerning_factor: ConcerningFactorOut | None
+    observations: list[ObservationItemOut]

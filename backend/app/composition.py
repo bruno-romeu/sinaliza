@@ -23,6 +23,9 @@ from app.application.home.get_home import GetHomeService
 from app.application.home.search_students import SearchStudentsService
 from app.application.observations.register_observation import RegisterObservationService
 from app.application.trajectory.get_student_trajectory import GetStudentTrajectoryService
+from app.application.trajectory.get_student_trajectory_detail import (
+    GetStudentTrajectoryDetailService,
+)
 from app.config import Settings, get_settings
 from app.infrastructure.db.base import get_db
 from app.infrastructure.repositories.sqlalchemy_academic_period_repository import (
@@ -149,6 +152,32 @@ def get_get_student_trajectory_service(
         academic_period_repository=SqlAlchemyAcademicPeriodRepository(db),
         pedagogical_observation_repository=SqlAlchemyPedagogicalObservationRepository(db),
         trajectory_change_repository=SqlAlchemyTrajectoryChangeRepository(db),
+    )
+
+
+def get_get_student_trajectory_detail_service(
+    db: Session = Depends(get_db),
+) -> GetStudentTrajectoryDetailService:
+    trajectory_change_repository = SqlAlchemyTrajectoryChangeRepository(db)
+    trajectory_service = GetStudentTrajectoryService(
+        student_repository=SqlAlchemyStudentRepository(db),
+        attendance_repository=SqlAlchemyAttendanceRepository(db),
+        grade_repository=SqlAlchemyGradeRepository(db),
+        assignment_repository=SqlAlchemyAssignmentRepository(db),
+        assignment_submission_repository=SqlAlchemyAssignmentSubmissionRepository(db),
+        academic_period_repository=SqlAlchemyAcademicPeriodRepository(db),
+        pedagogical_observation_repository=SqlAlchemyPedagogicalObservationRepository(db),
+        trajectory_change_repository=trajectory_change_repository,
+    )
+    return GetStudentTrajectoryDetailService(
+        trajectory_service=trajectory_service,
+        attendance_repository=SqlAlchemyAttendanceRepository(db),
+        grade_repository=SqlAlchemyGradeRepository(db),
+        assignment_repository=SqlAlchemyAssignmentRepository(db),
+        assignment_submission_repository=SqlAlchemyAssignmentSubmissionRepository(db),
+        academic_period_repository=SqlAlchemyAcademicPeriodRepository(db),
+        pedagogical_observation_repository=SqlAlchemyPedagogicalObservationRepository(db),
+        trajectory_change_source_repository=trajectory_change_repository,
     )
 
 
