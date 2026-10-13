@@ -53,7 +53,7 @@ development_status:
 
   epic-3: in-progress
   3-1-cálculo-de-indicadores-de-trajetória-em-janela-rolante: done
-  3-2-detecção-de-mudança-relevante-por-convergência-de-sinais: review
+  3-2-detecção-de-mudança-relevante-por-convergência-de-sinais: done
   3-3-página-inicial-com-mudanças-recentes: done
   3-4-trajetória-do-estudante-gráfico-evidências-e-fator-preocupan: backlog
   epic-3-retrospective: optional
