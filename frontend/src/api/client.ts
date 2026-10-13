@@ -41,6 +41,15 @@ export type StudentSearchResults =
   paths['/home/search']['get']['responses'][200]['content']['application/json']
 export type StudentSearchResult = StudentSearchResults['results'][number]
 
+export type TrajectoryDetail =
+  paths['/students/{student_id}/trajectory/detail']['get']['responses'][200]['content']['application/json']
+export type TrajectorySeriesPoint = TrajectoryDetail['series'][number]
+export type HabitualRange = NonNullable<TrajectoryDetail['habitual_range']>
+export type TrajectoryChange = NonNullable<TrajectoryDetail['trajectory_change']>
+export type EvidenceItem = TrajectoryDetail['evidence'][number]
+export type ConcerningFactor = NonNullable<TrajectoryDetail['concerning_factor']>
+export type ObservationItem = TrajectoryDetail['observations'][number]
+
 interface ErrorEnvelope {
   error: {
     code: string
@@ -249,6 +258,18 @@ export async function searchStudents(token: string, query: string): Promise<Stud
     path: `/home/search?q=${encodeURIComponent(query)}`,
     token,
     fallbackMessage: 'Não foi possível buscar estudantes agora.',
+  })
+}
+
+export async function getStudentTrajectoryDetail(
+  token: string,
+  studentId: string,
+): Promise<TrajectoryDetail> {
+  return request<TrajectoryDetail>({
+    method: 'GET',
+    path: `/students/${studentId}/trajectory/detail`,
+    token,
+    fallbackMessage: 'Não foi possível carregar os dados agora.',
   })
 }
 

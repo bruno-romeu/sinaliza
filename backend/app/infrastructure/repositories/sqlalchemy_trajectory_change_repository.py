@@ -101,3 +101,21 @@ class SqlAlchemyTrajectoryChangeRepository:
             )
             for model in models
         ]
+
+    def list_sources_by_change(self, change_id) -> list[TrajectoryChangeSource]:
+        """Story 3.4 — every `TrajectoryChangeSource` row attached to
+        `change_id`, feeding `GetStudentTrajectoryDetailService`'s evidence
+        resolution (RNF-11: never a free-text-only citation)."""
+        stmt = select(TrajectoryChangeSourceModel).where(
+            TrajectoryChangeSourceModel.trajectory_change_id == change_id
+        )
+        models = self._session.execute(stmt).scalars().all()
+        return [
+            TrajectoryChangeSource(
+                id=model.id,
+                trajectory_change_id=model.trajectory_change_id,
+                source_type=model.source_type,
+                source_id=model.source_id,
+            )
+            for model in models
+        ]

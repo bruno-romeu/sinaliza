@@ -1,0 +1,501 @@
+"""Covers the spec's I/O & Edge-Case Matrix for `GET
+/students/{id}/trajectory/detail` (Story 3.4)."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.domain.assignment_submission import AssignmentSubmissionStatus
+from app.domain.attendance import AttendanceStatus
+from app.domain.student import DatasetSplit
+from app.infrastructure.db.models import (
+    AcademicPeriodModel,
+    AssignmentModel,
+    AssignmentSubmissionModel,
+    AttendanceRecordModel,
+    ClassroomModel,
+    GradeModel,
+    PedagogicalObservationModel,
+    StudentModel,
+)
+
+STUDENT_NOT_FOUND_BODY = {
+    "error": {"code": "student_not_found", "message": "Estudante não encontrado."}
+}
+
+# Falls inside `seeded_academic_period`'s window (2026-07-27 .. 2026-09-25).
+AS_OF = "2026-09-24"
+
+
+@pytest.fixture(autouse=True)
+def _frozen_as_of(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SINALIZA_DEMO_AS_OF", AS_OF)
+
+
+def _auth_headers(client: TestClient, seeded_user) -> dict[str, str]:
+    response = client.post(
+        "/auth/login", json={"email": seeded_user.email, "password": "Senha-Correta-123"}
+    )
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _add_low_attendance(
+    db_session: Session, student_id, classroom_id, present_count: int, absent_count: int
+) -> None:
+    day = date(2026, 8, 1)
+    for _ in range(present_count):
+        db_session.add(
+            AttendanceRecordModel(
+                student_id=student_id, classroom_id=classroom_id, date=day, status=AttendanceStatus.PRESENT
+            )
+        )
+        day += timedelta(days=1)
+    for _ in range(absent_count):
+        db_session.add(
+            AttendanceRecordModel(
+                student_id=student_id,
+                classroom_id=classroom_id,
+                date=day,
+                status=AttendanceStatus.ABSENT_UNJUSTIFIED,
+            )
+        )
+        day += timedelta(days=1)
+
+
+# --- Change detected ---------------------------------------------------------------
+
+
+def test_detail_with_detected_change_includes_resolved_evidence_and_omits_concerning_factor(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    _add_low_attendance(db_session, seeded_enrolled_student.id, seeded_classroom.id, 1, 2)
+    db_session.add(
+        PedagogicalObservationModel(
+            student_id=seeded_enrolled_student.id,
+            author_user_id=seeded_user.id,
+            text="Observação de teste.",
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    # ATTENDANCE + PEDAGOGICAL_OBSERVATION confirm -> ATTENDANCE_DROP ->
+    # chart_indicator deterministically attendance_rate (spec Boundaries).
+    assert body["chart_indicator"] == "attendance_rate"
+    assert body["trajectory_change"] is not None
+    assert body["trajectory_change"]["type"] == "ATTENDANCE_DROP"
+    assert body["concerning_factor"] is None
+
+    # Every evidence item traces to a real source record, never free text
+    # alone (RNF-11).
+    assert len(body["evidence"]) == 4
+    source_types = {item["source_type"] for item in body["evidence"]}
+    assert source_types == {"ATTENDANCE_RECORD", "PEDAGOGICAL_OBSERVATION"}
+    for item in body["evidence"]:
+        assert item["description"]
+        assert item["date"]
+
+    observation_items = [
+        item for item in body["evidence"] if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
+    ]
+    assert observation_items[0]["description"] == "Registro pedagógico em 01/09/2026: Observação de teste."
+
+    # Series covers the (single) seeded período.
+    assert len(body["series"]) == 1
+    assert body["series"][0]["period_id"] == str(seeded_academic_period.id)
+    assert body["series"][0]["period_label"] == seeded_academic_period.label
+
+
+# --- Calm state ---------------------------------------------------------------------
+
+
+def test_detail_calm_state_has_no_change_no_concerning_factor_no_evidence(
+    client: TestClient,
+    seeded_user,
+    db_session: Session,
+) -> None:
+    bare_student = StudentModel(name="Estudante Sem Dados", dataset_split=DatasetSplit.EVAL_DEMO)
+    db_session.add(bare_student)
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{bare_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["trajectory_change"] is None
+    assert body["concerning_factor"] is None
+    assert body["evidence"] == []
+    assert body["chart_indicator"] == "attendance_rate"
+    # No history at all -> fewer than 2 non-null points -> no fabricated range.
+    assert body["habitual_range"] is None
+    assert body["observations"] == []
+
+
+# --- Concerning factor only ----------------------------------------------------------
+
+
+def test_detail_with_single_confirmed_signal_has_concerning_factor_and_no_evidence(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    db_session.add_all(
+        [
+            # current window [2026-08-25, 2026-09-24]
+            AttendanceRecordModel(
+                student_id=seeded_enrolled_student.id,
+                classroom_id=seeded_classroom.id,
+                date=date(2026, 9, 20),
+                status=AttendanceStatus.PRESENT,
+            ),
+            AttendanceRecordModel(
+                student_id=seeded_enrolled_student.id,
+                classroom_id=seeded_classroom.id,
+                date=date(2026, 9, 21),
+                status=AttendanceStatus.ABSENT_UNJUSTIFIED,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["trajectory_change"] is None
+    assert body["concerning_factor"] == {
+        "kind": "ATTENDANCE",
+        "description": "Mudança recente: queda de frequência — 3º Bimestre Teste",
+    }
+    # No stable id for a concerning factor -> no evidence list.
+    assert body["evidence"] == []
+
+
+# --- Habitual range: >=2 history points ------------------------------------------------
+
+
+def test_detail_habitual_range_is_min_max_of_students_own_series(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    previous_period = AcademicPeriodModel(
+        label="2º Bimestre Teste",
+        start_date=date(2026, 5, 1),
+        end_date=date(2026, 7, 26),
+        order_index=2,
+    )
+    db_session.add(previous_period)
+    db_session.flush()
+
+    # Previous período: 1/1 present -> rate 1.0 within its own ending window.
+    db_session.add(
+        AttendanceRecordModel(
+            student_id=seeded_enrolled_student.id,
+            classroom_id=seeded_classroom.id,
+            date=date(2026, 7, 20),
+            status=AttendanceStatus.PRESENT,
+        )
+    )
+    # Current período: 1 present + 1 absent -> rate 0.5.
+    db_session.add_all(
+        [
+            AttendanceRecordModel(
+                student_id=seeded_enrolled_student.id,
+                classroom_id=seeded_classroom.id,
+                date=date(2026, 9, 20),
+                status=AttendanceStatus.PRESENT,
+            ),
+            AttendanceRecordModel(
+                student_id=seeded_enrolled_student.id,
+                classroom_id=seeded_classroom.id,
+                date=date(2026, 9, 21),
+                status=AttendanceStatus.ABSENT_UNJUSTIFIED,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["series"]) == 2
+    # Ordered by start_date ascending.
+    assert body["series"][0]["period_id"] == str(previous_period.id)
+    assert body["series"][1]["period_id"] == str(seeded_academic_period.id)
+    assert body["habitual_range"] is not None
+    assert Decimal(body["habitual_range"]["low"]) == Decimal("0.5")
+    assert Decimal(body["habitual_range"]["high"]) == Decimal("1.0")
+
+
+# --- Unknown/TRAIN student -----------------------------------------------------------
+
+
+def test_detail_for_unknown_student_returns_404(client: TestClient, seeded_user) -> None:
+    response = client.get(
+        f"/students/{uuid.uuid4()}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 404
+    assert response.json() == STUDENT_NOT_FOUND_BODY
+
+
+def test_detail_for_train_split_student_returns_identical_404(
+    client: TestClient, seeded_user, db_session: Session
+) -> None:
+    train_student = StudentModel(name="Aluno de Treino", dataset_split=DatasetSplit.TRAIN)
+    db_session.add(train_student)
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{train_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 404
+    assert response.json() == STUDENT_NOT_FOUND_BODY
+
+
+# --- Chart-indicator selection per trajectory_change type -----------------------------
+
+
+def test_detail_chart_indicator_follows_grade_drop_change_type(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    db_session.add(
+        GradeModel(
+            student_id=seeded_enrolled_student.id,
+            classroom_id=seeded_classroom.id,
+            subject="Matemática",
+            period_id=seeded_academic_period.id,
+            date=date(2026, 9, 1),
+            value=Decimal("3.00"),
+        )
+    )
+    db_session.add(
+        PedagogicalObservationModel(
+            student_id=seeded_enrolled_student.id,
+            author_user_id=seeded_user.id,
+            text="Observação de teste.",
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["trajectory_change"]["type"] == "GRADE_DROP"
+    assert body["chart_indicator"] == "grade_average"
+    evidence_source_types = {item["source_type"] for item in body["evidence"]}
+    assert evidence_source_types == {"GRADE", "PEDAGOGICAL_OBSERVATION"}
+
+
+def test_detail_chart_indicator_follows_missing_assignments_change_type(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    for i in range(2):
+        assignment = AssignmentModel(
+            classroom_id=seeded_classroom.id,
+            subject="Matemática",
+            period_id=seeded_academic_period.id,
+            due_date=date(2026, 9, 10 + i),
+        )
+        db_session.add(assignment)
+        db_session.flush()
+        db_session.add(
+            AssignmentSubmissionModel(
+                assignment_id=assignment.id,
+                student_id=seeded_enrolled_student.id,
+                status=AssignmentSubmissionStatus.NOT_DELIVERED,
+                date=date(2026, 9, 10 + i),
+            )
+        )
+    db_session.add(
+        PedagogicalObservationModel(
+            student_id=seeded_enrolled_student.id,
+            author_user_id=seeded_user.id,
+            text="Observação de teste.",
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["trajectory_change"]["type"] == "MISSING_ASSIGNMENTS_INCREASE"
+    assert body["chart_indicator"] == "missing_assignments_count"
+
+
+def test_detail_chart_indicator_follows_combined_deterioration_change_type(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    """ATTENDANCE + GRADE both confirm -> COMBINED_DETERIORATION -> spec
+    Boundaries mandate `attendance_rate` for this type (same as the lone-signal
+    ATTENDANCE_DROP case)."""
+    _add_low_attendance(db_session, seeded_enrolled_student.id, seeded_classroom.id, 1, 2)
+    db_session.add(
+        GradeModel(
+            student_id=seeded_enrolled_student.id,
+            classroom_id=seeded_classroom.id,
+            subject="Matemática",
+            period_id=seeded_academic_period.id,
+            date=date(2026, 9, 1),
+            value=Decimal("3.00"),
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["trajectory_change"]["type"] == "COMBINED_DETERIORATION"
+    assert body["chart_indicator"] == "attendance_rate"
+
+
+# --- window_days override ---------------------------------------------------------------
+
+
+def test_detail_window_days_query_param_overrides_default(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    """Mirrors `test_trajectory.py`'s coverage of the identical query param on
+    the sibling `/trajectory` route — a record outside the default 30-day
+    window only surfaces once `?window_days=` widens it."""
+    db_session.add(
+        AttendanceRecordModel(
+            student_id=seeded_enrolled_student.id,
+            classroom_id=seeded_classroom.id,
+            date=date(2026, 8, 20),
+            status=AttendanceStatus.PRESENT,
+        )
+    )
+    db_session.commit()
+    headers = _auth_headers(client, seeded_user)
+
+    default_window = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail", headers=headers
+    )
+    widened_window = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail?window_days=40",
+        headers=headers,
+    )
+
+    assert default_window.json()["series"][0]["value"] is None
+    assert widened_window.json()["series"][0]["value"] == "1.0000"
+
+
+# --- Observations timeline ------------------------------------------------------------
+
+
+def test_detail_observations_are_capped_at_ten_desc_by_date(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    for i in range(12):
+        db_session.add(
+            PedagogicalObservationModel(
+                student_id=seeded_enrolled_student.id,
+                author_user_id=seeded_user.id,
+                text=f"Observação {i}.",
+                created_at=datetime(2026, 1, 1 + i, 12, 0, tzinfo=timezone.utc),
+            )
+        )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["observations"]) == 10
+    dates = [observation["date"] for observation in body["observations"]]
+    assert dates == sorted(dates, reverse=True)
+    assert body["observations"][0]["text"] == "Observação 11."
+
+
+# --- Unauthenticated -------------------------------------------------------------------
+
+
+def test_detail_without_bearer_token_returns_401(
+    client: TestClient, seeded_enrolled_student: StudentModel
+) -> None:
+    response = client.get(f"/students/{seeded_enrolled_student.id}/trajectory/detail")
+
+    assert response.status_code == 401
+    assert "error" in response.json()
