@@ -56,7 +56,7 @@ development_status:
   3-2-detecção-de-mudança-relevante-por-convergência-de-sinais: done
   3-3-página-inicial-com-mudanças-recentes: done
   3-4-trajetória-do-estudante-gráfico-evidências-e-fator-preocupan: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   epic-4: backlog
   4-1-abertura-de-acompanhamento-vinculado-a-evidências: backlog
@@ -183,3 +183,30 @@ action_items:
     owner: "dev"
     status: open
     ref: "docs/epic-2-retro-2026-10-08.md"
+  - id: "epic-3-retro-item-1-merge-stranded-branches"
+    epic: 3
+    action: "[fix-now] Merge the three stranded branches into master in dependency
+      order (feature/3-2-deteccao-de-mudanca-relevante-por-convergencia-de-sinais,
+      this branch's unpushed commits including 23db6b2, and feature/3-4-trajetoria-do-estudante-grafico-evidencias-fator-preocupante),
+      then re-run the full test suite against the merged result and confirm docs/spec-3-4-*.md
+      lands on master."
+    owner: "dev"
+    status: done
+    ref: "docs/epic-3-retro-2026-10-13.md"
+  - id: "epic-3-retro-item-2-live-search-cap-timezone-defects"
+    epic: 3
+    action: "[fix-now] Treat GET /home/search's missing result cap and Home.tsx's
+      UTC/local-timezone date-display bug as live production defects until the stranded
+      Story 3.2/3.3/3.4 branches are merged into master (docs/spec-3-3-pagina-inicial-com-mudancas-recentes.md:96-121)."
+    owner: "dev"
+    status: done
+    ref: "docs/epic-3-retro-2026-10-13.md"
+  - id: "epic-3-retro-item-3-merge-before-done-gate"
+    epic: 3
+    action: "[defer] Process lesson: a story must not be marked done in sprint-status.yaml
+      until its feature/worktree branch is actually merged into the integration branch.
+      Add a gate (manual check or CI) verifying git merge-base --is-ancestor <story-branch>
+      <integration-branch> before any chore: mark Story N done commit."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-3-retro-2026-10-13.md"
