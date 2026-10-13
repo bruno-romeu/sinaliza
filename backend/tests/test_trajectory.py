@@ -563,7 +563,7 @@ def test_trajectory_two_confirmed_signals_creates_trajectory_change_with_sources
     assert all(row.trajectory_change_id == db_rows[0].id for row in source_rows)
 
 
-def test_trajectory_recompute_same_period_replaces_description_and_sources(
+def test_trajectory_pedagogical_observation_after_as_of_is_excluded_from_signal(
     client: TestClient,
     seeded_user,
     seeded_classroom: ClassroomModel,
@@ -571,12 +571,64 @@ def test_trajectory_recompute_same_period_replaces_description_and_sources(
     seeded_academic_period: AcademicPeriodModel,
     db_session: Session,
 ) -> None:
+    """AD-11 leak-prevention invariant (`filter_as_of`, mirrored from the
+    attendance/assignment repositories' own precedent): a
+    `PedagogicalObservation` dated after `as_of()` — even if still inside
+    `seeded_academic_period`'s date range — must never confirm the
+    PEDAGOGICAL_OBSERVATION signal. Without this test, removing
+    `list_by_student_in_range`'s `filter_as_of` call would pass every other
+    test in this file undetected, since they only ever seed observations
+    dated before `as_of()` (Review Findings #23)."""
+    _add_low_attendance(db_session, seeded_enrolled_student.id, seeded_classroom.id, 1, 2)
+    db_session.add(
+        PedagogicalObservationModel(
+            student_id=seeded_enrolled_student.id,
+            author_user_id=seeded_user.id,
+            text="Observação futura, não deve contar ainda.",
+            # After AS_OF ("2026-09-24") but still inside the período
+            # vigente (ends 2026-09-25).
+            created_at=datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    # Only ATTENDANCE confirms (the future-dated observation must not count
+    # as a second signal) — exactly one confirmed signal yields a
+    # `concerning_factor`, never a persisted `trajectory_change`.
+    assert body["trajectory_change"] is None
+    assert body["concerning_factor"] == {
+        "kind": "ATTENDANCE",
+        "description": "Mudança recente: queda de frequência — 3º Bimestre Teste",
+    }
+    assert db_session.execute(select(TrajectoryChangeModel)).scalars().all() == []
+
+
+def test_trajectory_recompute_same_period_replaces_description_and_sources(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Spec I/O Matrix: "Recálculo do mesmo período" — same `(student_id,
     type, period_id)` upsert key both times (`COMBINED_DETERIORATION`, since
     ATTENDANCE stays confirmed throughout and a second core signal is
     confirmed both times), but `description`/`TrajectoryChangeSource` rows
     are fully substituted (delete+reinsert) once the confirming combination
-    changes."""
+    changes. `detected_at` is reader-derived from `as_of()` on every call
+    (Implementation Notes), so it must also advance on recompute — this test
+    runs the second `GET` under a later `SINALIZA_DEMO_AS_OF` (still inside
+    `seeded_academic_period`) to prove `ON CONFLICT ... DO UPDATE` actually
+    refreshes it, not just `description`/sources (Review Findings #22)."""
     _add_low_attendance(db_session, seeded_enrolled_student.id, seeded_classroom.id, 1, 2)
     db_session.add(
         GradeModel(
@@ -636,6 +688,10 @@ def test_trajectory_recompute_same_period_replaces_description_and_sources(
         )
     db_session.commit()
 
+    # Still inside `seeded_academic_period` (2026-07-27..2026-09-25) — same
+    # period, later "today", so `detected_at` must move forward on recompute.
+    monkeypatch.setenv("SINALIZA_DEMO_AS_OF", "2026-09-25")
+
     second = client.get(f"/students/{seeded_enrolled_student.id}/trajectory", headers=headers)
     assert second.status_code == 200
     second_change = second.json()["trajectory_change"]
@@ -644,11 +700,14 @@ def test_trajectory_recompute_same_period_replaces_description_and_sources(
         "Mudança recente: queda de frequência e aumento de atividades "
         "pendentes — 3º Bimestre Teste"
     )
+    assert second_change["detected_at"] != first_change["detected_at"]
+    assert second_change["detected_at"].startswith("2026-09-25")
 
     rows = db_session.execute(select(TrajectoryChangeModel)).scalars().all()
     assert len(rows) == 1
     assert rows[0].id == first_id
     assert rows[0].description == second_change["description"]
+    assert rows[0].detected_at == datetime(2026, 9, 25, 0, 0, tzinfo=timezone.utc)
 
     source_types = {
         row.source_type
