@@ -91,12 +91,20 @@ class TrajectoryChangeRepositoryPort(Protocol):
     ) -> TrajectoryChange:
         """Upserts `change` by its `(student_id, type, period_id)` key via
         `INSERT ... ON CONFLICT ... DO UPDATE` — never `SELECT`-then-write
-        (AD-1, RF-11). Always `DO UPDATE` unconditionally — no freeze-on-
-        evidence guard in this story (spec Never, `deferred-work.md`: Epic 4
-        adds the `NOT EXISTS (follow_up_evidence)` guard once that table
-        exists). `sources` fully replaces whatever `TrajectoryChangeSource`
-        rows already existed for this change (delete+reinsert), in the same
-        transaction as the upsert itself (RNF-11: never without a source)."""
+        (AD-1, RF-11). Story 4.1 adds a freeze-on-evidence guard: once a
+        `TrajectoryChange` has >=1 `FollowUpEvidence` row, this leaves it
+        unchanged (`detected_at`/`description`/sources) instead of
+        `DO UPDATE` (spec Boundaries & Constraints). `sources` fully replaces
+        whatever `TrajectoryChangeSource` rows already existed for this
+        change (delete+reinsert) when not frozen, in the same transaction as
+        the upsert itself (RNF-11: never without a source)."""
+        ...
+
+    def get_by_id(self, change_id: uuid.UUID) -> TrajectoryChange | None:
+        """Story 4.1 — loads one `TrajectoryChange` by id for
+        `OpenFollowUpService` to validate the clicked button's
+        `trajectory_change_id` against (`TrajectoryChangeNotFoundError`/
+        `TrajectoryChangeMismatchError`)."""
         ...
 
 

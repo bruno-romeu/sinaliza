@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 10-13-2026 20:30
+last_updated: 10-13-2026 21:50
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -58,8 +58,8 @@ development_status:
   3-4-trajetória-do-estudante-gráfico-evidências-e-fator-preocupan: done
   epic-3-retrospective: done
 
-  epic-4: backlog
-  4-1-abertura-de-acompanhamento-vinculado-a-evidências: backlog
+  epic-4: in-progress
+  4-1-abertura-de-acompanhamento-vinculado-a-evidências: review
   4-2-registro-de-ações-e-mudança-de-status-de-um-acompanhamento: backlog
   4-3-histórico-completo-de-ações-e-evidências-de-um-acompanhament: backlog
   4-4-escopo-de-acesso-ao-registro-pedagógico-vinculado-a-um-acomp: backlog

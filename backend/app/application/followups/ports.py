@@ -1,0 +1,56 @@
+"""Ports (interfaces) the `application/followups` layer depends on.
+
+`application/` only ever sees these Protocols — never a concrete class from
+`infrastructure/` (AD-2). Re-imports the read ports already defined in
+`application/trajectory/ports.py` rather than redeclaring duplicate
+Protocols (spec Code Map) — `GetFollowUpService` needs the exact same shapes
+`resolve_evidence` depends on.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Protocol
+
+from app.application.trajectory.ports import (
+    AssignmentSubmissionRepositoryPort,
+    AttendanceRepositoryPort,
+    GradeRepositoryPort,
+    PedagogicalObservationRepositoryPort,
+    StudentRepositoryPort,
+    TrajectoryChangeRepositoryPort,
+    TrajectoryChangeSourceRepositoryPort,
+)
+from app.domain.follow_up import FollowUp, FollowUpEvidence
+
+__all__ = [
+    "AssignmentSubmissionRepositoryPort",
+    "AttendanceRepositoryPort",
+    "GradeRepositoryPort",
+    "PedagogicalObservationRepositoryPort",
+    "StudentRepositoryPort",
+    "TrajectoryChangeRepositoryPort",
+    "TrajectoryChangeSourceRepositoryPort",
+    "FollowUpRepositoryPort",
+]
+
+
+class FollowUpRepositoryPort(Protocol):
+    def save_with_evidence(
+        self, follow_up: FollowUp, evidence: list[FollowUpEvidence]
+    ) -> FollowUp:
+        """Inserts `follow_up` + every `FollowUpEvidence` row in one
+        transaction (spec Boundaries & Constraints, same atomicity pattern as
+        `TrajectoryChange`+`TrajectoryChangeSource`, AD-7)."""
+        ...
+
+    def get_by_id(self, follow_up_id: uuid.UUID) -> FollowUp | None:
+        """Loads one `FollowUp` by id for `GetFollowUpService` — `None` when
+        it does not exist (spec I/O Matrix, "Nonexistent follow-up")."""
+        ...
+
+    def list_evidence_by_follow_up(self, follow_up_id: uuid.UUID) -> list[FollowUpEvidence]:
+        """Every `FollowUpEvidence` row attached to one `FollowUp`, used by
+        `GetFollowUpService` to resolve the evidence card (story 4.1 always
+        has exactly one, future stories may add more)."""
+        ...
