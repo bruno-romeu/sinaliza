@@ -18,8 +18,10 @@ from app.application.attendance.list_classrooms import ListClassroomsService
 from app.application.attendance.list_enrolled_students import ListEnrolledStudentsService
 from app.application.attendance.register_attendance import RegisterAttendanceService
 from app.application.auth.authenticate_user import AuthenticateUserService
+from app.application.followups.change_follow_up_status import ChangeFollowUpStatusService
 from app.application.followups.get_follow_up import GetFollowUpService
 from app.application.followups.open_follow_up import OpenFollowUpService
+from app.application.followups.register_follow_up_action import RegisterFollowUpActionService
 from app.application.grades.register_grade import RegisterGradeService
 from app.application.home.get_home import GetHomeService
 from app.application.home.search_students import SearchStudentsService
@@ -203,6 +205,18 @@ def get_get_follow_up_service(db: Session = Depends(get_db)) -> GetFollowUpServi
         assignment_submission_repository=SqlAlchemyAssignmentSubmissionRepository(db),
         pedagogical_observation_repository=SqlAlchemyPedagogicalObservationRepository(db),
     )
+
+
+def get_register_follow_up_action_service(
+    db: Session = Depends(get_db),
+) -> RegisterFollowUpActionService:
+    return RegisterFollowUpActionService(follow_up_repository=SqlAlchemyFollowUpRepository(db))
+
+
+def get_change_follow_up_status_service(
+    db: Session = Depends(get_db),
+) -> ChangeFollowUpStatusService:
+    return ChangeFollowUpStatusService(follow_up_repository=SqlAlchemyFollowUpRepository(db))
 
 
 def get_get_home_service(db: Session = Depends(get_db)) -> GetHomeService:

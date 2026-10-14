@@ -1,10 +1,39 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState, type ChangeEvent, type CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { ApiError, getFollowUp, type FollowUpDetail } from '../api/client'
+import {
+  ApiError,
+  changeFollowUpStatus,
+  getFollowUp,
+  registerFollowUpAction,
+  type FollowUpDetail,
+} from '../api/client'
 import { EvidenceCard } from '../components/EvidenceCard'
 import { FollowUpStatusPill } from '../components/FollowUpStatusPill'
 import { Header } from '../components/Header'
+
+type FollowUpStatusValue = FollowUpDetail['status']
+
+const STATUS_OPTIONS: { value: FollowUpStatusValue; label: string }[] = [
+  { value: 'EM_OBSERVACAO', label: 'Em observação' },
+  { value: 'ACOMPANHAMENTO_ATIVO', label: 'Ativo' },
+  { value: 'AGUARDANDO_RETORNO', label: 'Aguardando retorno' },
+  { value: 'ENCERRADO', label: 'Encerrado' },
+]
+
+const fieldStyle: CSSProperties = {
+  padding: '0 12px',
+  borderRadius: 'var(--radius-sm)',
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-surface)',
+  color: 'var(--color-text)',
+  fontSize: 15,
+}
+
+const selectStyle: CSSProperties = {
+  ...fieldStyle,
+  minHeight: 'var(--min-hit-target)',
+}
 
 type LoadState =
   | { status: 'loading' }
@@ -13,11 +42,13 @@ type LoadState =
   | { status: 'error' }
 
 /**
- * Tela de Acompanhamento (`/acompanhamentos/:followUpId`) — Story 4.1. Only
- * needs to show the status pill and the reused evidence card with a link
- * back to the student's trajectory (UX-DR4). Status transitions, the action
- * form, full history and Home's active-follow-ups section are Stories
- * 4.2/4.3/4.5 scope — not implemented here (spec Never).
+ * Tela de Acompanhamento (`/acompanhamentos/:followUpId`). Story 4.1 built
+ * the status pill and the reused evidence card with a link back to the
+ * student's trajectory (UX-DR4). Story 4.2 adds the status `<select>`
+ * (`StatusSelector`) and the free-text action form (`ActionForm`) below.
+ * Full chronological history (past actions + evidence list) and Home's
+ * active-follow-ups section remain Stories 4.3/4.5 scope — not implemented
+ * here.
  *
  * Same loading/error/not-found conventions as `EstudanteTrajetoria.tsx`
  * (Story 3.4): skeleton while loading, factual message + retry on error,
@@ -130,15 +161,29 @@ export function Acompanhamento() {
           </div>
         )}
 
-        {loadState.status === 'loaded' && (
-          <AcompanhamentoContent detail={loadState.detail} />
+        {loadState.status === 'loaded' && followUpId && (
+          <AcompanhamentoContent
+            followUpId={followUpId}
+            detail={loadState.detail}
+            onStatusChange={(status) =>
+              setLoadState({ status: 'loaded', detail: { ...loadState.detail, status } })
+            }
+          />
         )}
       </main>
     </div>
   )
 }
 
-function AcompanhamentoContent({ detail }: { detail: FollowUpDetail }) {
+function AcompanhamentoContent({
+  followUpId,
+  detail,
+  onStatusChange,
+}: {
+  followUpId: string
+  detail: FollowUpDetail
+  onStatusChange: (status: FollowUpStatusValue) => void
+}) {
   return (
     <>
       <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -146,12 +191,211 @@ function AcompanhamentoContent({ detail }: { detail: FollowUpDetail }) {
         <FollowUpStatusPill status={detail.status} />
       </section>
 
+      <StatusSelector
+        followUpId={followUpId}
+        status={detail.status}
+        onStatusChange={onStatusChange}
+      />
+
       <EvidenceCard
         title="Evidências"
         evidence={detail.evidence}
         linkTo={`/estudantes/${detail.student_id}`}
         linkLabel={`Ver na trajetória de ${detail.student_name}`}
       />
+
+      <ActionForm followUpId={followUpId} />
     </>
+  )
+}
+
+/**
+ * Native `<select>` with exactly the 4 closed `FollowUpStatus` values — never
+ * free text (RF-13, UX-DR8). Selecting "Encerrado" asks for a simple
+ * `window.confirm` before calling the API; any other target status calls the
+ * API immediately (UX-DR19 — only the destructive/irreversible transition is
+ * gated). Declining the confirmation makes no request and reverts the select
+ * to the prior status.
+ */
+function StatusSelector({
+  followUpId,
+  status,
+  onStatusChange,
+}: {
+  followUpId: string
+  status: FollowUpStatusValue
+  onStatusChange: (status: FollowUpStatusValue) => void
+}) {
+  const { token } = useAuth()
+  const selectId = useId()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function applyStatusChange(nextStatus: FollowUpStatusValue) {
+    if (!token) return
+    setSaving(true)
+    setError(null)
+    try {
+      const updated = await changeFollowUpStatus(token, followUpId, { status: nextStatus })
+      onStatusChange(updated.status)
+    } catch (caught) {
+      const message =
+        caught instanceof ApiError ? caught.message : 'Não foi possível atualizar o status agora.'
+      setError(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleChange(event: ChangeEvent<HTMLSelectElement>) {
+    const nextStatus = event.target.value as FollowUpStatusValue
+    if (nextStatus === status) return
+
+    if (nextStatus === 'ENCERRADO') {
+      const confirmed = window.confirm(
+        'Tem certeza que deseja encerrar este acompanhamento? Esta ação não pode ser desfeita.',
+      )
+      if (!confirmed) {
+        // Revert — the <select>'s value is controlled by `status`, which
+        // hasn't changed, so simply not calling the API is enough; React
+        // will re-render the <select> back to the current status.
+        return
+      }
+    }
+
+    void applyStatusChange(nextStatus)
+  }
+
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 280 }}>
+      <label htmlFor={selectId} style={{ fontWeight: 600 }}>
+        Status do acompanhamento
+      </label>
+      <select
+        id={selectId}
+        value={status}
+        onChange={handleChange}
+        disabled={saving}
+        style={selectStyle}
+      >
+        {STATUS_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <p role="alert" style={{ color: 'var(--color-attention)', margin: 0, fontSize: 14 }}>
+          {error}
+        </p>
+      )}
+    </section>
+  )
+}
+
+/**
+ * Free-text action form (textarea + disabled-while-empty submit) — mirrors
+ * `Observacoes.tsx`'s `ObservacaoRow`/`canSave` pattern. Submitting never
+ * replaces a prior action: every submission is a fresh row (RF-13, RF-14).
+ * No read-back/list of past actions here (Story 4.3 scope).
+ */
+function ActionForm({ followUpId }: { followUpId: string }) {
+  const { token } = useAuth()
+  const textId = useId()
+  const messageId = useId()
+  const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [isError, setIsError] = useState(false)
+
+  const canSave = text.trim() !== ''
+
+  async function handleSave() {
+    if (!token || !canSave) return
+    setSaving(true)
+    setMessage(null)
+    setIsError(false)
+    try {
+      await registerFollowUpAction(token, followUpId, { description: text })
+      setText('')
+      setMessage('Registro salvo.')
+      setIsError(false)
+    } catch (caught) {
+      const errorMessage =
+        caught instanceof ApiError ? caught.message : 'Não foi possível salvar o registro agora.'
+      setMessage(errorMessage)
+      setIsError(true)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        padding: '16px 20px',
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+      }}
+    >
+      <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Registrar ação</h2>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <label htmlFor={textId} style={{ fontSize: 13, fontWeight: 600 }}>
+          Ação
+        </label>
+        <textarea
+          id={textId}
+          value={text}
+          onChange={(event) => {
+            setText(event.target.value)
+            setMessage(null)
+            setIsError(false)
+          }}
+          aria-describedby={message ? messageId : undefined}
+          rows={3}
+          style={{ ...fieldStyle, padding: '8px 12px', resize: 'vertical', fontFamily: 'inherit' }}
+        />
+      </div>
+
+      <div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || !canSave}
+          style={{
+            minHeight: 'var(--min-hit-target)',
+            minWidth: 'var(--min-hit-target)',
+            padding: '0 16px',
+            borderRadius: 'var(--radius-md)',
+            border: 'none',
+            background: 'var(--color-primary)',
+            color: 'var(--color-surface)',
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: saving || !canSave ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {saving ? 'Salvando…' : 'Salvar'}
+        </button>
+      </div>
+
+      <div
+        id={messageId}
+        role={isError ? 'alert' : 'status'}
+        aria-live="polite"
+        style={{
+          minHeight: 20,
+          fontSize: 14,
+          color: isError ? 'var(--color-attention)' : 'var(--color-success)',
+        }}
+      >
+        {message}
+      </div>
+    </section>
   )
 }

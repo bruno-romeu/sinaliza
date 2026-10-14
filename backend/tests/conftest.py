@@ -27,6 +27,7 @@ from datetime import date  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine, event  # noqa: E402
+from sqlalchemy import text as sa_text  # noqa: E402
 from sqlalchemy.engine import Connection, Engine  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
@@ -64,6 +65,14 @@ def engine(test_settings: Settings) -> Generator[Engine, None, None]:
     engine = create_engine(test_settings.database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    # Tests build schema from SQLAlchemy metadata, bypassing Alembic
+    # entirely (this file's own docstring) — the GRANT/REVOKE applied by
+    # `0009_create_follow_up_action_table.py` in production must be mirrored
+    # here, identical SQL, so the privilege assertion stays verifiable under
+    # the test DB too (spec Boundaries & Constraints, AD-6).
+    with engine.begin() as connection:
+        connection.execute(sa_text("GRANT INSERT, SELECT ON follow_up_action TO CURRENT_USER"))
+        connection.execute(sa_text("REVOKE UPDATE, DELETE ON follow_up_action FROM CURRENT_USER"))
     yield engine
     Base.metadata.drop_all(engine)
     engine.dispose()

@@ -55,6 +55,7 @@ def migration_engine(engine: Engine) -> Engine:
     # and `trajectory_changes`, so it must drop before either.
     with engine.connect() as connection:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        connection.execute(text("DROP TABLE IF EXISTS follow_up_action"))
         connection.execute(text("DROP TABLE IF EXISTS follow_up_evidence"))
         connection.execute(text("DROP TABLE IF EXISTS follow_ups"))
         connection.execute(text("DROP TABLE IF EXISTS trajectory_change_sources"))
@@ -129,6 +130,9 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         follow_up_evidence_exists = connection.execute(
             text("SELECT to_regclass('public.follow_up_evidence') IS NOT NULL")
         ).scalar_one()
+        follow_up_action_exists = connection.execute(
+            text("SELECT to_regclass('public.follow_up_action') IS NOT NULL")
+        ).scalar_one()
         synthetic_profile_type_exists = connection.execute(
             text("SELECT to_regtype('synthetic_profile') IS NOT NULL")
         ).scalar_one()
@@ -150,6 +154,7 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
     assert trajectory_change_sources_exists is True
     assert follow_ups_exists is True
     assert follow_up_evidence_exists is True
+    assert follow_up_action_exists is True
     assert synthetic_profile_type_exists is True
     assert synthetic_profile_column_exists is True
 
