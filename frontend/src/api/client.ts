@@ -56,6 +56,13 @@ export type FollowUp = paths['/follow-ups']['post']['responses'][201]['content']
 export type FollowUpDetail =
   paths['/follow-ups/{follow_up_id}']['get']['responses'][200]['content']['application/json']
 
+export type RegisterFollowUpActionRequest =
+  paths['/follow-ups/{follow_up_id}/actions']['post']['requestBody']['content']['application/json']
+export type FollowUpAction =
+  paths['/follow-ups/{follow_up_id}/actions']['post']['responses'][201]['content']['application/json']
+export type ChangeFollowUpStatusRequest =
+  paths['/follow-ups/{follow_up_id}/status']['patch']['requestBody']['content']['application/json']
+
 interface ErrorEnvelope {
   error: {
     code: string
@@ -106,7 +113,7 @@ function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
 }
 
 interface RequestOptions {
-  method: 'GET' | 'POST'
+  method: 'GET' | 'POST' | 'PATCH'
   path: string
   body?: unknown
   token?: string
@@ -308,5 +315,33 @@ export async function getFollowUp(token: string, followUpId: string): Promise<Fo
     path: `/follow-ups/${followUpId}`,
     token,
     fallbackMessage: 'Não foi possível carregar os dados agora.',
+  })
+}
+
+export async function registerFollowUpAction(
+  token: string,
+  followUpId: string,
+  payload: RegisterFollowUpActionRequest,
+): Promise<FollowUpAction> {
+  return request<FollowUpAction>({
+    method: 'POST',
+    path: `/follow-ups/${followUpId}/actions`,
+    body: payload,
+    token,
+    fallbackMessage: 'Não foi possível salvar o registro agora.',
+  })
+}
+
+export async function changeFollowUpStatus(
+  token: string,
+  followUpId: string,
+  payload: ChangeFollowUpStatusRequest,
+): Promise<FollowUp> {
+  return request<FollowUp>({
+    method: 'PATCH',
+    path: `/follow-ups/${followUpId}/status`,
+    body: payload,
+    token,
+    fallbackMessage: 'Não foi possível atualizar o status agora.',
   })
 }
