@@ -199,6 +199,7 @@ def get_get_follow_up_service(db: Session = Depends(get_db)) -> GetFollowUpServi
     return GetFollowUpService(
         follow_up_repository=SqlAlchemyFollowUpRepository(db),
         student_repository=SqlAlchemyStudentRepository(db),
+        trajectory_change_repository=SqlAlchemyTrajectoryChangeRepository(db),
         trajectory_change_source_repository=SqlAlchemyTrajectoryChangeRepository(db),
         attendance_repository=SqlAlchemyAttendanceRepository(db),
         grade_repository=SqlAlchemyGradeRepository(db),

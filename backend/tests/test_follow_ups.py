@@ -14,14 +14,17 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.domain.student import DatasetSplit
+from app.domain.trajectory_change import TrajectoryChangeType
 from app.infrastructure.db.models import (
     AcademicPeriodModel,
     AttendanceRecordModel,
     ClassroomModel,
     FollowUpActionModel,
+    FollowUpEvidenceModel,
     FollowUpModel,
     PedagogicalObservationModel,
     StudentModel,
+    TrajectoryChangeModel,
     TrajectoryChangeSourceModel,
 )
 
@@ -144,12 +147,17 @@ def test_open_follow_up_creates_follow_up_and_evidence_then_fetch_returns_detail
     assert detail["student_id"] == str(seeded_enrolled_student.id)
     assert detail["student_name"] == seeded_enrolled_student.name
     assert detail["status"] == "EM_OBSERVACAO"
+    # Story 4.3: evidence is grouped per linked `TrajectoryChange`.
+    assert detail["actions"] == []
+    assert len(detail["trajectory_changes"]) == 1
+    group = detail["trajectory_changes"][0]
+    assert group["trajectory_change"]["id"] == change["id"]
     # Same evidence resolution path as the trajectory detail endpoint
     # (RNF-11: every item traces to a real source record).
-    assert len(detail["evidence"]) >= 1
-    source_types = {item["source_type"] for item in detail["evidence"]}
+    assert len(group["evidence"]) >= 1
+    source_types = {item["source_type"] for item in group["evidence"]}
     assert "ATTENDANCE_RECORD" in source_types or "PEDAGOGICAL_OBSERVATION" in source_types
-    for item in detail["evidence"]:
+    for item in group["evidence"]:
         assert item["description"]
         assert item["date"]
 
@@ -296,7 +304,11 @@ def test_recompute_after_follow_up_evidence_exists_keeps_change_frozen(
     follow_up_detail = client.get(
         f"/follow-ups/{open_response.json()['id']}", headers=headers
     ).json()
-    descriptions = {item["description"] for item in follow_up_detail["evidence"]}
+    descriptions = {
+        item["description"]
+        for group in follow_up_detail["trajectory_changes"]
+        for item in group["evidence"]
+    }
     assert "Nova observação pós-congelamento." not in "".join(descriptions)
 
 
@@ -494,6 +506,132 @@ def test_change_follow_up_status_with_invalid_status_returns_422(
     )
 
     assert response.status_code == 422
+
+
+# --- Story 4.3: GET /follow-ups/{id} returns full history --------------------------------
+
+
+def test_get_follow_up_returns_actions_chronologically_oldest_first(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+    follow_up = _seed_follow_up(db_session, seeded_enrolled_student, seeded_user.id)
+
+    # Inserted out of `created_at` order on purpose (spec I/O Matrix, "Multiple
+    # actions over time") — the response must still come back oldest-first.
+    db_session.add_all(
+        [
+            FollowUpActionModel(
+                id=uuid.uuid4(),
+                follow_up_id=follow_up.id,
+                description="Terceira ação (mais recente).",
+                author_user_id=seeded_user.id,
+                created_at=datetime(2026, 9, 24, 15, 0, tzinfo=timezone.utc),
+            ),
+            FollowUpActionModel(
+                id=uuid.uuid4(),
+                follow_up_id=follow_up.id,
+                description="Primeira ação (mais antiga).",
+                author_user_id=seeded_user.id,
+                created_at=datetime(2026, 9, 24, 13, 0, tzinfo=timezone.utc),
+            ),
+            FollowUpActionModel(
+                id=uuid.uuid4(),
+                follow_up_id=follow_up.id,
+                description="Segunda ação.",
+                author_user_id=seeded_user.id,
+                created_at=datetime(2026, 9, 24, 14, 0, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(f"/follow-ups/{follow_up.id}", headers=headers)
+
+    assert response.status_code == 200
+    descriptions = [action["description"] for action in response.json()["actions"]]
+    assert descriptions == [
+        "Primeira ação (mais antiga).",
+        "Segunda ação.",
+        "Terceira ação (mais recente).",
+    ]
+
+
+def test_get_follow_up_with_zero_actions_returns_empty_list(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+    follow_up = _seed_follow_up(db_session, seeded_enrolled_student, seeded_user.id)
+
+    response = client.get(f"/follow-ups/{follow_up.id}", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["actions"] == []
+
+
+def test_get_follow_up_groups_evidence_by_trajectory_change_ordered_by_detected_at(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+    change = _detect_attendance_drop_change(
+        client, headers, db_session, seeded_enrolled_student, seeded_classroom, seeded_user.id
+    )
+
+    open_response = client.post(
+        "/follow-ups",
+        json={
+            "student_id": str(seeded_enrolled_student.id),
+            "trajectory_change_id": change["id"],
+        },
+        headers=headers,
+    )
+    assert open_response.status_code == 201
+    follow_up_id = open_response.json()["id"]
+
+    # Second `TrajectoryChange`, detected earlier than the first, cited by a
+    # second `FollowUpEvidence` row inserted directly — no UI creates a
+    # second one yet (spec Design Notes), so the grouping/ordering path is
+    # exercised at the DB layer.
+    earlier_change = TrajectoryChangeModel(
+        id=uuid.uuid4(),
+        student_id=seeded_enrolled_student.id,
+        type=TrajectoryChangeType.GRADE_DROP,
+        period_id=seeded_academic_period.id,
+        detected_at=datetime(2026, 8, 1, 0, 0, tzinfo=timezone.utc),
+        description="Queda de notas detectada.",
+    )
+    db_session.add(earlier_change)
+    db_session.flush()
+    db_session.add(
+        FollowUpEvidenceModel(
+            id=uuid.uuid4(),
+            follow_up_id=uuid.UUID(follow_up_id),
+            trajectory_change_id=earlier_change.id,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/follow-ups/{follow_up_id}", headers=headers)
+
+    assert response.status_code == 200
+    groups = response.json()["trajectory_changes"]
+    assert len(groups) == 2
+    # Ordered by `detected_at` ascending: the directly-seeded earlier change
+    # (2026-08-01) comes before the originally-detected attendance change.
+    assert groups[0]["trajectory_change"]["id"] == str(earlier_change.id)
+    assert groups[1]["trajectory_change"]["id"] == change["id"]
+    assert groups[0]["evidence"] == []
 
 
 def test_follow_up_action_table_privileges_allow_insert_select_deny_update_delete(
