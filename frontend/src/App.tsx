@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
+import { Acompanhamento } from './pages/Acompanhamento'
 import { EstudanteTrajetoria } from './pages/EstudanteTrajetoria'
 import { Home } from './pages/Home'
 import { Atividades } from './pages/Lancamento/Atividades'
@@ -60,6 +61,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <EstudanteTrajetoria />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/acompanhamentos/:followUpId"
+            element={
+              <ProtectedRoute>
+                <Acompanhamento />
               </ProtectedRoute>
             }
           />

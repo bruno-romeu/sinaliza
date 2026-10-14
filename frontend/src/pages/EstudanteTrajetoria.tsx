@@ -1,13 +1,14 @@
 import { useEffect, useId, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, type NavigateFunction } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import {
   ApiError,
   getStudentTrajectoryDetail,
-  type EvidenceItem,
+  openFollowUp,
   type ObservationItem,
   type TrajectoryDetail,
 } from '../api/client'
+import { EvidenceCard } from '../components/EvidenceCard'
 import { Header } from '../components/Header'
 
 type ChartIndicator = TrajectoryDetail['chart_indicator']
@@ -26,13 +27,6 @@ const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
   COMBINED_DETERIORATION: 'Mudança combinada',
 }
 
-const SOURCE_TYPE_LABEL: Record<EvidenceItem['source_type'], string> = {
-  ATTENDANCE_RECORD: 'Frequência',
-  GRADE: 'Nota',
-  ASSIGNMENT_SUBMISSION: 'Atividade',
-  PEDAGOGICAL_OBSERVATION: 'Registro pedagógico',
-}
-
 function formatIndicatorValue(indicator: ChartIndicator, value: string | null): string {
   if (value === null) return 'Sem dado'
   const num = Number(value)
@@ -43,12 +37,6 @@ function formatIndicatorValue(indicator: ChartIndicator, value: string | null): 
 
 function formatDateBr(value: string): string {
   const date = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('pt-BR')
-}
-
-function formatDetectedAt(value: string): string {
-  const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString('pt-BR')
 }
@@ -256,6 +244,7 @@ type LoadState =
 export function EstudanteTrajetoria() {
   const { studentId } = useParams<{ studentId: string }>()
   const { token } = useAuth()
+  const navigate = useNavigate()
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [concerningFactorOpen, setConcerningFactorOpen] = useState(false)
@@ -362,12 +351,15 @@ export function EstudanteTrajetoria() {
           </div>
         )}
 
-        {loadState.status === 'loaded' && (
+        {loadState.status === 'loaded' && studentId && (
           <TrajectoryDetailContent
             detail={loadState.detail}
             concerningFactorOpen={concerningFactorOpen}
             setConcerningFactorOpen={setConcerningFactorOpen}
             concerningFactorContentId={concerningFactorContentId}
+            studentId={studentId}
+            token={token}
+            navigate={navigate}
           />
         )}
       </main>
@@ -375,20 +367,44 @@ export function EstudanteTrajetoria() {
   )
 }
 
+type OpenFollowUpState = { status: 'idle' } | { status: 'submitting' } | { status: 'error' }
+
 function TrajectoryDetailContent({
   detail,
   concerningFactorOpen,
   setConcerningFactorOpen,
   concerningFactorContentId,
+  studentId,
+  token,
+  navigate,
 }: {
   detail: TrajectoryDetail
   concerningFactorOpen: boolean
   setConcerningFactorOpen: (updater: (open: boolean) => boolean) => void
   concerningFactorContentId: string
+  studentId: string
+  token: string | null
+  navigate: NavigateFunction
 }) {
   const hasChange = detail.trajectory_change !== null
   const hasConcerningFactor = detail.concerning_factor !== null
   const isCalm = !hasChange && !hasConcerningFactor
+  const [openFollowUpState, setOpenFollowUpState] = useState<OpenFollowUpState>({ status: 'idle' })
+
+  const handleOpenFollowUp = () => {
+    if (!token || detail.trajectory_change === null) return
+    setOpenFollowUpState({ status: 'submitting' })
+    openFollowUp(token, {
+      student_id: studentId,
+      trajectory_change_id: detail.trajectory_change.id,
+    })
+      .then((followUp) => {
+        navigate(`/acompanhamentos/${followUp.id}`)
+      })
+      .catch(() => {
+        setOpenFollowUpState({ status: 'error' })
+      })
+  }
 
   return (
     <>
@@ -400,39 +416,16 @@ function TrajectoryDetailContent({
         <TrajectoryChart detail={detail} />
       </section>
 
-      {/* Evidence section — only when a change was detected. */}
+      {/* Evidence section — only when a change was detected. No `linkTo` here:
+          this page already *is* the trajectory destination that link would
+          point at (spec Code Map). */}
       {hasChange && (
-        <section style={cardStyle}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-            {CHANGE_TYPE_LABEL[detail.trajectory_change!.type]}
-          </h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-            {detail.trajectory_change!.description} —{' '}
-            {formatDetectedAt(detail.trajectory_change!.detected_at)}
-          </p>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {detail.evidence.map((item, index) => (
-              <li
-                key={`${item.source_type}-${index}`}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 2,
-                }}
-              >
-                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                  {SOURCE_TYPE_LABEL[item.source_type]}
-                </span>
-                <span>
-                  {item.description} — {formatDateBr(item.date)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <EvidenceCard
+          title={CHANGE_TYPE_LABEL[detail.trajectory_change!.type]}
+          description={detail.trajectory_change!.description}
+          detectedAt={detail.trajectory_change!.detected_at}
+          evidence={detail.evidence}
+        />
       )}
 
       {/* Concerning-factor section — exactly one confirmed signal, closed by default. */}
@@ -516,25 +509,35 @@ function TrajectoryDetailContent({
         )}
       </section>
 
-      {/* Follow-up action — Epic 4 scope, rendered disabled for now. */}
-      <section>
+      {/* Follow-up action — enabled once a change was detected (Story 4.1). */}
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
         <button
           type="button"
-          disabled
-          title="Acompanhamento vinculado a evidências chega em uma próxima etapa."
+          disabled={!hasChange || openFollowUpState.status === 'submitting'}
+          onClick={handleOpenFollowUp}
+          title={
+            hasChange
+              ? undefined
+              : 'Acompanhamento vinculado a evidências requer uma mudança detectada.'
+          }
           style={{
             minHeight: 'var(--min-hit-target)',
             padding: '0 20px',
             borderRadius: 'var(--radius-md)',
             border: '1px solid var(--color-border)',
-            background: 'var(--color-surface)',
-            color: 'var(--color-text-secondary)',
+            background: hasChange ? 'var(--color-primary)' : 'var(--color-surface)',
+            color: hasChange ? 'var(--color-surface)' : 'var(--color-text-secondary)',
             fontSize: 15,
-            cursor: 'not-allowed',
+            cursor: hasChange && openFollowUpState.status !== 'submitting' ? 'pointer' : 'not-allowed',
           }}
         >
-          Abrir acompanhamento
+          {openFollowUpState.status === 'submitting' ? 'Abrindo…' : 'Abrir acompanhamento'}
         </button>
+        {openFollowUpState.status === 'error' && (
+          <p role="alert" style={{ margin: 0, color: 'var(--color-attention)' }}>
+            Não foi possível abrir o acompanhamento agora.
+          </p>
+        )}
       </section>
     </>
   )

@@ -21,6 +21,7 @@ from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from app.domain.follow_up import FollowUpStatus
 from app.domain.student import SyntheticProfile
 from app.domain.trajectory_change import SourceType, TrajectoryChangeType
 
@@ -50,9 +51,12 @@ def migration_engine(engine: Engine) -> Engine:
     # Drop order respects FKs: assignment_submissions/assignments/grades/
     # attendance_records/pedagogical_observations/enrollments (children)
     # before students/classrooms/academic_periods/users (parents), then
-    # native enum types.
+    # native enum types. `follow_up_evidence` depends on both `follow_ups`
+    # and `trajectory_changes`, so it must drop before either.
     with engine.connect() as connection:
         connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
+        connection.execute(text("DROP TABLE IF EXISTS follow_up_evidence"))
+        connection.execute(text("DROP TABLE IF EXISTS follow_ups"))
         connection.execute(text("DROP TABLE IF EXISTS trajectory_change_sources"))
         connection.execute(text("DROP TABLE IF EXISTS trajectory_changes"))
         connection.execute(text("DROP TABLE IF EXISTS synthetic_generation_runs"))
@@ -66,6 +70,7 @@ def migration_engine(engine: Engine) -> Engine:
         connection.execute(text("DROP TABLE IF EXISTS students"))
         connection.execute(text("DROP TABLE IF EXISTS classrooms"))
         connection.execute(text("DROP TABLE IF EXISTS users"))
+        connection.execute(text("DROP TYPE IF EXISTS follow_up_status"))
         connection.execute(text("DROP TYPE IF EXISTS trajectory_change_source_type"))
         connection.execute(text("DROP TYPE IF EXISTS trajectory_change_type"))
         connection.execute(text("DROP TYPE IF EXISTS synthetic_profile"))
@@ -118,6 +123,12 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         trajectory_change_sources_exists = connection.execute(
             text("SELECT to_regclass('public.trajectory_change_sources') IS NOT NULL")
         ).scalar_one()
+        follow_ups_exists = connection.execute(
+            text("SELECT to_regclass('public.follow_ups') IS NOT NULL")
+        ).scalar_one()
+        follow_up_evidence_exists = connection.execute(
+            text("SELECT to_regclass('public.follow_up_evidence') IS NOT NULL")
+        ).scalar_one()
         synthetic_profile_type_exists = connection.execute(
             text("SELECT to_regtype('synthetic_profile') IS NOT NULL")
         ).scalar_one()
@@ -137,6 +148,8 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
     assert synthetic_generation_runs_exists is True
     assert trajectory_changes_exists is True
     assert trajectory_change_sources_exists is True
+    assert follow_ups_exists is True
+    assert follow_up_evidence_exists is True
     assert synthetic_profile_type_exists is True
     assert synthetic_profile_column_exists is True
 
@@ -186,6 +199,19 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         member.value for member in TrajectoryChangeType
     }
     assert trajectory_change_source_type_labels == {member.value for member in SourceType}
+
+    # Same label-drift regression as above, for Story 4.1's `follow_up_status`.
+    with migration_engine.connect() as connection:
+        follow_up_status_labels = set(
+            connection.execute(
+                text(
+                    "SELECT e.enumlabel FROM pg_enum e "
+                    "JOIN pg_type t ON e.enumtypid = t.oid "
+                    "WHERE t.typname = 'follow_up_status'"
+                )
+            ).scalars()
+        )
+    assert follow_up_status_labels == {member.value for member in FollowUpStatus}
 
     # `test_grades.py`'s DB-bypass test only proves `ck_grade_value_range`
     # exists on the schema built by `Base.metadata.create_all()` (conftest's

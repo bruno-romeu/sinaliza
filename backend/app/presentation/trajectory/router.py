@@ -64,6 +64,7 @@ def get_student_trajectory(
     indicators = result.indicators
     trajectory_change_out = (
         TrajectoryChangeOut(
+            id=result.trajectory_change.id,
             type=result.trajectory_change.type.value,
             period_id=result.trajectory_change.period_id,
             detected_at=result.trajectory_change.detected_at,
@@ -117,6 +118,7 @@ def get_student_trajectory_detail(
 
     trajectory_change_out = (
         TrajectoryChangeOut(
+            id=result.trajectory_change.id,
             type=result.trajectory_change.type.value,
             period_id=result.trajectory_change.period_id,
             detected_at=result.trajectory_change.detected_at,
