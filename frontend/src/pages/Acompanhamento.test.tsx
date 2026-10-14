@@ -20,11 +20,23 @@ function baseDetail(overrides: Partial<Record<string, unknown>> = {}) {
     student_name: 'Maria Silva',
     status: 'EM_OBSERVACAO',
     created_at: '2026-10-13T00:00:00Z',
-    evidence: [
+    actions: [],
+    trajectory_changes: [
       {
-        source_type: 'ATTENDANCE_RECORD',
-        description: 'Falta não justificada em 20/09/2026',
-        date: '2026-09-20',
+        trajectory_change: {
+          id: 'change-1',
+          type: 'ATTENDANCE_DROP',
+          period_id: 'period-1',
+          detected_at: '2026-09-01T00:00:00Z',
+          description: 'Queda de frequência detectada.',
+        },
+        evidence: [
+          {
+            source_type: 'ATTENDANCE_RECORD',
+            description: 'Falta não justificada em 20/09/2026',
+            date: '2026-09-20',
+          },
+        ],
       },
     ],
     ...overrides,
@@ -64,22 +76,7 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
   })
 
   it('shows the "Em observação" pill, student name, and evidence with a working link back to the trajectory', async () => {
-    fetchMock = vi.fn(async () =>
-      jsonResponse({
-        id: 'follow-up-1',
-        student_id: 'student-1',
-        student_name: 'Maria Silva',
-        status: 'EM_OBSERVACAO',
-        created_at: '2026-10-13T00:00:00Z',
-        evidence: [
-          {
-            source_type: 'ATTENDANCE_RECORD',
-            description: 'Falta não justificada em 20/09/2026',
-            date: '2026-09-20',
-          },
-        ],
-      }),
-    )
+    fetchMock = vi.fn(async () => jsonResponse(baseDetail()))
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
@@ -360,5 +357,151 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     await screen.findByText('Acompanhamento não encontrado.')
+  })
+
+  it('shows every registered action in chronological order (oldest first)', async () => {
+    fetchMock = vi.fn(async () =>
+      jsonResponse(
+        baseDetail({
+          actions: [
+            {
+              id: 'action-1',
+              follow_up_id: 'follow-up-1',
+              description: 'Primeira ação.',
+              author_user_id: 'u1',
+              created_at: '2026-10-01T12:00:00Z',
+            },
+            {
+              id: 'action-2',
+              follow_up_id: 'follow-up-1',
+              description: 'Segunda ação.',
+              author_user_id: 'u1',
+              created_at: '2026-10-05T12:00:00Z',
+            },
+          ],
+        }),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    await screen.findByText('Maria Silva')
+    const items = screen.getAllByRole('listitem').map((item) => item.textContent ?? '')
+    const actionItems = items.filter(
+      (text) => text.includes('Primeira ação.') || text.includes('Segunda ação.'),
+    )
+    expect(actionItems).toHaveLength(2)
+    expect(actionItems[0]).toContain('Primeira ação.')
+    expect(actionItems[1]).toContain('Segunda ação.')
+  })
+
+  it('shows the empty-state message when a follow-up has zero registered actions', async () => {
+    fetchMock = vi.fn(async () => jsonResponse(baseDetail({ actions: [] })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    await screen.findByText('Maria Silva')
+    expect(screen.getByText('Nenhuma ação registrada até o momento.')).toBeInTheDocument()
+  })
+
+  it('renders one evidence section per trajectory-change group', async () => {
+    fetchMock = vi.fn(async () =>
+      jsonResponse(
+        baseDetail({
+          trajectory_changes: [
+            {
+              trajectory_change: {
+                id: 'change-1',
+                type: 'ATTENDANCE_DROP',
+                period_id: 'period-1',
+                detected_at: '2026-08-01T00:00:00Z',
+                description: 'Queda de frequência detectada.',
+              },
+              evidence: [
+                {
+                  source_type: 'ATTENDANCE_RECORD',
+                  description: 'Falta não justificada em 01/08/2026',
+                  date: '2026-08-01',
+                },
+              ],
+            },
+            {
+              trajectory_change: {
+                id: 'change-2',
+                type: 'GRADE_DROP',
+                period_id: 'period-1',
+                detected_at: '2026-09-01T00:00:00Z',
+                description: 'Queda de notas detectada.',
+              },
+              evidence: [
+                {
+                  source_type: 'GRADE',
+                  description: 'Nota abaixo da média em 01/09/2026',
+                  date: '2026-09-01',
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    await screen.findByText('Maria Silva')
+    expect(screen.getByText('Queda de frequência')).toBeInTheDocument() // collapsible section header
+    expect(screen.getByText('Queda de notas')).toBeInTheDocument()
+    expect(screen.getAllByText('Evidências')).toHaveLength(2) // each group's EvidenceCard title
+    expect(screen.getByText('Falta não justificada em 01/08/2026', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Nota abaixo da média em 01/09/2026', { exact: false })).toBeInTheDocument()
+  })
+
+  it('toggles a section open/closed with a click, keeping focus on the header button; the header is a native <button> so Enter/Space activate it natively', async () => {
+    fetchMock = vi.fn(async () =>
+      jsonResponse(
+        baseDetail({
+          actions: [
+            {
+              id: 'action-1',
+              follow_up_id: 'follow-up-1',
+              description: 'Conversei com a família.',
+              author_user_id: 'u1',
+              created_at: '2026-10-01T12:00:00Z',
+            },
+          ],
+        }),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    await screen.findByText('Maria Silva')
+    const header = screen.getByRole('button', { name: 'Histórico de ações' })
+    // A real `<button type="button">` receives Enter/Space UA activation for
+    // free in every browser — jsdom's `fireEvent.keyDown` does not simulate
+    // that native click-conversion (verified: a bare `<button onClick>`
+    // dispatches no click on `fireEvent.keyDown(btn, {key:'Enter'})` here),
+    // so the structural guarantee below — a native, non-disabled `<button>`
+    // — is what actually backs RNF-08/UX-DR20's keyboard-operability claim,
+    // not a jsdom keyboard-event simulation that would misrepresent it.
+    expect(header.tagName).toBe('BUTTON')
+    expect(header).toHaveAttribute('type', 'button')
+    expect(header).not.toBeDisabled()
+    expect(header).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Conversei com a família.')).toBeInTheDocument()
+
+    header.focus()
+    fireEvent.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Conversei com a família.')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(header)
+
+    fireEvent.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Conversei com a família.')).toBeInTheDocument()
   })
 })

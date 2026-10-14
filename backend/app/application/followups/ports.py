@@ -50,9 +50,19 @@ class FollowUpRepositoryPort(Protocol):
         ...
 
     def list_evidence_by_follow_up(self, follow_up_id: uuid.UUID) -> list[FollowUpEvidence]:
-        """Every `FollowUpEvidence` row attached to one `FollowUp`, used by
-        `GetFollowUpService` to resolve the evidence card (story 4.1 always
-        has exactly one, future stories may add more)."""
+        """Every `FollowUpEvidence` row attached to one `FollowUp`, ordered by
+        its linked `TrajectoryChange.detected_at` ascending (then `id`
+        ascending as a deterministic tiebreak) so `GetFollowUpService` can
+        group/order evidence by `detected_at` without a second query (spec
+        Boundaries & Constraints, RF-14/RF-20; story 4.1 always has exactly
+        one, future stories may add more)."""
+        ...
+
+    def list_actions_by_follow_up(self, follow_up_id: uuid.UUID) -> list[FollowUpAction]:
+        """Every `FollowUpAction` row attached to one `FollowUp`, ordered by
+        `created_at` ascending (then `id` ascending as a deterministic
+        tiebreak) — oldest first, matching "histórico" (spec Boundaries &
+        Constraints, RF-14)."""
         ...
 
     def add_action(self, action: FollowUpAction) -> FollowUpAction:
