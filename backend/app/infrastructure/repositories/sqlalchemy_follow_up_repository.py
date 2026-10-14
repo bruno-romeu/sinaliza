@@ -1,0 +1,80 @@
+"""Implements `FollowUpRepositoryPort` on top of SQLAlchemy. Plain inserts
+only (no upsert needed, spec Code Map) — a `FollowUp` is always a fresh row,
+never updated by this repository (status transitions are Story 4.2+ scope,
+spec Never: "the router never mutates `FollowUp` state directly")."""
+
+from __future__ import annotations
+
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.domain.follow_up import FollowUp, FollowUpEvidence
+from app.infrastructure.db.models import FollowUpEvidenceModel, FollowUpModel
+
+
+class SqlAlchemyFollowUpRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def save_with_evidence(
+        self, follow_up: FollowUp, evidence: list[FollowUpEvidence]
+    ) -> FollowUp:
+        self._session.add(
+            FollowUpModel(
+                id=follow_up.id,
+                student_id=follow_up.student_id,
+                status=follow_up.status,
+                reason=follow_up.reason,
+                responsible_user_id=follow_up.responsible_user_id,
+                next_review_date=follow_up.next_review_date,
+                created_at=follow_up.created_at,
+            )
+        )
+        # Flushed before the evidence rows below: `FollowUpModel`/
+        # `FollowUpEvidenceModel` have no `relationship()` between them (plain
+        # FK columns only, same as `TrajectoryChangeModel`/
+        # `TrajectoryChangeSourceModel`), so the unit of work has no
+        # dependency edge to order these two inserts by — an explicit flush
+        # here guarantees `follow_ups` is written first, inside the same
+        # transaction as the evidence insert and the final commit below.
+        self._session.flush()
+        for item in evidence:
+            self._session.add(
+                FollowUpEvidenceModel(
+                    id=item.id,
+                    follow_up_id=item.follow_up_id,
+                    trajectory_change_id=item.trajectory_change_id,
+                )
+            )
+        self._session.commit()
+        return follow_up
+
+    def get_by_id(self, follow_up_id: uuid.UUID) -> FollowUp | None:
+        model = self._session.get(FollowUpModel, follow_up_id)
+        if model is None:
+            return None
+        return FollowUp(
+            id=model.id,
+            student_id=model.student_id,
+            status=model.status,
+            reason=model.reason,
+            responsible_user_id=model.responsible_user_id,
+            next_review_date=model.next_review_date,
+            created_at=model.created_at,
+        )
+
+    def list_evidence_by_follow_up(self, follow_up_id: uuid.UUID) -> list[FollowUpEvidence]:
+        stmt = select(FollowUpEvidenceModel).where(
+            FollowUpEvidenceModel.follow_up_id == follow_up_id
+        )
+        models = self._session.execute(stmt).scalars().all()
+        return [
+            FollowUpEvidence(
+                id=model.id,
+                follow_up_id=model.follow_up_id,
+                trajectory_change_id=model.trajectory_change_id,
+            )
+            for model in models
+        ]
