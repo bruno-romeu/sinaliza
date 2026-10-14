@@ -16,18 +16,33 @@ happened to generate for a fresh `TrajectoryChange` object.
 already existed for this change (delete+reinsert, spec I/O Matrix:
 "Recálculo do mesmo período... substituídos") in the same transaction as the
 upsert — there is never a window where a `TrajectoryChange` exists without at
-least one source row (RNF-11). No freeze-on-evidence guard here: the upsert
-is always unconditional `DO UPDATE` (spec Never, `deferred-work.md` — Epic 4
-adds the guard once `follow_up_evidence` exists)."""
+least one source row (RNF-11).
+
+Story 4.1 adds the freeze-on-evidence guard deferred from Story 3.2: once a
+`TrajectoryChange` has >=1 `FollowUpEvidence` row, the `ON CONFLICT ... DO
+UPDATE` is scoped with a `WHERE NOT EXISTS (follow_up_evidence...)` clause, so
+Postgres silently skips the update for a frozen row instead of touching it.
+`RETURNING` only returns rows actually touched by the statement — a
+`WHERE`-blocked `DO UPDATE` touches nothing — so `scalar_one_or_none()` is
+used instead of `scalar_one()`; when it comes back `None` (frozen), the
+existing row's current (frozen) values are fetched by a separate `SELECT` on
+the `(student_id, type, period_id)` key, and `TrajectoryChangeSource` rows are
+left completely untouched (no delete+reinsert) — the whole point of freezing."""
 
 from __future__ import annotations
 
-from sqlalchemy import delete, select
+import uuid
+
+from sqlalchemy import delete, exists, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.domain.trajectory_change import TrajectoryChange, TrajectoryChangeSource
-from app.infrastructure.db.models import TrajectoryChangeModel, TrajectoryChangeSourceModel
+from app.infrastructure.db.models import (
+    FollowUpEvidenceModel,
+    TrajectoryChangeModel,
+    TrajectoryChangeSourceModel,
+)
 
 
 class SqlAlchemyTrajectoryChangeRepository:
@@ -45,14 +60,47 @@ class SqlAlchemyTrajectoryChangeRepository:
             detected_at=change.detected_at,
             description=change.description,
         )
+        # Skips the update entirely when the (about to be conflicted-on)
+        # existing row already has >=1 FollowUpEvidence citing it (frozen,
+        # spec Boundaries & Constraints).
+        not_frozen = ~exists(
+            select(FollowUpEvidenceModel.id).where(
+                FollowUpEvidenceModel.trajectory_change_id == TrajectoryChangeModel.id
+            )
+        )
         upsert_stmt = insert_stmt.on_conflict_do_update(
             index_elements=["student_id", "type", "period_id"],
             set_={
                 "detected_at": insert_stmt.excluded.detected_at,
                 "description": insert_stmt.excluded.description,
             },
+            where=not_frozen,
         ).returning(TrajectoryChangeModel.id)
-        change_id = self._session.execute(upsert_stmt).scalar_one()
+        change_id = self._session.execute(upsert_stmt).scalar_one_or_none()
+
+        if change_id is None:
+            # Frozen: the WHERE blocked the update, so nothing was returned.
+            # Fetch the existing row's real (frozen) values by its natural
+            # key instead of assuming they equal the proposed-but-rejected
+            # `change` argument — and never touch TrajectoryChangeSource rows
+            # in this branch.
+            existing_stmt = select(TrajectoryChangeModel).where(
+                TrajectoryChangeModel.student_id == change.student_id,
+                TrajectoryChangeModel.type == change.type,
+                TrajectoryChangeModel.period_id == change.period_id,
+            )
+            existing = self._session.execute(existing_stmt).scalar_one()
+            # Only a SELECT happened in this branch (frozen row, no write) —
+            # this commit merely closes the read-only transaction cleanly.
+            self._session.commit()
+            return TrajectoryChange(
+                id=existing.id,
+                student_id=existing.student_id,
+                type=existing.type,
+                period_id=existing.period_id,
+                detected_at=existing.detected_at,
+                description=existing.description,
+            )
 
         self._session.execute(
             delete(TrajectoryChangeSourceModel).where(
@@ -78,6 +126,21 @@ class SqlAlchemyTrajectoryChangeRepository:
             period_id=change.period_id,
             detected_at=change.detected_at,
             description=change.description,
+        )
+
+    def get_by_id(self, change_id: uuid.UUID) -> TrajectoryChange | None:
+        """Story 4.1 — loads one `TrajectoryChange` by id for
+        `OpenFollowUpService`."""
+        model = self._session.get(TrajectoryChangeModel, change_id)
+        if model is None:
+            return None
+        return TrajectoryChange(
+            id=model.id,
+            student_id=model.student_id,
+            type=model.type,
+            period_id=model.period_id,
+            detected_at=model.detected_at,
+            description=model.description,
         )
 
     def list_recent(self, limit: int) -> list[TrajectoryChange]:

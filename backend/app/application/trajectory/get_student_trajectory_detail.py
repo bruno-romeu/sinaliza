@@ -42,6 +42,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Literal
 
+from app.application.trajectory.evidence import EvidenceItem, resolve_evidence
 from app.application.trajectory.get_student_trajectory import (
     ConcerningFactor,
     GetStudentTrajectoryService,
@@ -56,13 +57,9 @@ from app.application.trajectory.ports import (
     TrajectoryChangeSourceRepositoryPort,
 )
 from app.domain.academic_period import AcademicPeriod
-from app.domain.assignment_submission import AssignmentSubmission, AssignmentSubmissionStatus
 from app.domain.as_of import as_of
-from app.domain.attendance import AttendanceRecord, AttendanceStatus
-from app.domain.grade import Grade
-from app.domain.pedagogical_observation import PedagogicalObservation
 from app.domain.trajectory import TrajectoryIndicators, compute_trajectory_indicators
-from app.domain.trajectory_change import SourceType, TrajectoryChange, TrajectoryChangeType
+from app.domain.trajectory_change import TrajectoryChange, TrajectoryChangeType
 
 ChartIndicator = Literal["attendance_rate", "grade_average", "missing_assignments_count"]
 
@@ -80,32 +77,6 @@ _CHART_INDICATOR_BY_CHANGE_TYPE: dict[TrajectoryChangeType, ChartIndicator] = {
     TrajectoryChangeType.COMBINED_DETERIORATION: "attendance_rate",
 }
 
-# Deterministic evidence ordering — mirrors `domain/convergence.py`'s
-# `_DESCRIPTION_ORDER` so the same confirmed sources always render in the
-# same order (RNF-09), independent of query/set iteration order.
-_SOURCE_TYPE_ORDER: tuple[SourceType, ...] = (
-    SourceType.ATTENDANCE_RECORD,
-    SourceType.GRADE,
-    SourceType.ASSIGNMENT_SUBMISSION,
-    SourceType.PEDAGOGICAL_OBSERVATION,
-)
-
-_ATTENDANCE_STATUS_LABEL: dict[AttendanceStatus, str] = {
-    AttendanceStatus.PRESENT: "Presença registrada",
-    AttendanceStatus.ABSENT_JUSTIFIED: "Falta justificada",
-    AttendanceStatus.ABSENT_UNJUSTIFIED: "Falta não justificada",
-}
-
-_SUBMISSION_STATUS_LABEL: dict[AssignmentSubmissionStatus, str] = {
-    AssignmentSubmissionStatus.DELIVERED: "Atividade entregue",
-    AssignmentSubmissionStatus.NOT_DELIVERED: "Atividade não entregue",
-    AssignmentSubmissionStatus.PARTIAL: "Atividade entregue parcialmente",
-}
-
-
-def _format_date_br(value: date) -> str:
-    return value.strftime("%d/%m/%Y")
-
 
 @dataclass(frozen=True)
 class SeriesPoint:
@@ -118,13 +89,6 @@ class SeriesPoint:
 class HabitualRange:
     low: Decimal
     high: Decimal
-
-
-@dataclass(frozen=True)
-class EvidenceItem:
-    source_type: SourceType
-    description: str
-    date: date
 
 
 @dataclass(frozen=True)
@@ -274,87 +238,13 @@ class GetStudentTrajectoryDetailService:
         if trajectory_change is None:
             return []
 
-        sources = self._trajectory_change_source_repository.list_sources_by_change(
-            trajectory_change.id
-        )
-        ids_by_type: dict[SourceType, list[uuid.UUID]] = {}
-        for source in sources:
-            ids_by_type.setdefault(source.source_type, []).append(source.source_id)
-
-        items: list[EvidenceItem] = []
-        for source_type in _SOURCE_TYPE_ORDER:
-            ids = ids_by_type.get(source_type)
-            if not ids:
-                continue
-            items.extend(self._resolve_items_for_type(source_type, ids))
-        return items
-
-    def _resolve_items_for_type(
-        self, source_type: SourceType, ids: list[uuid.UUID]
-    ) -> list[EvidenceItem]:
-        if source_type == SourceType.ATTENDANCE_RECORD:
-            records = self._attendance_repository.get_by_ids(ids)
-            items = [
-                EvidenceItem(
-                    source_type=source_type,
-                    description=self._attendance_description(record),
-                    date=record.date,
-                )
-                for record in records
-            ]
-        elif source_type == SourceType.GRADE:
-            grades = self._grade_repository.get_by_ids(ids)
-            items = [
-                EvidenceItem(
-                    source_type=source_type,
-                    description=self._grade_description(grade),
-                    date=grade.date,
-                )
-                for grade in grades
-            ]
-        elif source_type == SourceType.ASSIGNMENT_SUBMISSION:
-            submissions = self._assignment_submission_repository.get_by_ids(ids)
-            items = [
-                EvidenceItem(
-                    source_type=source_type,
-                    description=self._assignment_submission_description(submission),
-                    date=submission.date,
-                )
-                for submission in submissions
-            ]
-        else:
-            observations = self._pedagogical_observation_repository.get_by_ids(ids)
-            items = [
-                EvidenceItem(
-                    source_type=source_type,
-                    description=self._observation_description(observation),
-                    date=observation.created_at.date(),
-                )
-                for observation in observations
-            ]
-        items.sort(key=lambda item: item.date)
-        return items
-
-    @staticmethod
-    def _attendance_description(record: AttendanceRecord) -> str:
-        return f"{_ATTENDANCE_STATUS_LABEL[record.status]} em {_format_date_br(record.date)}"
-
-    @staticmethod
-    def _grade_description(grade: Grade) -> str:
-        return f"Nota {grade.value} em {grade.subject} — {_format_date_br(grade.date)}"
-
-    @staticmethod
-    def _assignment_submission_description(submission: AssignmentSubmission) -> str:
-        return (
-            f"{_SUBMISSION_STATUS_LABEL[submission.status]} em "
-            f"{_format_date_br(submission.date)}"
-        )
-
-    @staticmethod
-    def _observation_description(observation: PedagogicalObservation) -> str:
-        return (
-            f"Registro pedagógico em {_format_date_br(observation.created_at.date())}: "
-            f"{observation.text}"
+        return resolve_evidence(
+            trajectory_change.id,
+            source_repo=self._trajectory_change_source_repository,
+            attendance_repo=self._attendance_repository,
+            grade_repo=self._grade_repository,
+            submission_repo=self._assignment_submission_repository,
+            observation_repo=self._pedagogical_observation_repository,
         )
 
     def _recent_observations(self, student_id: uuid.UUID) -> list[ObservationItem]:

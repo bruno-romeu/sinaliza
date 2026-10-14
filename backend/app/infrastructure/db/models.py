@@ -15,6 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.assignment_submission import AssignmentSubmissionStatus
 from app.domain.attendance import AttendanceStatus
+from app.domain.follow_up import FollowUpStatus
 from app.domain.student import DatasetSplit, SyntheticProfile
 from app.domain.trajectory_change import SourceType, TrajectoryChangeType
 from app.domain.user import UserRole
@@ -39,6 +40,9 @@ trajectory_change_type_enum = SAEnum(
 )
 trajectory_change_source_type_enum = SAEnum(
     SourceType, name="trajectory_change_source_type", native_enum=True, validate_strings=True
+)
+follow_up_status_enum = SAEnum(
+    FollowUpStatus, name="follow_up_status", native_enum=True, validate_strings=True
 )
 
 
@@ -257,6 +261,43 @@ class TrajectoryChangeSourceModel(Base):
         trajectory_change_source_type_enum, nullable=False
     )
     source_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+
+
+class FollowUpModel(Base):
+    """No `ondelete` on either FK — same unaddressed, already-accepted
+    codebase-wide pattern as `TrajectoryChangeModel`/`TrajectoryChangeSourceModel`
+    (see `deferred-work.md`). `reason`/`next_review_date` are nullable: no UI
+    captures them in this story (spec Boundaries & Constraints)."""
+
+    __tablename__ = "follow_ups"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+    )
+    status: Mapped[FollowUpStatus] = mapped_column(follow_up_status_enum, nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    responsible_user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    next_review_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class FollowUpEvidenceModel(Base):
+    """`trajectory_change_id` is a real `NOT NULL` FK (RNF-11, AD-7) — unlike
+    `TrajectoryChangeSource.source_id`, this is never polymorphic: a
+    `FollowUpEvidence` row always points at exactly one `TrajectoryChange`."""
+
+    __tablename__ = "follow_up_evidence"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    follow_up_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("follow_ups.id"), nullable=False, index=True
+    )
+    trajectory_change_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("trajectory_changes.id"), nullable=False, index=True
+    )
 
 
 class SyntheticGenerationRunModel(Base):

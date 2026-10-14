@@ -9,6 +9,11 @@ from pydantic import BaseModel, Field
 
 
 class TrajectoryChangeOut(BaseModel):
+    # Story 4.1: additive `id` field so the frontend can submit
+    # `trajectory_change_id` to `POST /follow-ups` — the rest of this shape
+    # (and both /trajectory and /trajectory/detail response contracts) is
+    # otherwise untouched (spec Boundaries & Constraints).
+    id: uuid.UUID
     type: Literal[
         "ATTENDANCE_DROP",
         "GRADE_DROP",

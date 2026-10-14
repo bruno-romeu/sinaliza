@@ -50,6 +50,12 @@ export type EvidenceItem = TrajectoryDetail['evidence'][number]
 export type ConcerningFactor = NonNullable<TrajectoryDetail['concerning_factor']>
 export type ObservationItem = TrajectoryDetail['observations'][number]
 
+export type OpenFollowUpRequest =
+  paths['/follow-ups']['post']['requestBody']['content']['application/json']
+export type FollowUp = paths['/follow-ups']['post']['responses'][201]['content']['application/json']
+export type FollowUpDetail =
+  paths['/follow-ups/{follow_up_id}']['get']['responses'][200]['content']['application/json']
+
 interface ErrorEnvelope {
   error: {
     code: string
@@ -283,5 +289,24 @@ export async function registerPedagogicalObservation(
     body: payload,
     token,
     fallbackMessage: 'Não foi possível salvar a observação agora.',
+  })
+}
+
+export async function openFollowUp(token: string, payload: OpenFollowUpRequest): Promise<FollowUp> {
+  return request<FollowUp>({
+    method: 'POST',
+    path: '/follow-ups',
+    body: payload,
+    token,
+    fallbackMessage: 'Não foi possível abrir o acompanhamento agora.',
+  })
+}
+
+export async function getFollowUp(token: string, followUpId: string): Promise<FollowUpDetail> {
+  return request<FollowUpDetail>({
+    method: 'GET',
+    path: `/follow-ups/${followUpId}`,
+    token,
+    fallbackMessage: 'Não foi possível carregar os dados agora.',
   })
 }

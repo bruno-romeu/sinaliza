@@ -20,6 +20,7 @@ function renderPage(studentId = 'student-1') {
         <Routes>
           <Route path="/estudantes/:studentId" element={<EstudanteTrajetoria />} />
           <Route path="/home" element={<div>Home mock</div>} />
+          <Route path="/acompanhamentos/:followUpId" element={<div>Acompanhamento mock</div>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -56,6 +57,7 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
         series: SERIES,
         habitual_range: { low: '0.5000', high: '0.9000' },
         trajectory_change: {
+          id: 'change-1',
           type: 'ATTENDANCE_DROP',
           period_id: 'p2',
           detected_at: '2026-09-24T00:00:00Z',
@@ -183,5 +185,109 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     await screen.findByText('Não foi possível carregar os dados agora.')
     expect(screen.getByRole('button', { name: 'Tentar novamente' })).toBeInTheDocument()
+  })
+
+  // --- "Abrir acompanhamento" button (Story 4.1, replaces Story 3.4's stub) ---------
+
+  const DETAIL_WITH_CHANGE = {
+    chart_indicator: 'attendance_rate',
+    series: SERIES,
+    habitual_range: { low: '0.5000', high: '0.9000' },
+    trajectory_change: {
+      id: 'change-1',
+      type: 'ATTENDANCE_DROP',
+      period_id: 'p2',
+      detected_at: '2026-09-24T00:00:00Z',
+      description: 'Mudança recente: queda de frequência — 3º Bimestre',
+    },
+    evidence: [
+      { source_type: 'ATTENDANCE_RECORD', description: 'Falta não justificada em 20/09/2026', date: '2026-09-20' },
+    ],
+    concerning_factor: null,
+    observations: [],
+  }
+
+  const DETAIL_CALM = {
+    chart_indicator: 'attendance_rate',
+    series: SERIES,
+    habitual_range: { low: '0.5000', high: '0.9000' },
+    trajectory_change: null,
+    evidence: [],
+    concerning_factor: null,
+    observations: [],
+  }
+
+  it('enables "Abrir acompanhamento" when a change exists, and clicking it opens the follow-up then navigates', async () => {
+    fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/trajectory/detail')) {
+        return jsonResponse(DETAIL_WITH_CHANGE)
+      }
+      if (url.includes('/follow-ups') && init?.method === 'POST') {
+        return jsonResponse(
+          {
+            id: 'follow-up-1',
+            student_id: 'student-1',
+            status: 'EM_OBSERVACAO',
+            created_at: '2026-10-13T00:00:00Z',
+          },
+          201,
+        )
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    const button = await screen.findByRole('button', { name: 'Abrir acompanhamento' })
+    expect(button).toBeEnabled()
+
+    fireEvent.click(button)
+
+    await screen.findByText('Acompanhamento mock')
+    const postCall = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        (typeof input === 'string' ? input : input.toString()).includes('/follow-ups') &&
+        init?.method === 'POST',
+    )
+    expect(postCall).toBeDefined()
+    const body = JSON.parse((postCall![1] as RequestInit).body as string)
+    expect(body).toEqual({ student_id: 'student-1', trajectory_change_id: 'change-1' })
+  })
+
+  it('shows an inline error and stays on the page when opening the follow-up fails', async () => {
+    fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('/trajectory/detail')) {
+        return jsonResponse(DETAIL_WITH_CHANGE)
+      }
+      if (url.includes('/follow-ups') && init?.method === 'POST') {
+        return jsonResponse(
+          { error: { code: 'trajectory_change_not_found', message: 'Mudança de trajetória não encontrada.' } },
+          404,
+        )
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    const button = await screen.findByRole('button', { name: 'Abrir acompanhamento' })
+    fireEvent.click(button)
+
+    await screen.findByText('Não foi possível abrir o acompanhamento agora.')
+    expect(screen.getByText('Trajetória do estudante')).toBeInTheDocument()
+  })
+
+  it('keeps "Abrir acompanhamento" disabled in the calm state (no detected change)', async () => {
+    fetchMock = vi.fn(async () => jsonResponse(DETAIL_CALM))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    const button = await screen.findByRole('button', { name: 'Abrir acompanhamento' })
+    expect(button).toBeDisabled()
   })
 })

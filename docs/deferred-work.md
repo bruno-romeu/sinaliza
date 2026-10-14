@@ -1,5 +1,9 @@
 # Deferred Work
 
+- source_spec: `docs/spec-4-1-abertura-de-acompanhamento-vinculado-a-evidencias.md`
+  summary: `GET /follow-ups/{id}` lets any authenticated user read a cited `PedagogicalObservation`'s full text via the evidence list, with no `responsible_user_id` visibility scoping yet.
+  evidence: Real exposure window — `GetFollowUpService` reuses Story 3.4's unfiltered `resolve_evidence` as the frozen Boundaries & Constraints require ("Never filter `PedagogicalObservation` visibility here — Story 4.4 scope"). Story 4.4 closes this by adding the `responsible_user_id`-scoped read filter at the repository-base level (AD-8/AD-11). Until then, any authenticated user who knows/guesses a `follow_up_id` can read observation text cited as its evidence.
+
 - source_spec: `docs/spec-1-1-autenticacao-coordenacao-pedagogica.md`
   summary: `POST /auth/login` has no rate limiting or lockout, so the single seeded account is open to unlimited password-guessing attempts.
   evidence: Confirmed no rate-limiting/backoff middleware anywhere in `backend/app/presentation/auth/router.py` or `app/main.py`. Not required by any RF/RNF captured so far (RNF-05 only mandates hashed storage); real but not needed for this story's scope. Revisit if the product moves toward real deployment beyond the TCC demo.
