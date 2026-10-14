@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ChangeEvent, type CSSProperties } from 'react'
+import { useEffect, useId, useState, type ChangeEvent, type CSSProperties, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import {
@@ -7,12 +7,15 @@ import {
   getFollowUp,
   registerFollowUpAction,
   type FollowUpDetail,
+  type TrajectoryChangeEvidenceGroup,
 } from '../api/client'
 import { EvidenceCard } from '../components/EvidenceCard'
 import { FollowUpStatusPill } from '../components/FollowUpStatusPill'
 import { Header } from '../components/Header'
 
 type FollowUpStatusValue = FollowUpDetail['status']
+type FollowUpActionItem = FollowUpDetail['actions'][number]
+type ChangeType = TrajectoryChangeEvidenceGroup['trajectory_change']['type']
 
 const STATUS_OPTIONS: { value: FollowUpStatusValue; label: string }[] = [
   { value: 'EM_OBSERVACAO', label: 'Em observação' },
@@ -20,6 +23,16 @@ const STATUS_OPTIONS: { value: FollowUpStatusValue; label: string }[] = [
   { value: 'AGUARDANDO_RETORNO', label: 'Aguardando retorno' },
   { value: 'ENCERRADO', label: 'Encerrado' },
 ]
+
+// Duplicated from `EstudanteTrajetoria.tsx` (same labels, spec Code Map — no
+// shared module exists for it; extracting one for two call sites across two
+// files is a larger, unscoped refactor the intent doesn't ask for).
+const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
+  ATTENDANCE_DROP: 'Queda de frequência',
+  GRADE_DROP: 'Queda de notas',
+  MISSING_ASSIGNMENTS_INCREASE: 'Aumento de atividades pendentes',
+  COMBINED_DETERIORATION: 'Mudança combinada',
+}
 
 const fieldStyle: CSSProperties = {
   padding: '0 12px',
@@ -33,6 +46,121 @@ const fieldStyle: CSSProperties = {
 const selectStyle: CSSProperties = {
   ...fieldStyle,
   minHeight: 'var(--min-hit-target)',
+}
+
+const cardStyle: CSSProperties = {
+  background: 'var(--color-surface)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-md)',
+  padding: 'var(--spacing-card-padding)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+}
+
+function formatDateTimeBr(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('pt-BR')
+}
+
+/**
+ * Collapsible section header — same `aria-expanded`/`aria-controls`/`+`/`−`
+ * button pattern as `EstudanteTrajetoria.tsx`'s "Fator preocupante" section
+ * (spec Boundaries & Constraints, RNF-08, UX-DR20), copied inline here rather
+ * than extracted into a shared component (spec Design Notes). Default open —
+ * unlike that section, this screen's whole purpose is reviewing history.
+ */
+function CollapsibleSection({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(true)
+  const contentId = useId()
+
+  return (
+    <section style={cardStyle}>
+      <h2 style={{ margin: 0 }}>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={contentId}
+          onClick={() => setOpen((current) => !current)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            minHeight: 'var(--min-hit-target)',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            fontSize: 18,
+            fontWeight: 700,
+            color: 'var(--color-text)',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          <span>{title}</span>
+          <span aria-hidden="true">{open ? '−' : '+'}</span>
+        </button>
+      </h2>
+      {open && <div id={contentId}>{children}</div>}
+    </section>
+  )
+}
+
+/**
+ * Chronological list of every registered `FollowUpAction`, oldest first
+ * (RF-14). Zero actions renders an explicit message instead of a blank list
+ * (spec Boundaries & Constraints — "transparência em vez de validação
+ * forçada").
+ */
+function ActionHistory({ actions }: { actions: FollowUpActionItem[] }) {
+  return (
+    <CollapsibleSection title="Histórico de ações">
+      {actions.length === 0 ? (
+        <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
+          Nenhuma ação registrada até o momento.
+        </p>
+      ) : (
+        <ol
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          {actions.map((action) => (
+            <li
+              key={action.id}
+              style={{
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+              }}
+            >
+              <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                {formatDateTimeBr(action.created_at)}
+              </span>
+              <span>{action.description}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </CollapsibleSection>
+  )
 }
 
 type LoadState =
@@ -197,12 +325,23 @@ function AcompanhamentoContent({
         onStatusChange={onStatusChange}
       />
 
-      <EvidenceCard
-        title="Evidências"
-        evidence={detail.evidence}
-        linkTo={`/estudantes/${detail.student_id}`}
-        linkLabel={`Ver na trajetória de ${detail.student_name}`}
-      />
+      {detail.trajectory_changes.map((group) => (
+        <CollapsibleSection
+          key={group.trajectory_change.id}
+          title={CHANGE_TYPE_LABEL[group.trajectory_change.type]}
+        >
+          <EvidenceCard
+            title="Evidências"
+            description={group.trajectory_change.description}
+            detectedAt={group.trajectory_change.detected_at}
+            evidence={group.evidence}
+            linkTo={`/estudantes/${detail.student_id}`}
+            linkLabel={`Ver na trajetória de ${detail.student_name}`}
+          />
+        </CollapsibleSection>
+      ))}
+
+      <ActionHistory actions={detail.actions} />
 
       <ActionForm followUpId={followUpId} />
     </>

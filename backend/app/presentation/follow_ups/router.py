@@ -37,8 +37,9 @@ from app.presentation.schemas.follow_ups import (
     FollowUpOut,
     OpenFollowUpRequest,
     RegisterFollowUpActionRequest,
+    TrajectoryChangeEvidenceGroupOut,
 )
-from app.presentation.schemas.trajectory import EvidenceItemOut
+from app.presentation.schemas.trajectory import EvidenceItemOut, TrajectoryChangeOut
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -96,13 +97,35 @@ def get_follow_up(
         student_name=result.student_name,
         status=result.follow_up.status.value,
         created_at=result.follow_up.created_at,
-        evidence=[
-            EvidenceItemOut(
-                source_type=item.source_type.value,
-                description=item.description,
-                date=item.date,
+        actions=[
+            FollowUpActionOut(
+                id=action.id,
+                follow_up_id=action.follow_up_id,
+                description=action.description,
+                author_user_id=action.author_user_id,
+                created_at=action.created_at,
             )
-            for item in result.evidence
+            for action in result.actions
+        ],
+        trajectory_changes=[
+            TrajectoryChangeEvidenceGroupOut(
+                trajectory_change=TrajectoryChangeOut(
+                    id=group.trajectory_change.id,
+                    type=group.trajectory_change.type.value,
+                    period_id=group.trajectory_change.period_id,
+                    detected_at=group.trajectory_change.detected_at,
+                    description=group.trajectory_change.description,
+                ),
+                evidence=[
+                    EvidenceItemOut(
+                        source_type=item.source_type.value,
+                        description=item.description,
+                        date=item.date,
+                    )
+                    for item in group.evidence
+                ],
+            )
+            for group in result.trajectory_changes
         ],
     )
 

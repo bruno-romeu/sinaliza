@@ -55,6 +55,7 @@ export type OpenFollowUpRequest =
 export type FollowUp = paths['/follow-ups']['post']['responses'][201]['content']['application/json']
 export type FollowUpDetail =
   paths['/follow-ups/{follow_up_id}']['get']['responses'][200]['content']['application/json']
+export type TrajectoryChangeEvidenceGroup = FollowUpDetail['trajectory_changes'][number]
 
 export type RegisterFollowUpActionRequest =
   paths['/follow-ups/{follow_up_id}/actions']['post']['requestBody']['content']['application/json']

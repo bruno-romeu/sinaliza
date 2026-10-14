@@ -11,7 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.follow_up import FollowUp, FollowUpAction, FollowUpEvidence, FollowUpStatus
-from app.infrastructure.db.models import FollowUpActionModel, FollowUpEvidenceModel, FollowUpModel
+from app.infrastructure.db.models import (
+    FollowUpActionModel,
+    FollowUpEvidenceModel,
+    FollowUpModel,
+    TrajectoryChangeModel,
+)
 
 
 class SqlAlchemyFollowUpRepository:
@@ -66,8 +71,17 @@ class SqlAlchemyFollowUpRepository:
         )
 
     def list_evidence_by_follow_up(self, follow_up_id: uuid.UUID) -> list[FollowUpEvidence]:
-        stmt = select(FollowUpEvidenceModel).where(
-            FollowUpEvidenceModel.follow_up_id == follow_up_id
+        # Joined to `trajectory_changes` purely to order by its `detected_at`
+        # (spec Code Map) — `GetFollowUpService` still loads each
+        # `TrajectoryChange` separately via `TrajectoryChangeRepositoryPort`.
+        stmt = (
+            select(FollowUpEvidenceModel)
+            .join(
+                TrajectoryChangeModel,
+                TrajectoryChangeModel.id == FollowUpEvidenceModel.trajectory_change_id,
+            )
+            .where(FollowUpEvidenceModel.follow_up_id == follow_up_id)
+            .order_by(TrajectoryChangeModel.detected_at.asc(), FollowUpEvidenceModel.id.asc())
         )
         models = self._session.execute(stmt).scalars().all()
         return [
@@ -75,6 +89,24 @@ class SqlAlchemyFollowUpRepository:
                 id=model.id,
                 follow_up_id=model.follow_up_id,
                 trajectory_change_id=model.trajectory_change_id,
+            )
+            for model in models
+        ]
+
+    def list_actions_by_follow_up(self, follow_up_id: uuid.UUID) -> list[FollowUpAction]:
+        stmt = (
+            select(FollowUpActionModel)
+            .where(FollowUpActionModel.follow_up_id == follow_up_id)
+            .order_by(FollowUpActionModel.created_at.asc(), FollowUpActionModel.id.asc())
+        )
+        models = self._session.execute(stmt).scalars().all()
+        return [
+            FollowUpAction(
+                id=model.id,
+                follow_up_id=model.follow_up_id,
+                description=model.description,
+                author_user_id=model.author_user_id,
+                created_at=model.created_at,
             )
             for model in models
         ]
