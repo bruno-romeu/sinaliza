@@ -47,3 +47,17 @@ class FollowUpEvidence:
     id: uuid.UUID
     follow_up_id: uuid.UUID
     trajectory_change_id: uuid.UUID
+
+
+@dataclass(frozen=True)
+class FollowUpAction:
+    """A free-text action registered against an open `FollowUp` (RF-13,
+    RF-14). Always a fresh INSERT — never updated or replaced — so the
+    history accumulates one row per submission (spec Boundaries &
+    Constraints)."""
+
+    id: uuid.UUID
+    follow_up_id: uuid.UUID
+    description: str
+    author_user_id: uuid.UUID
+    created_at: datetime

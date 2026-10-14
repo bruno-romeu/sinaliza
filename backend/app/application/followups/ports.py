@@ -21,7 +21,7 @@ from app.application.trajectory.ports import (
     TrajectoryChangeRepositoryPort,
     TrajectoryChangeSourceRepositoryPort,
 )
-from app.domain.follow_up import FollowUp, FollowUpEvidence
+from app.domain.follow_up import FollowUp, FollowUpAction, FollowUpEvidence, FollowUpStatus
 
 __all__ = [
     "AssignmentSubmissionRepositoryPort",
@@ -53,4 +53,19 @@ class FollowUpRepositoryPort(Protocol):
         """Every `FollowUpEvidence` row attached to one `FollowUp`, used by
         `GetFollowUpService` to resolve the evidence card (story 4.1 always
         has exactly one, future stories may add more)."""
+        ...
+
+    def add_action(self, action: FollowUpAction) -> FollowUpAction:
+        """Plain insert+commit of a new `FollowUpAction` row — every call
+        appends, never replaces a prior row (spec Boundaries & Constraints,
+        RF-13/RF-14)."""
+        ...
+
+    def update_status(
+        self, follow_up_id: uuid.UUID, status: FollowUpStatus
+    ) -> FollowUp | None:
+        """UPDATE scoped to the `status` column only. Returns `None` when
+        `follow_up_id` does not exist so `ChangeFollowUpStatusService` can
+        raise `FollowUpNotFoundError` without a prior extra read (spec Code
+        Map, mirrors `get_by_id`'s existing `| None` contract)."""
         ...

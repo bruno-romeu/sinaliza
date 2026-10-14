@@ -10,6 +10,7 @@ from datetime import date, datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.domain.student import DatasetSplit
@@ -17,6 +18,8 @@ from app.infrastructure.db.models import (
     AcademicPeriodModel,
     AttendanceRecordModel,
     ClassroomModel,
+    FollowUpActionModel,
+    FollowUpModel,
     PedagogicalObservationModel,
     StudentModel,
     TrajectoryChangeSourceModel,
@@ -332,3 +335,202 @@ def test_get_follow_up_without_bearer_token_returns_401(client: TestClient) -> N
 
     assert response.status_code == 401
     assert response.json() == INVALID_TOKEN_BODY
+
+
+# --- Story 4.2: register action / change status ----------------------------------------
+
+
+def _seed_follow_up(
+    db_session: Session, student: StudentModel, responsible_user_id: uuid.UUID
+) -> FollowUpModel:
+    """Inserts a `FollowUp` row directly — this story's action/status tests
+    don't need a real `TrajectoryChange`/evidence trail, just an existing
+    follow-up to act on."""
+    follow_up = FollowUpModel(
+        id=uuid.uuid4(),
+        student_id=student.id,
+        status="EM_OBSERVACAO",
+        reason=None,
+        responsible_user_id=responsible_user_id,
+        next_review_date=None,
+        created_at=datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc),
+    )
+    db_session.add(follow_up)
+    db_session.commit()
+    db_session.refresh(follow_up)
+    return follow_up
+
+
+def test_register_follow_up_action_persists_and_appends(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+    follow_up = _seed_follow_up(db_session, seeded_enrolled_student, seeded_user.id)
+
+    first = client.post(
+        f"/follow-ups/{follow_up.id}/actions",
+        json={"description": "Primeira ação registrada."},
+        headers=headers,
+    )
+    assert first.status_code == 201
+    first_body = first.json()
+    assert first_body["follow_up_id"] == str(follow_up.id)
+    assert first_body["description"] == "Primeira ação registrada."
+    assert first_body["author_user_id"] == str(seeded_user.id)
+    assert first_body["created_at"]
+
+    second = client.post(
+        f"/follow-ups/{follow_up.id}/actions",
+        json={"description": "Segunda ação registrada."},
+        headers=headers,
+    )
+    assert second.status_code == 201
+    assert second.json()["id"] != first_body["id"]
+
+    rows = (
+        db_session.query(FollowUpActionModel)
+        .filter(FollowUpActionModel.follow_up_id == follow_up.id)
+        .all()
+    )
+    assert len(rows) == 2
+    descriptions = {row.description for row in rows}
+    assert descriptions == {"Primeira ação registrada.", "Segunda ação registrada."}
+
+
+def test_register_follow_up_action_with_blank_description_returns_422(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+    follow_up = _seed_follow_up(db_session, seeded_enrolled_student, seeded_user.id)
+
+    response = client.post(
+        f"/follow-ups/{follow_up.id}/actions",
+        json={"description": "   "},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_follow_up_action_on_unknown_follow_up_returns_404(
+    client: TestClient, seeded_user
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+
+    response = client.post(
+        f"/follow-ups/{uuid.uuid4()}/actions",
+        json={"description": "Ação qualquer."},
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == FOLLOW_UP_NOT_FOUND_BODY
+
+
+@pytest.mark.parametrize(
+    "target_status",
+    ["EM_OBSERVACAO", "ACOMPANHAMENTO_ATIVO", "AGUARDANDO_RETORNO", "ENCERRADO"],
+)
+def test_change_follow_up_status_happy_path(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+    target_status: str,
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+    follow_up = _seed_follow_up(db_session, seeded_enrolled_student, seeded_user.id)
+
+    response = client.patch(
+        f"/follow-ups/{follow_up.id}/status",
+        json={"status": target_status},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == str(follow_up.id)
+    assert body["status"] == target_status
+
+    db_session.expire_all()
+    refreshed = db_session.get(FollowUpModel, follow_up.id)
+    assert refreshed.status.value == target_status
+
+
+def test_change_follow_up_status_on_unknown_follow_up_returns_404(
+    client: TestClient, seeded_user
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+
+    response = client.patch(
+        f"/follow-ups/{uuid.uuid4()}/status",
+        json={"status": "ENCERRADO"},
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == FOLLOW_UP_NOT_FOUND_BODY
+
+
+def test_change_follow_up_status_with_invalid_status_returns_422(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+    follow_up = _seed_follow_up(db_session, seeded_enrolled_student, seeded_user.id)
+
+    response = client.patch(
+        f"/follow-ups/{follow_up.id}/status",
+        json={"status": "FOO"},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+
+
+def test_follow_up_action_table_privileges_allow_insert_select_deny_update_delete(
+    db_session: Session,
+) -> None:
+    """DB-level backstop (spec I/O Matrix, "DB-level backstop"): the app role
+    has `GRANT INSERT, SELECT` but not `UPDATE`/`DELETE` on `follow_up_action`
+    (AD-6) — inspected directly from the Postgres catalog (`pg_class.relacl`
+    via `aclexplode`) rather than `has_table_privilege`.
+
+    `has_table_privilege` reflects *enforcement*: Postgres superusers bypass
+    every ACL check unconditionally regardless of any GRANT/REVOKE issued
+    against them, so that function always reports `True` for a superuser
+    role no matter what the ACL actually says — and the local `sinaliza`
+    role used by `TEST_DATABASE_URL`/`DATABASE_URL` is provisioned as a
+    superuser in this environment (confirmed: `rolsuper = true`).
+    `aclexplode` instead reflects what the migration/`conftest.py` actually
+    *recorded* in the catalog, which is exactly what the AC asks to
+    "inspect" — and is unaffected by superuser status, so this test always
+    runs (never skips) regardless of the role's enforcement characteristics.
+    """
+    granted_privileges = (
+        db_session.execute(
+            text(
+                """
+                SELECT acl.privilege_type
+                FROM pg_class c, aclexplode(c.relacl) acl
+                WHERE c.relname = 'follow_up_action'
+                  AND acl.grantee = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+                """
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    assert "INSERT" in granted_privileges
+    assert "SELECT" in granted_privileges
+    assert "UPDATE" not in granted_privileges
+    assert "DELETE" not in granted_privileges

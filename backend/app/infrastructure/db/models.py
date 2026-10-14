@@ -300,6 +300,27 @@ class FollowUpEvidenceModel(Base):
     )
 
 
+class FollowUpActionModel(Base):
+    """`description`/`author_user_id`/`created_at` make each row a fresh,
+    append-only INSERT (spec Boundaries & Constraints, RF-13/RF-14) — the
+    table also carries DB-level `GRANT INSERT, SELECT` / revoked
+    `UPDATE`/`DELETE` for the app's role, applied in the Alembic migration
+    and mirrored in `tests/conftest.py` so append-only-ness doesn't rely only
+    on application code (AD-6)."""
+
+    __tablename__ = "follow_up_action"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    follow_up_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("follow_ups.id"), nullable=False, index=True
+    )
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    author_user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class SyntheticGenerationRunModel(Base):
     """One row per execution of `python -m app.synthetic.generate` — the
     persisted provenance RNF-13 requires (logging it would not survive the

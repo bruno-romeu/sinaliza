@@ -10,8 +10,8 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.follow_up import FollowUp, FollowUpEvidence
-from app.infrastructure.db.models import FollowUpEvidenceModel, FollowUpModel
+from app.domain.follow_up import FollowUp, FollowUpAction, FollowUpEvidence, FollowUpStatus
+from app.infrastructure.db.models import FollowUpActionModel, FollowUpEvidenceModel, FollowUpModel
 
 
 class SqlAlchemyFollowUpRepository:
@@ -78,3 +78,37 @@ class SqlAlchemyFollowUpRepository:
             )
             for model in models
         ]
+
+    def add_action(self, action: FollowUpAction) -> FollowUpAction:
+        self._session.add(
+            FollowUpActionModel(
+                id=action.id,
+                follow_up_id=action.follow_up_id,
+                description=action.description,
+                author_user_id=action.author_user_id,
+                created_at=action.created_at,
+            )
+        )
+        self._session.commit()
+        return action
+
+    def update_status(
+        self, follow_up_id: uuid.UUID, status: FollowUpStatus
+    ) -> FollowUp | None:
+        model = self._session.get(FollowUpModel, follow_up_id)
+        if model is None:
+            return None
+        # The one and only `FollowUpModel.status =` assignment in the
+        # codebase (spec Code Map, AD-6) — reached only via
+        # `ChangeFollowUpStatusService`, never the router.
+        model.status = status
+        self._session.commit()
+        return FollowUp(
+            id=model.id,
+            student_id=model.student_id,
+            status=model.status,
+            reason=model.reason,
+            responsible_user_id=model.responsible_user_id,
+            next_review_date=model.next_review_date,
+            created_at=model.created_at,
+        )

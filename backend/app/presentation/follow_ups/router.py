@@ -12,6 +12,7 @@ import uuid
 
 from fastapi import APIRouter, Depends
 
+from app.application.followups.change_follow_up_status import ChangeFollowUpStatusService
 from app.application.followups.errors import (
     FollowUpNotFoundError,
     TrajectoryChangeMismatchError,
@@ -19,10 +20,24 @@ from app.application.followups.errors import (
 )
 from app.application.followups.get_follow_up import GetFollowUpService
 from app.application.followups.open_follow_up import OpenFollowUpService
-from app.composition import get_get_follow_up_service, get_open_follow_up_service
+from app.application.followups.register_follow_up_action import RegisterFollowUpActionService
+from app.composition import (
+    get_change_follow_up_status_service,
+    get_get_follow_up_service,
+    get_open_follow_up_service,
+    get_register_follow_up_action_service,
+)
+from app.domain.follow_up import FollowUpStatus
 from app.presentation.auth.dependencies import CurrentUser, get_current_user
 from app.presentation.errors import AppError
-from app.presentation.schemas.follow_ups import FollowUpDetailOut, FollowUpOut, OpenFollowUpRequest
+from app.presentation.schemas.follow_ups import (
+    ChangeFollowUpStatusRequest,
+    FollowUpActionOut,
+    FollowUpDetailOut,
+    FollowUpOut,
+    OpenFollowUpRequest,
+    RegisterFollowUpActionRequest,
+)
 from app.presentation.schemas.trajectory import EvidenceItemOut
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
@@ -89,4 +104,60 @@ def get_follow_up(
             )
             for item in result.evidence
         ],
+    )
+
+
+@router.post(
+    "/follow-ups/{follow_up_id}/actions", response_model=FollowUpActionOut, status_code=201
+)
+def register_follow_up_action(
+    follow_up_id: uuid.UUID,
+    payload: RegisterFollowUpActionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    service: RegisterFollowUpActionService = Depends(get_register_follow_up_action_service),
+) -> FollowUpActionOut:
+    try:
+        action = service.execute(
+            follow_up_id=follow_up_id,
+            description=payload.description,
+            author_user_id=uuid.UUID(current_user.id),
+        )
+    except FollowUpNotFoundError as exc:
+        raise AppError(
+            status_code=404,
+            code="follow_up_not_found",
+            message="Acompanhamento não encontrado.",
+        ) from exc
+
+    return FollowUpActionOut(
+        id=action.id,
+        follow_up_id=action.follow_up_id,
+        description=action.description,
+        author_user_id=action.author_user_id,
+        created_at=action.created_at,
+    )
+
+
+@router.patch("/follow-ups/{follow_up_id}/status", response_model=FollowUpOut)
+def change_follow_up_status(
+    follow_up_id: uuid.UUID,
+    payload: ChangeFollowUpStatusRequest,
+    service: ChangeFollowUpStatusService = Depends(get_change_follow_up_status_service),
+) -> FollowUpOut:
+    try:
+        follow_up = service.execute(
+            follow_up_id=follow_up_id, status=FollowUpStatus(payload.status)
+        )
+    except FollowUpNotFoundError as exc:
+        raise AppError(
+            status_code=404,
+            code="follow_up_not_found",
+            message="Acompanhamento não encontrado.",
+        ) from exc
+
+    return FollowUpOut(
+        id=follow_up.id,
+        student_id=follow_up.student_id,
+        status=follow_up.status.value,
+        created_at=follow_up.created_at,
     )
