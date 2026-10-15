@@ -9,12 +9,14 @@ from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.domain.follow_up import FollowUpStatus
 from app.domain.student import DatasetSplit
 from app.domain.trajectory_change import TrajectoryChangeType
 from app.infrastructure.db.models import (
     AcademicPeriodModel,
     ClassroomModel,
     EnrollmentModel,
+    FollowUpModel,
     StudentModel,
     TrajectoryChangeModel,
 )
@@ -45,6 +47,25 @@ def _add_change(
     )
     db_session.add(change)
     return change
+
+
+def _add_follow_up(
+    db_session: Session,
+    student: StudentModel,
+    responsible_user_id: uuid.UUID,
+    status: FollowUpStatus,
+    created_at: datetime,
+) -> FollowUpModel:
+    follow_up = FollowUpModel(
+        student_id=student.id,
+        status=status,
+        reason=None,
+        responsible_user_id=responsible_user_id,
+        next_review_date=None,
+        created_at=created_at,
+    )
+    db_session.add(follow_up)
+    return follow_up
 
 
 # --- Recent changes exist -----------------------------------------------------------
@@ -98,7 +119,7 @@ def test_home_with_no_trajectory_changes_returns_empty_list(
     response = client.get("/home", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
-    assert response.json() == {"recent_changes": []}
+    assert response.json() == {"recent_changes": [], "in_progress_follow_ups": []}
 
 
 # --- Caps at 20 -----------------------------------------------------------------------
@@ -180,6 +201,153 @@ def test_home_breaks_detected_at_tie_by_id_desc(
     # Identical `detected_at` -> the higher `id` (change_high) must sort
     # first, deterministically, every time.
     assert student_names == ["Estudante Alto", "Estudante Baixo"]
+
+
+# --- Active follow-ups (spec-4-5) -----------------------------------------------------
+
+
+def test_home_includes_active_follow_ups_ordered_by_created_at_desc(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    older_student = StudentModel(name="Estudante Antigo FU", dataset_split=DatasetSplit.EVAL_DEMO)
+    db_session.add(older_student)
+    db_session.flush()
+
+    _add_follow_up(
+        db_session,
+        seeded_enrolled_student,
+        seeded_user.id,
+        FollowUpStatus.EM_OBSERVACAO,
+        datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc),
+    )
+    _add_follow_up(
+        db_session,
+        older_student,
+        seeded_user.id,
+        FollowUpStatus.ACOMPANHAMENTO_ATIVO,
+        datetime(2026, 9, 20, 0, 0, tzinfo=timezone.utc),
+    )
+    db_session.commit()
+
+    response = client.get("/home", headers=_auth_headers(client, seeded_user))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [row["student_name"] for row in body["in_progress_follow_ups"]] == [
+        "Estudante Teste",
+        "Estudante Antigo FU",
+    ]
+    assert body["in_progress_follow_ups"][0]["status"] == "EM_OBSERVACAO"
+    assert body["in_progress_follow_ups"][0]["student_id"] == str(seeded_enrolled_student.id)
+
+
+def test_home_breaks_follow_up_created_at_tie_by_id_desc(
+    client: TestClient,
+    seeded_user,
+    db_session: Session,
+) -> None:
+    """Two active `FollowUp` rows sharing an identical `created_at` must still
+    sort deterministically — mirrors
+    `test_home_breaks_detected_at_tie_by_id_desc` for `list_active()`'s own
+    `created_at.desc(), id.desc()` tiebreak (spec-4-5 Code Map)."""
+    student_low = StudentModel(name="Estudante FU Baixo", dataset_split=DatasetSplit.EVAL_DEMO)
+    student_high = StudentModel(name="Estudante FU Alto", dataset_split=DatasetSplit.EVAL_DEMO)
+    db_session.add_all([student_low, student_high])
+    db_session.flush()
+
+    same_created_at = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    follow_up_low = FollowUpModel(
+        id=uuid.UUID(int=1),
+        student_id=student_low.id,
+        status=FollowUpStatus.EM_OBSERVACAO,
+        reason=None,
+        responsible_user_id=seeded_user.id,
+        next_review_date=None,
+        created_at=same_created_at,
+    )
+    follow_up_high = FollowUpModel(
+        id=uuid.UUID(int=2),
+        student_id=student_high.id,
+        status=FollowUpStatus.EM_OBSERVACAO,
+        reason=None,
+        responsible_user_id=seeded_user.id,
+        next_review_date=None,
+        created_at=same_created_at,
+    )
+    db_session.add_all([follow_up_low, follow_up_high])
+    db_session.commit()
+
+    response = client.get("/home", headers=_auth_headers(client, seeded_user))
+
+    assert response.status_code == 200
+    student_names = [row["student_name"] for row in response.json()["in_progress_follow_ups"]]
+    # Identical `created_at` -> the higher `id` (follow_up_high) must sort
+    # first, deterministically, every time.
+    assert student_names == ["Estudante FU Alto", "Estudante FU Baixo"]
+
+
+def test_home_returns_more_than_twenty_active_follow_ups_uncapped(
+    client: TestClient,
+    seeded_user,
+    db_session: Session,
+) -> None:
+    """`list_active()` is explicitly never capped (spec-4-5 Never — unlike
+    `list_recent`'s 20-row cap) — pins that 25 seeded active follow-ups all
+    come back, not truncated to 20."""
+    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    for i in range(25):
+        student = StudentModel(name=f"Estudante FU {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
+        db_session.add(student)
+        db_session.flush()
+        _add_follow_up(
+            db_session,
+            student,
+            seeded_user.id,
+            FollowUpStatus.EM_OBSERVACAO,
+            base_time - timedelta(days=i),
+        )
+    db_session.commit()
+
+    response = client.get("/home", headers=_auth_headers(client, seeded_user))
+
+    assert response.status_code == 200
+    assert len(response.json()["in_progress_follow_ups"]) == 25
+
+
+def test_home_excludes_encerrado_follow_ups(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    active_student = StudentModel(name="Estudante Ativo", dataset_split=DatasetSplit.EVAL_DEMO)
+    closed_student = StudentModel(name="Estudante Encerrado", dataset_split=DatasetSplit.EVAL_DEMO)
+    db_session.add_all([active_student, closed_student])
+    db_session.flush()
+
+    now = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    _add_follow_up(db_session, active_student, seeded_user.id, FollowUpStatus.AGUARDANDO_RETORNO, now)
+    _add_follow_up(db_session, closed_student, seeded_user.id, FollowUpStatus.ENCERRADO, now)
+    db_session.commit()
+
+    response = client.get("/home", headers=_auth_headers(client, seeded_user))
+
+    assert response.status_code == 200
+    body = response.json()
+    student_names = [row["student_name"] for row in body["in_progress_follow_ups"]]
+    assert student_names == ["Estudante Ativo"]
+
+
+def test_home_with_no_active_follow_ups_returns_empty_list(
+    client: TestClient, seeded_user
+) -> None:
+    response = client.get("/home", headers=_auth_headers(client, seeded_user))
+
+    assert response.status_code == 200
+    assert response.json()["in_progress_follow_ups"] == []
 
 
 # --- Search matches -------------------------------------------------------------------

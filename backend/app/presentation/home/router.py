@@ -20,6 +20,7 @@ from app.composition import get_get_home_service, get_search_students_service
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.schemas.home import (
     HomeOut,
+    InProgressFollowUpOut,
     RecentChangeOut,
     StudentSearchOut,
     StudentSearchResultOut,
@@ -30,7 +31,7 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 
 @router.get("/home", response_model=HomeOut)
 def get_home(service: GetHomeService = Depends(get_get_home_service)) -> HomeOut:
-    recent_changes = service.execute()
+    result = service.execute()
     return HomeOut(
         recent_changes=[
             RecentChangeOut(
@@ -40,8 +41,17 @@ def get_home(service: GetHomeService = Depends(get_get_home_service)) -> HomeOut
                 description=recent.trajectory_change.description,
                 detected_at=recent.trajectory_change.detected_at,
             )
-            for recent in recent_changes
-        ]
+            for recent in result.recent_changes
+        ],
+        in_progress_follow_ups=[
+            InProgressFollowUpOut(
+                id=active.follow_up.id,
+                student_id=active.follow_up.student_id,
+                student_name=active.student_name,
+                status=active.follow_up.status.value,
+            )
+            for active in result.active_follow_ups
+        ],
     )
 
 
