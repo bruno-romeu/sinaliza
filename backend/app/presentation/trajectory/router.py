@@ -25,7 +25,7 @@ from app.composition import (
     get_get_student_trajectory_service,
 )
 from app.config import Settings, get_settings
-from app.presentation.auth.dependencies import get_current_user
+from app.presentation.auth.dependencies import CurrentUser, get_current_user
 from app.presentation.errors import AppError
 from app.presentation.schemas.trajectory import (
     ConcerningFactorOut,
@@ -98,17 +98,22 @@ def get_student_trajectory(
 def get_student_trajectory_detail(
     student_id: uuid.UUID,
     window_days: int | None = Query(default=None, gt=0, le=3650),
+    current_user: CurrentUser = Depends(get_current_user),
     service: GetStudentTrajectoryDetailService = Depends(get_get_student_trajectory_detail_service),
     settings: Settings = Depends(get_settings),
 ) -> TrajectoryDetailOut:
     """Story 3.4 — additive endpoint: `GET /students/{id}/trajectory`'s
-    response contract above is untouched (spec Boundaries & Constraints)."""
+    response contract above is untouched (spec Boundaries & Constraints).
+    Story 4.4 — `current_user` scopes the evidence card's
+    `PedagogicalObservation` text visibility (RF-22)."""
     effective_window_days = (
         window_days if window_days is not None else settings.trajectory_window_days
     )
 
     try:
-        result = service.execute(student_id, effective_window_days)
+        result = service.execute(
+            student_id, effective_window_days, requesting_user_id=uuid.UUID(current_user.id)
+        )
     except StudentNotFoundError as exc:
         raise AppError(
             status_code=404,

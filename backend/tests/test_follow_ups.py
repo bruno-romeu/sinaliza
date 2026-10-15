@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.student import DatasetSplit
 from app.domain.trajectory_change import TrajectoryChangeType
+from app.domain.user import UserRole
 from app.infrastructure.db.models import (
     AcademicPeriodModel,
     AttendanceRecordModel,
@@ -26,7 +27,9 @@ from app.infrastructure.db.models import (
     StudentModel,
     TrajectoryChangeModel,
     TrajectoryChangeSourceModel,
+    UserModel,
 )
+from app.infrastructure.security.bcrypt_hasher import BcryptPasswordHasher
 
 TRAJECTORY_CHANGE_NOT_FOUND_BODY = {
     "error": {
@@ -632,6 +635,165 @@ def test_get_follow_up_groups_evidence_by_trajectory_change_ordered_by_detected_
     assert groups[0]["trajectory_change"]["id"] == str(earlier_change.id)
     assert groups[1]["trajectory_change"]["id"] == change["id"]
     assert groups[0]["evidence"] == []
+
+
+# --- Story 4.4: RF-22 visibility scoping of PedagogicalObservation evidence --------------
+
+_RESTRICTED_TEXT = (
+    "Texto do registro pedagógico restrito ao responsável pelo "
+    "acompanhamento que o cita como evidência."
+)
+
+
+def _create_user(db_session: Session, email: str) -> UserModel:
+    hasher = BcryptPasswordHasher()
+    user = UserModel(
+        name="Outra Coordenação",
+        email=email,
+        password_hash=hasher.hash("Senha-Correta-123"),
+        role=UserRole.COORDENACAO_PEDAGOGICA,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def test_get_follow_up_redacts_observation_text_for_non_responsible_user(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    headers = _auth_headers(client, seeded_user)
+    change = _detect_attendance_drop_change(
+        client, headers, db_session, seeded_enrolled_student, seeded_classroom, seeded_user.id
+    )
+    open_response = client.post(
+        "/follow-ups",
+        json={
+            "student_id": str(seeded_enrolled_student.id),
+            "trajectory_change_id": change["id"],
+        },
+        headers=headers,
+    )
+    assert open_response.status_code == 201
+    follow_up_id = open_response.json()["id"]
+
+    other_user = _create_user(db_session, "outra.coordenacao@escola.test")
+    other_headers = _auth_headers(client, other_user)
+
+    # Responsible user sees the real observation text.
+    own_detail = client.get(f"/follow-ups/{follow_up_id}", headers=headers).json()
+    own_descriptions = "".join(
+        item["description"]
+        for group in own_detail["trajectory_changes"]
+        for item in group["evidence"]
+    )
+    assert "Observação de teste." in own_descriptions
+
+    # A different authenticated user is redacted.
+    other_detail = client.get(f"/follow-ups/{follow_up_id}", headers=other_headers).json()
+    other_descriptions = [
+        item["description"]
+        for group in other_detail["trajectory_changes"]
+        for item in group["evidence"]
+        if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
+    ]
+    assert other_descriptions
+    for description in other_descriptions:
+        assert "Observação de teste." not in description
+        assert _RESTRICTED_TEXT in description
+    assert other_user.id != seeded_user.id
+
+
+def test_get_follow_up_visible_to_second_responsible_user_citing_same_observation(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    """AD-8: a restricted observation cited by two distinct `FollowUp`s is
+    visible to either responsible user — never exclusive to one."""
+    headers = _auth_headers(client, seeded_user)
+    change = _detect_attendance_drop_change(
+        client, headers, db_session, seeded_enrolled_student, seeded_classroom, seeded_user.id
+    )
+    open_response = client.post(
+        "/follow-ups",
+        json={
+            "student_id": str(seeded_enrolled_student.id),
+            "trajectory_change_id": change["id"],
+        },
+        headers=headers,
+    )
+    assert open_response.status_code == 201
+
+    second_user = _create_user(db_session, "segunda.coordenacao@escola.test")
+    second_headers = _auth_headers(client, second_user)
+
+    # A second TrajectoryChange, sourced by the SAME PedagogicalObservation,
+    # evidenced by a second FollowUp whose responsible user is `second_user`.
+    pedagogical_source = next(
+        row
+        for row in db_session.query(TrajectoryChangeSourceModel)
+        .filter(TrajectoryChangeSourceModel.trajectory_change_id == change["id"])
+        .all()
+        if row.source_type.value == "PEDAGOGICAL_OBSERVATION"
+    )
+    observation_id = pedagogical_source.source_id
+
+    second_change = TrajectoryChangeModel(
+        id=uuid.uuid4(),
+        student_id=seeded_enrolled_student.id,
+        type=TrajectoryChangeType.GRADE_DROP,
+        period_id=seeded_academic_period.id,
+        detected_at=datetime(2026, 8, 5, 0, 0, tzinfo=timezone.utc),
+        description="Segunda mudança detectada.",
+    )
+    db_session.add(second_change)
+    db_session.flush()
+    db_session.add(
+        TrajectoryChangeSourceModel(
+            id=uuid.uuid4(),
+            trajectory_change_id=second_change.id,
+            source_type="PEDAGOGICAL_OBSERVATION",
+            source_id=observation_id,
+        )
+    )
+    second_follow_up = FollowUpModel(
+        id=uuid.uuid4(),
+        student_id=seeded_enrolled_student.id,
+        status="EM_OBSERVACAO",
+        reason=None,
+        responsible_user_id=second_user.id,
+        next_review_date=None,
+        created_at=datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc),
+    )
+    db_session.add(second_follow_up)
+    db_session.flush()
+    db_session.add(
+        FollowUpEvidenceModel(
+            id=uuid.uuid4(),
+            follow_up_id=second_follow_up.id,
+            trajectory_change_id=second_change.id,
+        )
+    )
+    db_session.commit()
+
+    second_detail = client.get(f"/follow-ups/{second_follow_up.id}", headers=second_headers).json()
+    descriptions = [
+        item["description"]
+        for group in second_detail["trajectory_changes"]
+        for item in group["evidence"]
+        if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
+    ]
+    assert descriptions
+    assert any("Observação de teste." in description for description in descriptions)
 
 
 def test_follow_up_action_table_privileges_allow_insert_select_deny_update_delete(

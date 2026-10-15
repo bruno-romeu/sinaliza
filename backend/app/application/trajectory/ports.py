@@ -78,10 +78,17 @@ class PedagogicalObservationRepositoryPort(Protocol):
         self, student_id: uuid.UUID, start_date: date, end_date: date
     ) -> list[PedagogicalObservation]: ...
 
-    def get_by_ids(self, ids: list[uuid.UUID]) -> list[PedagogicalObservation]:
+    def get_by_ids(
+        self, ids: list[uuid.UUID], requesting_user_id: uuid.UUID
+    ) -> list[PedagogicalObservation]:
         """Story 3.4 — batch-resolves `TrajectoryChangeSource.source_id` rows
         of type `PEDAGOGICAL_OBSERVATION` into real records for the evidence
-        card."""
+        card. Story 4.4 — `requesting_user_id` scopes the returned `text`:
+        an observation cited as evidence of a real `FollowUp` (RF-22, AD-8)
+        has its `text` redacted unless `requesting_user_id` is the
+        `responsible_user_id` of at least one `FollowUp` citing it; an
+        observation not (yet) cited by any `FollowUp` is always returned
+        with its real text."""
         ...
 
 
