@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.domain.assignment_submission import AssignmentSubmissionStatus
 from app.domain.attendance import AttendanceStatus
 from app.domain.student import DatasetSplit
+from app.domain.user import UserRole
 from app.infrastructure.db.models import (
     AcademicPeriodModel,
     AssignmentModel,
@@ -23,7 +24,9 @@ from app.infrastructure.db.models import (
     GradeModel,
     PedagogicalObservationModel,
     StudentModel,
+    UserModel,
 )
+from app.infrastructure.security.bcrypt_hasher import BcryptPasswordHasher
 
 STUDENT_NOT_FOUND_BODY = {
     "error": {"code": "student_not_found", "message": "Estudante não encontrado."}
@@ -567,6 +570,96 @@ def test_detail_observations_are_capped_at_ten_desc_by_date(
     dates = [observation["date"] for observation in body["observations"]]
     assert dates == sorted(dates, reverse=True)
     assert body["observations"][0]["text"] == "Observação 11."
+
+
+# --- Story 4.4: RF-22 visibility scoping of PedagogicalObservation evidence --------------
+
+_RESTRICTED_TEXT = (
+    "Texto do registro pedagógico restrito ao responsável pelo "
+    "acompanhamento que o cita como evidência."
+)
+
+
+def _create_user(db_session: Session, email: str) -> UserModel:
+    hasher = BcryptPasswordHasher()
+    user = UserModel(
+        name="Outra Coordenação",
+        email=email,
+        password_hash=hasher.hash("Senha-Correta-123"),
+        role=UserRole.COORDENACAO_PEDAGOGICA,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def test_detail_evidence_redacts_observation_text_once_cited_by_a_follow_up_for_other_users(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    _add_low_attendance(db_session, seeded_enrolled_student.id, seeded_classroom.id, 1, 2)
+    db_session.add(
+        PedagogicalObservationModel(
+            student_id=seeded_enrolled_student.id,
+            author_user_id=seeded_user.id,
+            text="Observação de teste.",
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    headers = _auth_headers(client, seeded_user)
+
+    # Before any FollowUp cites it: visible to anyone (unrestricted default).
+    before = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail", headers=headers
+    ).json()
+    change_id = before["trajectory_change"]["id"]
+    observation_before = next(
+        item for item in before["evidence"] if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
+    )
+    assert "Observação de teste." in observation_before["description"]
+
+    # Open a FollowUp citing this change -- the observation becomes restricted.
+    open_response = client.post(
+        "/follow-ups",
+        json={
+            "student_id": str(seeded_enrolled_student.id),
+            "trajectory_change_id": change_id,
+        },
+        headers=headers,
+    )
+    assert open_response.status_code == 201
+
+    # Responsible user still sees the real text.
+    own_detail = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail", headers=headers
+    ).json()
+    own_observation = next(
+        item
+        for item in own_detail["evidence"]
+        if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
+    )
+    assert "Observação de teste." in own_observation["description"]
+
+    # A different authenticated user is redacted.
+    other_user = _create_user(db_session, "outra.coordenacao@escola.test")
+    other_headers = _auth_headers(client, other_user)
+    other_detail = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail", headers=other_headers
+    ).json()
+    other_observation = next(
+        item
+        for item in other_detail["evidence"]
+        if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
+    )
+    assert "Observação de teste." not in other_observation["description"]
+    assert _RESTRICTED_TEXT in other_observation["description"]
 
 
 # --- Unauthenticated -------------------------------------------------------------------
