@@ -1,9 +1,12 @@
 """`GetFollowUpService` — the application-layer entry point for
 `GET /follow-ups/{id}` (Story 4.1, RF-20; extended Story 4.3, RF-14/RF-20).
 
-Evidence resolution reuses Story 3.4's existing, unfiltered reads as-is
-(`application/trajectory/evidence.resolve_evidence`) — never filters
-`PedagogicalObservation` visibility here (spec Never: Story 4.4 scope).
+Evidence resolution reuses Story 3.4's existing reads
+(`application/trajectory/evidence.resolve_evidence`). Story 4.4 adds
+`requesting_user_id`-scoped `PedagogicalObservation` visibility — the
+filter itself lives in `SqlAlchemyPedagogicalObservationRepository
+.get_by_ids`, never inline here (AD-11); this service only threads the
+caller's identity through.
 
 Story 4.3 groups evidence per linked `TrajectoryChange` instead of returning
 a single flat list: `list_evidence_by_follow_up` already orders its rows by
@@ -74,7 +77,9 @@ class GetFollowUpService:
         self._assignment_submission_repository = assignment_submission_repository
         self._pedagogical_observation_repository = pedagogical_observation_repository
 
-    def execute(self, follow_up_id: uuid.UUID) -> FollowUpDetailResult:
+    def execute(
+        self, follow_up_id: uuid.UUID, requesting_user_id: uuid.UUID
+    ) -> FollowUpDetailResult:
         follow_up = self._follow_up_repository.get_by_id(follow_up_id)
         if follow_up is None:
             raise FollowUpNotFoundError()
@@ -97,6 +102,7 @@ class GetFollowUpService:
                 grade_repo=self._grade_repository,
                 submission_repo=self._assignment_submission_repository,
                 observation_repo=self._pedagogical_observation_repository,
+                requesting_user_id=requesting_user_id,
             )
             trajectory_changes.append(
                 TrajectoryChangeEvidenceGroup(trajectory_change=change, evidence=evidence)

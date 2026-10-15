@@ -70,7 +70,12 @@ def resolve_evidence(
     grade_repo: GradeRepositoryPort,
     submission_repo: AssignmentSubmissionRepositoryPort,
     observation_repo: PedagogicalObservationRepositoryPort,
+    requesting_user_id: uuid.UUID,
 ) -> list[EvidenceItem]:
+    """`requesting_user_id` (Story 4.4, RF-22) scopes any
+    `PEDAGOGICAL_OBSERVATION` source's visible text — threaded straight
+    through to `observation_repo.get_by_ids`, the one place the filter
+    actually lives (AD-11)."""
     sources = source_repo.list_sources_by_change(trajectory_change_id)
     ids_by_type: dict[SourceType, list[uuid.UUID]] = {}
     for source in sources:
@@ -83,7 +88,13 @@ def resolve_evidence(
             continue
         items.extend(
             _resolve_items_for_type(
-                source_type, ids, attendance_repo, grade_repo, submission_repo, observation_repo
+                source_type,
+                ids,
+                attendance_repo,
+                grade_repo,
+                submission_repo,
+                observation_repo,
+                requesting_user_id,
             )
         )
     return items
@@ -96,6 +107,7 @@ def _resolve_items_for_type(
     grade_repo: GradeRepositoryPort,
     submission_repo: AssignmentSubmissionRepositoryPort,
     observation_repo: PedagogicalObservationRepositoryPort,
+    requesting_user_id: uuid.UUID,
 ) -> list[EvidenceItem]:
     if source_type == SourceType.ATTENDANCE_RECORD:
         records = attendance_repo.get_by_ids(ids)
@@ -128,7 +140,7 @@ def _resolve_items_for_type(
             for submission in submissions
         ]
     else:
-        observations = observation_repo.get_by_ids(ids)
+        observations = observation_repo.get_by_ids(ids, requesting_user_id)
         items = [
             EvidenceItem(
                 source_type=source_type,

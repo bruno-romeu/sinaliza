@@ -80,10 +80,11 @@ def open_follow_up(
 @router.get("/follow-ups/{follow_up_id}", response_model=FollowUpDetailOut)
 def get_follow_up(
     follow_up_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
     service: GetFollowUpService = Depends(get_get_follow_up_service),
 ) -> FollowUpDetailOut:
     try:
-        result = service.execute(follow_up_id)
+        result = service.execute(follow_up_id, requesting_user_id=uuid.UUID(current_user.id))
     except FollowUpNotFoundError as exc:
         raise AppError(
             status_code=404,
