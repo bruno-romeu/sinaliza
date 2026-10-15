@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 10-14-2026 19:30
+last_updated: 10-14-2026 23:38
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -64,7 +64,7 @@ development_status:
   4-3-histórico-completo-de-ações-e-evidências-de-um-acompanhament: done
   4-4-escopo-de-acesso-ao-registro-pedagógico-vinculado-a-um-acomp: done
   4-5-acompanhamentos-em-andamento-na-página-inicial: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   epic-5: backlog
   5-1-pipeline-de-pré-processamento-e-treino-do-modelo-offline: backlog
@@ -208,5 +208,63 @@ action_items:
       Add a gate (manual check or CI) verifying git merge-base --is-ancestor <story-branch>
       <integration-branch> before any chore: mark Story N done commit."
     owner: "dev"
-    status: open
+    status: in-progress
     ref: "docs/epic-3-retro-2026-10-13.md"
+  - id: "epic-4-retro-item-16-fix-now-thread-an-onactionregistered-sty"
+    epic: 4
+    action: "[fix-now] Thread an onActionRegistered-style callback from AcompanhamentoContent
+      into ActionForm (mirroring StatusSelector's onStatusChange) so a newly-submitted
+      FollowUpAction appears in ActionHistory immediately, without a page reload.
+      frontend/src/pages/Acompanhamento.tsx:306-349,441-540."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-4-retro-2026-10-14.md"
+  - id: "epic-4-retro-item-17-fix-now-security-reconcile-rf-22-visibil"
+    epic: 4
+    action: "[fix-now][security] Reconcile RF-22 visibility scoping: GetStudentTrajectoryDetailService._recent_observations
+      (backend/app/application/trajectory/get_student_trajectory_detail.py:255-260)
+      returns PedagogicalObservation.text unfiltered, exposing the identical text
+      that is redacted in the same follow-up's evidence card for a non-responsible
+      user. Confirmed live against the running app with two real users. Either redact
+      text there too or make an explicit, user-facing documented decision that the
+      raw timeline is exempt."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-4-retro-2026-10-14.md"
+  - id: "epic-4-retro-item-18-open-question-decide-whether-followup-mu"
+    epic: 4
+    action: "[open-question] Decide whether FollowUp mutation (PATCH /follow-ups/{id}/status,
+      POST /follow-ups/{id}/actions) should be scoped to responsible_user_id now that
+      Story 4.4 established a real read-side trust boundary on the same entity. Confirmed
+      live: a non-responsible user can change a FollowUp's status via PATCH (200)
+      despite being blocked from reading its evidence text."
+    owner: "product"
+    status: open
+    ref: "docs/epic-4-retro-2026-10-14.md"
+  - id: "epic-4-retro-item-19-fix-now-trivial-correct-docs-epic-4-cont"
+    epic: 4
+    action: "[fix-now][trivial] Correct docs/epic-4-context.md:45, which claims FollowUp.next_review_date
+      is read by a live query in GET /home - never implemented; the field stays unused
+      end to end across all 5 stories."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-4-retro-2026-10-14.md"
+  - id: "epic-4-retro-item-20-fix-now-escalate-epic-2-retro-item-1-mig"
+    epic: 4
+    action: "[fix-now] Escalate epic-2-retro-item-1-migration-enum-self-heal: fix-now
+      item open since 2026-10-08 (Epic 2 retro), unaddressed across Epic 3 and Epic
+      4. Propose picking it up before Epic 5 starts, since Epic 5's ML pipeline reads
+      from the same synthetic_profile-bearing tables."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-4-retro-2026-10-14.md"
+  - id: "epic-4-retro-item-21-defer-record-the-never-amend-an-applied"
+    epic: 4
+    action: "[defer] Record the \"never amend an applied Alembic migration in place\"\
+      \ convention (epic-2-retro-item-2) in AGENTS.md or equivalent durable project
+      doc. The practice was followed correctly across migrations 0008/0009 in this
+      epic, but the convention still lives only in docs/epic-2-retro-2026-10-08.md
+      prose."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-4-retro-2026-10-14.md"
