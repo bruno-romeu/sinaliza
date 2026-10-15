@@ -224,6 +224,7 @@ def get_get_home_service(db: Session = Depends(get_db)) -> GetHomeService:
     return GetHomeService(
         trajectory_change_repository=SqlAlchemyTrajectoryChangeRepository(db),
         student_repository=SqlAlchemyStudentRepository(db),
+        follow_up_repository=SqlAlchemyFollowUpRepository(db),
     )
 
 

@@ -37,6 +37,7 @@ export type PedagogicalObservation =
 
 export type Home = paths['/home']['get']['responses'][200]['content']['application/json']
 export type RecentChange = Home['recent_changes'][number]
+export type InProgressFollowUp = Home['in_progress_follow_ups'][number]
 export type StudentSearchResults =
   paths['/home/search']['get']['responses'][200]['content']['application/json']
 export type StudentSearchResult = StudentSearchResults['results'][number]

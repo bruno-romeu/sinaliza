@@ -5,10 +5,12 @@ import {
   ApiError,
   getHome,
   searchStudents,
+  type InProgressFollowUp,
   type RecentChange,
   type StudentSearchResult,
 } from '../api/client'
 import { Header } from '../components/Header'
+import { FollowUpStatusPill } from '../components/FollowUpStatusPill'
 
 type ChangeType = RecentChange['type']
 
@@ -58,6 +60,7 @@ export function Home() {
   const searchInputId = useId()
 
   const [recentChanges, setRecentChanges] = useState<RecentChange[] | null>(null)
+  const [inProgressFollowUps, setInProgressFollowUps] = useState<InProgressFollowUp[] | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
 
@@ -75,6 +78,7 @@ export function Home() {
       .then((home) => {
         if (ignore) return
         setRecentChanges(home.recent_changes)
+        setInProgressFollowUps(home.in_progress_follow_ups)
       })
       .catch(() => {
         if (ignore) return
@@ -169,6 +173,48 @@ export function Home() {
               fontSize: 15,
             }}
           />
+        </section>
+
+        {/* Always renders, independent of `showingSearch` (spec-4-5 Boundaries
+            & Constraints, UX-DR18) — the active-follow-ups count stays
+            visible even while search results are showing. */}
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Acompanhamentos em andamento</h2>
+
+          {inProgressFollowUps === null && !loadError && (
+            <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[0, 1].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    height: 64,
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--color-border)',
+                    opacity: 0.4,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {inProgressFollowUps !== null && inProgressFollowUps.length === 0 && (
+            <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
+              Nenhum acompanhamento em andamento no momento
+            </p>
+          )}
+
+          {inProgressFollowUps !== null && inProgressFollowUps.length > 0 && (
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {inProgressFollowUps.map((item) => (
+                <li key={item.id}>
+                  <Link to={`/acompanhamentos/${item.id}`} style={rowStyle}>
+                    <FollowUpStatusPill status={item.status} />
+                    <span style={{ fontWeight: 600 }}>{item.student_name}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {showingSearch && (
