@@ -12,12 +12,17 @@ from __future__ import annotations
 import uuid
 from typing import Protocol
 
+from app.domain.follow_up import FollowUp
 from app.domain.student import Student, StudentSearchResult
 from app.domain.trajectory_change import TrajectoryChange
 
 
 class TrajectoryChangeRepositoryPort(Protocol):
     def list_recent(self, limit: int) -> list[TrajectoryChange]: ...
+
+
+class FollowUpRepositoryPort(Protocol):
+    def list_active(self) -> list[FollowUp]: ...
 
 
 class StudentRepositoryPort(Protocol):
