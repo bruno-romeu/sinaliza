@@ -58,12 +58,12 @@ development_status:
   3-4-trajetória-do-estudante-gráfico-evidências-e-fator-preocupan: done
   epic-3-retrospective: done
 
-  epic-4: in-progress
+  epic-4: done
   4-1-abertura-de-acompanhamento-vinculado-a-evidências: done
   4-2-registro-de-ações-e-mudança-de-status-de-um-acompanhamento: done
   4-3-histórico-completo-de-ações-e-evidências-de-um-acompanhament: done
   4-4-escopo-de-acesso-ao-registro-pedagógico-vinculado-a-um-acomp: done
-  4-5-acompanhamentos-em-andamento-na-página-inicial: review
+  4-5-acompanhamentos-em-andamento-na-página-inicial: done
   epic-4-retrospective: optional
 
   epic-5: backlog
