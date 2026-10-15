@@ -129,7 +129,9 @@ class GetStudentTrajectoryDetailService:
         self._pedagogical_observation_repository = pedagogical_observation_repository
         self._trajectory_change_source_repository = trajectory_change_source_repository
 
-    def execute(self, student_id: uuid.UUID, window_days: int) -> TrajectoryDetailResult:
+    def execute(
+        self, student_id: uuid.UUID, window_days: int, requesting_user_id: uuid.UUID
+    ) -> TrajectoryDetailResult:
         # Raises StudentNotFoundError when applicable — never duplicated here.
         result = self._trajectory_service.execute(student_id, window_days)
 
@@ -145,7 +147,7 @@ class GetStudentTrajectoryDetailService:
         ]
         habitual_range = self._habitual_range(series)
 
-        evidence = self._resolve_evidence(result.trajectory_change)
+        evidence = self._resolve_evidence(result.trajectory_change, requesting_user_id)
         observations = self._recent_observations(student_id)
 
         return TrajectoryDetailResult(
@@ -234,7 +236,9 @@ class GetStudentTrajectoryDetailService:
             return None
         return HabitualRange(low=min(values), high=max(values))
 
-    def _resolve_evidence(self, trajectory_change: TrajectoryChange | None) -> list[EvidenceItem]:
+    def _resolve_evidence(
+        self, trajectory_change: TrajectoryChange | None, requesting_user_id: uuid.UUID
+    ) -> list[EvidenceItem]:
         if trajectory_change is None:
             return []
 
@@ -245,6 +249,7 @@ class GetStudentTrajectoryDetailService:
             grade_repo=self._grade_repository,
             submission_repo=self._assignment_submission_repository,
             observation_repo=self._pedagogical_observation_repository,
+            requesting_user_id=requesting_user_id,
         )
 
     def _recent_observations(self, student_id: uuid.UUID) -> list[ObservationItem]:
