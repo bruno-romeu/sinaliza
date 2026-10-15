@@ -62,6 +62,7 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
               detected_at: '2026-09-20T00:00:00Z',
             },
           ],
+          in_progress_follow_ups: [],
         })
       }
       throw new Error(`Unexpected fetch call in test: ${url}`)
@@ -79,7 +80,7 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
   })
 
   it('shows the explicit empty-state message when there are no recent changes', async () => {
-    fetchMock = vi.fn(async () => jsonResponse({ recent_changes: [] }))
+    fetchMock = vi.fn(async () => jsonResponse({ recent_changes: [], in_progress_follow_ups: [] }))
     vi.stubGlobal('fetch', fetchMock)
 
     renderHome()
@@ -101,7 +102,7 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url === '/api/home') {
-        return jsonResponse({ recent_changes: [] })
+        return jsonResponse({ recent_changes: [], in_progress_follow_ups: [] })
       }
       if (url.startsWith('/api/home/search')) {
         return jsonResponse({
@@ -132,7 +133,7 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url === '/api/home') {
-        return jsonResponse({ recent_changes: [] })
+        return jsonResponse({ recent_changes: [], in_progress_follow_ups: [] })
       }
       if (url.startsWith('/api/home/search')) {
         return jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500)
@@ -155,7 +156,7 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url === '/api/home') {
-        return jsonResponse({ recent_changes: [] })
+        return jsonResponse({ recent_changes: [], in_progress_follow_ups: [] })
       }
       if (url.startsWith('/api/home/search')) {
         return jsonResponse({ results: [], count: 0 })
@@ -172,5 +173,85 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     })
 
     await screen.findByText('Nenhum estudante encontrado com esse nome/turma.')
+  })
+})
+
+describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    localStorage.clear()
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        token: 'fake-token',
+        user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'COORDENACAO_PEDAGOGICA' },
+      }),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('shows one card per in-progress follow-up, with status pill, student name and a full-card link', async () => {
+    fetchMock = vi.fn(async () =>
+      jsonResponse({
+        recent_changes: [],
+        in_progress_follow_ups: [
+          { id: 'fu-1', student_id: 'student-1', student_name: 'Maria Silva', status: 'EM_OBSERVACAO' },
+          { id: 'fu-2', student_id: 'student-2', student_name: 'João Souza', status: 'ACOMPANHAMENTO_ATIVO' },
+        ],
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHome()
+
+    await screen.findByText('Maria Silva')
+    expect(screen.getByText('João Souza')).toBeInTheDocument()
+    expect(screen.getByText('Em observação')).toBeInTheDocument()
+    expect(screen.getByText('Ativo')).toBeInTheDocument()
+
+    const link = screen.getByText('Maria Silva').closest('a')
+    expect(link).toHaveAttribute('href', '/acompanhamentos/fu-1')
+  })
+
+  it('shows the neutral empty-state message when there are no active follow-ups', async () => {
+    fetchMock = vi.fn(async () => jsonResponse({ recent_changes: [], in_progress_follow_ups: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHome()
+
+    await screen.findByText('Nenhum acompanhamento em andamento no momento')
+  })
+
+  it('keeps the active-follow-ups section visible while search results are showing', async () => {
+    fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url === '/api/home') {
+        return jsonResponse({
+          recent_changes: [],
+          in_progress_follow_ups: [
+            { id: 'fu-1', student_id: 'student-1', student_name: 'Maria Silva', status: 'EM_OBSERVACAO' },
+          ],
+        })
+      }
+      if (url.startsWith('/api/home/search')) {
+        return jsonResponse({ results: [], count: 0 })
+      }
+      throw new Error(`Unexpected fetch call in test: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHome()
+    await screen.findByText('Maria Silva')
+
+    fireEvent.change(screen.getByLabelText('Buscar estudante por nome ou turma'), {
+      target: { value: 'Inexistente' },
+    })
+
+    await screen.findByText('Nenhum estudante encontrado com esse nome/turma.')
+    expect(screen.getByText('Maria Silva')).toBeInTheDocument()
   })
 })

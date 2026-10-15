@@ -20,8 +20,21 @@ class RecentChangeOut(BaseModel):
     detected_at: datetime
 
 
+class InProgressFollowUpOut(BaseModel):
+    id: uuid.UUID
+    student_id: uuid.UUID
+    student_name: str
+    status: Literal[
+        "EM_OBSERVACAO",
+        "ACOMPANHAMENTO_ATIVO",
+        "AGUARDANDO_RETORNO",
+        "ENCERRADO",
+    ]
+
+
 class HomeOut(BaseModel):
     recent_changes: list[RecentChangeOut]
+    in_progress_follow_ups: list[InProgressFollowUpOut]
 
 
 class StudentSearchResultOut(BaseModel):

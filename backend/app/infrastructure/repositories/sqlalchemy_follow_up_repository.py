@@ -70,6 +70,29 @@ class SqlAlchemyFollowUpRepository:
             created_at=model.created_at,
         )
 
+    def list_active(self) -> list[FollowUp]:
+        # spec-4-5: every `FollowUp` whose status is not `ENCERRADO` (never
+        # capped/paginated — open-case volume is operator-driven, unlike the
+        # high-volume synthetic `TrajectoryChange` rows `list_recent` caps).
+        stmt = (
+            select(FollowUpModel)
+            .where(FollowUpModel.status != FollowUpStatus.ENCERRADO)
+            .order_by(FollowUpModel.created_at.desc(), FollowUpModel.id.desc())
+        )
+        models = self._session.execute(stmt).scalars().all()
+        return [
+            FollowUp(
+                id=model.id,
+                student_id=model.student_id,
+                status=model.status,
+                reason=model.reason,
+                responsible_user_id=model.responsible_user_id,
+                next_review_date=model.next_review_date,
+                created_at=model.created_at,
+            )
+            for model in models
+        ]
+
     def list_evidence_by_follow_up(self, follow_up_id: uuid.UUID) -> list[FollowUpEvidence]:
         # Joined to `trajectory_changes` purely to order by its `detected_at`
         # (spec Code Map) — `GetFollowUpService` still loads each
