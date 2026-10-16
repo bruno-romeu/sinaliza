@@ -217,7 +217,7 @@ action_items:
       FollowUpAction appears in ActionHistory immediately, without a page reload.
       frontend/src/pages/Acompanhamento.tsx:306-349,441-540."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-17-fix-now-security-reconcile-rf-22-visibil"
     epic: 4

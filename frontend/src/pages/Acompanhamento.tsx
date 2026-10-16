@@ -296,6 +296,12 @@ export function Acompanhamento() {
             onStatusChange={(status) =>
               setLoadState({ status: 'loaded', detail: { ...loadState.detail, status } })
             }
+            onActionRegistered={(action) =>
+              setLoadState({
+                status: 'loaded',
+                detail: { ...loadState.detail, actions: [...loadState.detail.actions, action] },
+              })
+            }
           />
         )}
       </main>
@@ -307,10 +313,12 @@ function AcompanhamentoContent({
   followUpId,
   detail,
   onStatusChange,
+  onActionRegistered,
 }: {
   followUpId: string
   detail: FollowUpDetail
   onStatusChange: (status: FollowUpStatusValue) => void
+  onActionRegistered: (action: FollowUpActionItem) => void
 }) {
   return (
     <>
@@ -343,7 +351,7 @@ function AcompanhamentoContent({
 
       <ActionHistory actions={detail.actions} />
 
-      <ActionForm followUpId={followUpId} />
+      <ActionForm followUpId={followUpId} onActionRegistered={onActionRegistered} />
     </>
   )
 }
@@ -438,7 +446,13 @@ function StatusSelector({
  * replaces a prior action: every submission is a fresh row (RF-13, RF-14).
  * No read-back/list of past actions here (Story 4.3 scope).
  */
-function ActionForm({ followUpId }: { followUpId: string }) {
+function ActionForm({
+  followUpId,
+  onActionRegistered,
+}: {
+  followUpId: string
+  onActionRegistered: (action: FollowUpActionItem) => void
+}) {
   const { token } = useAuth()
   const textId = useId()
   const messageId = useId()
@@ -455,7 +469,8 @@ function ActionForm({ followUpId }: { followUpId: string }) {
     setMessage(null)
     setIsError(false)
     try {
-      await registerFollowUpAction(token, followUpId, { description: text })
+      const action = await registerFollowUpAction(token, followUpId, { description: text })
+      onActionRegistered(action)
       setText('')
       setMessage('Registro salvo.')
       setIsError(false)
