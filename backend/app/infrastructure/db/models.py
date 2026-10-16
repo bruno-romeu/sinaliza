@@ -341,3 +341,20 @@ class SyntheticGenerationRunModel(Base):
     executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     student_count: Mapped[int] = mapped_column(Integer, nullable=False)
     train_ratio: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)
+
+
+class MLModelVersionModel(Base):
+    """One row per successful `python -m app.ml.train` run (spec-5-1, RF-17)
+    — never written by the web process (AD-3). `version` is `UNIQUE` so a
+    re-run can never collide with or overwrite a prior row/artifact file
+    (spec Never). `artifact_path` points at the single serialized sklearn
+    `Pipeline` file Story 5.2's inference loader will later `joblib.load`."""
+
+    __tablename__ = "ml_model_version"
+    __table_args__ = (UniqueConstraint("version", name="uq_ml_model_version_version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
+    artifact_path: Mapped[str] = mapped_column(String(1024), nullable=False)
+    trained_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
