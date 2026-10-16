@@ -239,7 +239,7 @@ action_items:
       live: a non-responsible user can change a FollowUp's status via PATCH (200)
       despite being blocked from reading its evidence text."
     owner: "product"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-19-fix-now-trivial-correct-docs-epic-4-cont"
     epic: 4
