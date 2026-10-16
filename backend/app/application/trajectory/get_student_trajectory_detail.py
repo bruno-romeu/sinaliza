@@ -148,7 +148,7 @@ class GetStudentTrajectoryDetailService:
         habitual_range = self._habitual_range(series)
 
         evidence = self._resolve_evidence(result.trajectory_change, requesting_user_id)
-        observations = self._recent_observations(student_id)
+        observations = self._recent_observations(student_id, requesting_user_id)
 
         return TrajectoryDetailResult(
             chart_indicator=chart_indicator,
@@ -252,14 +252,31 @@ class GetStudentTrajectoryDetailService:
             requesting_user_id=requesting_user_id,
         )
 
-    def _recent_observations(self, student_id: uuid.UUID) -> list[ObservationItem]:
+    def _recent_observations(
+        self, student_id: uuid.UUID, requesting_user_id: uuid.UUID
+    ) -> list[ObservationItem]:
         as_of_date = as_of()
         start = as_of_date - timedelta(days=_OBSERVATIONS_WINDOW_DAYS)
         observations = self._pedagogical_observation_repository.list_by_student_in_range(
             student_id, start, as_of_date
         )
         ordered = sorted(observations, key=lambda observation: observation.created_at, reverse=True)
+        most_recent = ordered[:_MAX_OBSERVATIONS]
+
+        # RF-22/AD-8: the timeline must redact an observation's text exactly
+        # like the evidence card does — re-resolve through get_by_ids, the
+        # one place the restricted/visible rule lives, instead of using the
+        # raw text list_by_student_in_range returns.
+        redacted_by_id = {
+            observation.id: observation
+            for observation in self._pedagogical_observation_repository.get_by_ids(
+                [observation.id for observation in most_recent], requesting_user_id
+            )
+        }
         return [
-            ObservationItem(date=observation.created_at.date(), text=observation.text)
-            for observation in ordered[:_MAX_OBSERVATIONS]
+            ObservationItem(
+                date=observation.created_at.date(),
+                text=redacted_by_id[observation.id].text,
+            )
+            for observation in most_recent
         ]

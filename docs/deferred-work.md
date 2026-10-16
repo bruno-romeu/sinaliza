@@ -1,5 +1,9 @@
 # Deferred Work
 
+- source_spec: `docs/spec-epic-4-retro-item-17-rf22-timeline-redaction.md`
+  summary: `tests/test_synthetic_dataset_split.py`'s 4 tests that call `run_generation` (`test_exactly_two_dataset_split_values_exist_on_a_generated_base`, `test_generated_train_students_never_appear_in_list_enrolled_for_any_classroom`, `test_generated_train_students_fail_exists_enrollment_for_their_real_classroom`, `test_generated_train_facts_exist_in_the_database_but_never_via_the_student_repository`) fail with `MissingAuthorUserError` because the file never seeds the `DEV_SEED_EMAIL` coordination user before calling `run_generation`, unlike `test_synthetic_facts_generation.py` which does this explicitly per-test.
+  evidence: Pre-existing gap, unrelated to this spec's change — reproduced identically before and after this spec's diff (confirmed via `git stash`/`git stash pop` isolation), `cd backend && uv run pytest -q` consistently shows these 4 failures with 353 other tests passing. Fix: add the same `UserModel(email=settings.dev_seed_email, ...)` seeding helper `test_synthetic_facts_generation.py` uses to `test_synthetic_dataset_split.py`'s setup.
+
 - source_spec: `docs/spec-4-1-abertura-de-acompanhamento-vinculado-a-evidencias.md`
   summary: `GET /follow-ups/{id}` lets any authenticated user read a cited `PedagogicalObservation`'s full text via the evidence list, with no `responsible_user_id` visibility scoping yet.
   evidence: Real exposure window — `GetFollowUpService` reuses Story 3.4's unfiltered `resolve_evidence` as the frozen Boundaries & Constraints require ("Never filter `PedagogicalObservation` visibility here — Story 4.4 scope"). Story 4.4 closes this by adding the `responsible_user_id`-scoped read filter at the repository-base level (AD-8/AD-11). Until then, any authenticated user who knows/guesses a `follow_up_id` can read observation text cited as its evidence.
@@ -63,3 +67,17 @@
 - source_spec: `docs/spec-4-2-registro-de-acoes-e-mudanca-de-status.md`
   summary: The `follow_up_action` DB-level `GRANT INSERT, SELECT` / `REVOKE UPDATE, DELETE` backstop (AD-6) assumes migrations and the running app always connect as the same Postgres role (`GRANT/REVOKE ... TO/FROM CURRENT_USER`), and assumes that role is never a superuser — either assumption breaking would silently neutralize the backstop.
   evidence: Confirmed `alembic/env.py` reads the same `settings.database_url` the app uses (single-role setup), and no split migration/admin-role convention exists anywhere in this codebase or Epic 6's hosting docs today, so this is not reachable under the current deployment model. Separately confirmed empirically (against this project's own test Postgres instance) that a non-superuser *owner* role genuinely cannot bypass an explicit `REVOKE UPDATE, DELETE` on its own table — only superuser status bypasses it, and the local `sinaliza` role used by `TEST_DATABASE_URL`/`DATABASE_URL` is in fact provisioned as a superuser in this environment (confirmed via `SELECT rolsuper FROM pg_roles`), meaning the backstop has no actual runtime effect in dev/test today even though the catalog correctly records the revoked grants. Revisit if Epic 6's hosting setup ever introduces a split migration-role convention, or if the production role is also a superuser (should be de-privileged before relying on this backstop for real).
+
+## Deferred from: multi-goal split, bmad-build intake (2026-10-15)
+
+- source_spec: none
+  summary: epic-4-retro-item-20 — write a corrective Alembic migration that idempotently adds any missing `synthetic_profile` enum labels (`ALTER TYPE synthetic_profile ADD VALUE IF NOT EXISTS FALLING_GRADES`) so a database that ran the original 3-member version of migration 0006 self-heals on its next `alembic upgrade head`. Escalated from Epic 2's retro; recommended before Epic 5 since Epic 5's ML pipeline reads from the same `synthetic_profile`-bearing tables.
+  evidence: Split from the fix-now security item (epic-4-retro-item-17) because each is an independently shippable deliverable. Ref: `docs/epic-4-retro-2026-10-14.md`, `docs/epic-2-retro-2026-10-08.md`.
+
+- source_spec: `docs/spec-4-2-registro-de-acoes-e-mudanca-de-status.md`
+  summary: epic-4-retro-item-16 — thread an `onActionRegistered`-style callback from `AcompanhamentoContent` into `ActionForm` (mirroring `StatusSelector`'s `onStatusChange`) so a newly-submitted `FollowUpAction` appears in `ActionHistory` immediately, without a page reload. `frontend/src/pages/Acompanhamento.tsx:306-349,441-540`.
+  evidence: Split from the fix-now security item (epic-4-retro-item-17) because each is an independently shippable deliverable. Ref: `docs/epic-4-retro-2026-10-14.md`.
+
+- source_spec: none
+  summary: epic-4-retro-item-19 — correct `docs/epic-4-context.md:45`, which claims `FollowUp.next_review_date` is read by a live query in `GET /home` — never implemented; the field stays unused end to end across all 5 stories.
+  evidence: Split from the fix-now security item (epic-4-retro-item-17) because each is an independently shippable deliverable. Ref: `docs/epic-4-retro-2026-10-14.md`.
