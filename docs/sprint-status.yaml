@@ -229,7 +229,7 @@ action_items:
       text there too or make an explicit, user-facing documented decision that the
       raw timeline is exempt."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-18-open-question-decide-whether-followup-mu"
     epic: 4
