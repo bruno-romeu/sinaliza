@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends
 
 from app.application.followups.change_follow_up_status import ChangeFollowUpStatusService
 from app.application.followups.errors import (
+    FollowUpAccessDeniedError,
     FollowUpNotFoundError,
     TrajectoryChangeMismatchError,
     TrajectoryChangeNotFoundError,
@@ -152,6 +153,12 @@ def register_follow_up_action(
             code="follow_up_not_found",
             message="Acompanhamento não encontrado.",
         ) from exc
+    except FollowUpAccessDeniedError as exc:
+        raise AppError(
+            status_code=403,
+            code="follow_up_access_denied",
+            message="Você não tem permissão para registrar uma ação neste acompanhamento.",
+        ) from exc
 
     return FollowUpActionOut(
         id=action.id,
@@ -166,17 +173,26 @@ def register_follow_up_action(
 def change_follow_up_status(
     follow_up_id: uuid.UUID,
     payload: ChangeFollowUpStatusRequest,
+    current_user: CurrentUser = Depends(get_current_user),
     service: ChangeFollowUpStatusService = Depends(get_change_follow_up_status_service),
 ) -> FollowUpOut:
     try:
         follow_up = service.execute(
-            follow_up_id=follow_up_id, status=FollowUpStatus(payload.status)
+            follow_up_id=follow_up_id,
+            status=FollowUpStatus(payload.status),
+            requesting_user_id=uuid.UUID(current_user.id),
         )
     except FollowUpNotFoundError as exc:
         raise AppError(
             status_code=404,
             code="follow_up_not_found",
             message="Acompanhamento não encontrado.",
+        ) from exc
+    except FollowUpAccessDeniedError as exc:
+        raise AppError(
+            status_code=403,
+            code="follow_up_access_denied",
+            message="Você não tem permissão para alterar o status deste acompanhamento.",
         ) from exc
 
     return FollowUpOut(

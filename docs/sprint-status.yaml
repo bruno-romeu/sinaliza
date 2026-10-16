@@ -163,7 +163,7 @@ action_items:
       version of migration 0006 (before Story 2.2 amended it in place) self-heals
       on its next alembic upgrade head."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-2-retro-2026-10-08.md"
   - id: "epic-2-retro-item-2-never-amend-applied-migration"
     epic: 2
@@ -217,7 +217,7 @@ action_items:
       FollowUpAction appears in ActionHistory immediately, without a page reload.
       frontend/src/pages/Acompanhamento.tsx:306-349,441-540."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-17-fix-now-security-reconcile-rf-22-visibil"
     epic: 4
@@ -239,7 +239,7 @@ action_items:
       live: a non-responsible user can change a FollowUp's status via PATCH (200)
       despite being blocked from reading its evidence text."
     owner: "product"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-19-fix-now-trivial-correct-docs-epic-4-cont"
     epic: 4
@@ -247,7 +247,7 @@ action_items:
       is read by a live query in GET /home - never implemented; the field stays unused
       end to end across all 5 stories."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-20-fix-now-escalate-epic-2-retro-item-1-mig"
     epic: 4
@@ -256,7 +256,7 @@ action_items:
       4. Propose picking it up before Epic 5 starts, since Epic 5's ML pipeline reads
       from the same synthetic_profile-bearing tables."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-21-defer-record-the-never-amend-an-applied"
     epic: 4

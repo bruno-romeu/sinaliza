@@ -8,6 +8,11 @@ request field — the router is responsible for sourcing it from
 `responsible_user_id` idiom). Action submission is never gated on the
 follow-up's current status (spec Never) — any of the 4 statuses accepts a
 new action.
+
+`author_user_id` also doubles as `requesting_user_id`: this service scopes
+registration to the `FollowUp`'s `responsible_user_id` (RF-22 write-side,
+epic-4-retro-item-18), the same trust boundary Story 4.4 already applies to
+reads.
 """
 
 from __future__ import annotations
@@ -15,7 +20,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from app.application.followups.errors import FollowUpNotFoundError
+from app.application.followups.errors import FollowUpAccessDeniedError, FollowUpNotFoundError
 from app.application.followups.ports import FollowUpRepositoryPort
 from app.domain.follow_up import FollowUpAction
 
@@ -30,8 +35,11 @@ class RegisterFollowUpActionService:
         description: str,
         author_user_id: uuid.UUID,
     ) -> FollowUpAction:
-        if self._follow_up_repository.get_by_id(follow_up_id) is None:
+        follow_up = self._follow_up_repository.get_by_id(follow_up_id)
+        if follow_up is None:
             raise FollowUpNotFoundError()
+        if follow_up.responsible_user_id != author_user_id:
+            raise FollowUpAccessDeniedError()
 
         action = FollowUpAction(
             id=uuid.uuid4(),
