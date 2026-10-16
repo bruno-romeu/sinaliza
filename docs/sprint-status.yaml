@@ -247,7 +247,7 @@ action_items:
       is read by a live query in GET /home - never implemented; the field stays unused
       end to end across all 5 stories."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-20-fix-now-escalate-epic-2-retro-item-1-mig"
     epic: 4
