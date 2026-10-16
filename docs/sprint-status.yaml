@@ -163,7 +163,7 @@ action_items:
       version of migration 0006 (before Story 2.2 amended it in place) self-heals
       on its next alembic upgrade head."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-2-retro-2026-10-08.md"
   - id: "epic-2-retro-item-2-never-amend-applied-migration"
     epic: 2
@@ -256,7 +256,7 @@ action_items:
       4. Propose picking it up before Epic 5 starts, since Epic 5's ML pipeline reads
       from the same synthetic_profile-bearing tables."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-21-defer-record-the-never-amend-an-applied"
     epic: 4
