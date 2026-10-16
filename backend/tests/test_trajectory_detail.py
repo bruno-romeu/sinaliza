@@ -662,6 +662,58 @@ def test_detail_evidence_redacts_observation_text_once_cited_by_a_follow_up_for_
     assert _RESTRICTED_TEXT in other_observation["description"]
 
 
+def test_detail_timeline_redacts_observation_text_once_cited_by_a_follow_up_for_other_users(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    _add_low_attendance(db_session, seeded_enrolled_student.id, seeded_classroom.id, 1, 2)
+    db_session.add(
+        PedagogicalObservationModel(
+            student_id=seeded_enrolled_student.id,
+            author_user_id=seeded_user.id,
+            text="Observação de teste.",
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    headers = _auth_headers(client, seeded_user)
+
+    before = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail", headers=headers
+    ).json()
+    change_id = before["trajectory_change"]["id"]
+    assert before["observations"][0]["text"] == "Observação de teste."
+
+    open_response = client.post(
+        "/follow-ups",
+        json={
+            "student_id": str(seeded_enrolled_student.id),
+            "trajectory_change_id": change_id,
+        },
+        headers=headers,
+    )
+    assert open_response.status_code == 201
+
+    # Responsible user still sees the real text in the timeline.
+    own_detail = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail", headers=headers
+    ).json()
+    assert own_detail["observations"][0]["text"] == "Observação de teste."
+
+    # A different authenticated user is redacted in the timeline too (RF-22).
+    other_user = _create_user(db_session, "outra.coordenacao.timeline@escola.test")
+    other_headers = _auth_headers(client, other_user)
+    other_detail = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail", headers=other_headers
+    ).json()
+    assert other_detail["observations"][0]["text"] == _RESTRICTED_TEXT
+
+
 # --- Unauthenticated -------------------------------------------------------------------
 
 

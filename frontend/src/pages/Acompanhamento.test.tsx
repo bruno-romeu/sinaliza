@@ -332,6 +332,13 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     const [, init] = actionCall as [RequestInfo | URL, RequestInit]
     expect(init?.method).toBe('POST')
     expect(JSON.parse(String(init?.body))).toEqual({ description: 'Conversei com a família.' })
+
+    // Appears in ActionHistory immediately, without a page reload
+    // (epic-4-retro-item-16).
+    expect(screen.getByText('Conversei com a família.')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Nenhuma ação registrada até o momento.'),
+    ).not.toBeInTheDocument()
   })
 
   it('shows an inline error when submitting an action fails', async () => {

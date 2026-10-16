@@ -448,6 +448,40 @@ def test_register_follow_up_action_on_unknown_follow_up_returns_404(
     assert response.json() == FOLLOW_UP_NOT_FOUND_BODY
 
 
+def test_register_follow_up_action_by_non_responsible_user_returns_403(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    """RF-22 write-side (epic-4-retro-item-18): the same trust boundary that
+    redacts evidence text for a non-responsible user also blocks them from
+    registering a new action."""
+    follow_up = _seed_follow_up(db_session, seeded_enrolled_student, seeded_user.id)
+    other_user = _create_user(db_session, "outra.coordenacao.actions@escola.test")
+    other_headers = _auth_headers(client, other_user)
+
+    response = client.post(
+        f"/follow-ups/{follow_up.id}/actions",
+        json={"description": "Ação de outro usuário."},
+        headers=other_headers,
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "error": {
+            "code": "follow_up_access_denied",
+            "message": "Você não tem permissão para registrar uma ação neste acompanhamento.",
+        }
+    }
+    assert (
+        db_session.query(FollowUpActionModel)
+        .filter(FollowUpActionModel.follow_up_id == follow_up.id)
+        .count()
+        == 0
+    )
+
+
 @pytest.mark.parametrize(
     "target_status",
     ["EM_OBSERVACAO", "ACOMPANHAMENTO_ATIVO", "AGUARDANDO_RETORNO", "ENCERRADO"],
@@ -491,6 +525,37 @@ def test_change_follow_up_status_on_unknown_follow_up_returns_404(
 
     assert response.status_code == 404
     assert response.json() == FOLLOW_UP_NOT_FOUND_BODY
+
+
+def test_change_follow_up_status_by_non_responsible_user_returns_403(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    db_session: Session,
+) -> None:
+    """RF-22 write-side (epic-4-retro-item-18): the same trust boundary that
+    redacts evidence text for a non-responsible user also blocks them from
+    changing the follow-up's status."""
+    follow_up = _seed_follow_up(db_session, seeded_enrolled_student, seeded_user.id)
+    other_user = _create_user(db_session, "outra.coordenacao.status@escola.test")
+    other_headers = _auth_headers(client, other_user)
+
+    response = client.patch(
+        f"/follow-ups/{follow_up.id}/status",
+        json={"status": "ENCERRADO"},
+        headers=other_headers,
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "error": {
+            "code": "follow_up_access_denied",
+            "message": "Você não tem permissão para alterar o status deste acompanhamento.",
+        }
+    }
+    db_session.expire_all()
+    refreshed = db_session.get(FollowUpModel, follow_up.id)
+    assert refreshed.status.value == "EM_OBSERVACAO"
 
 
 def test_change_follow_up_status_with_invalid_status_returns_422(
