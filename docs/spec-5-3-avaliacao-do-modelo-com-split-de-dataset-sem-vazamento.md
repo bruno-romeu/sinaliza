@@ -1,0 +1,119 @@
+---
+title: 'Avaliação do modelo com split de dataset sem vazamento'
+type: 'feature'
+created: '2026-10-16'
+status: 'done'
+route: 'full'
+route_source: 'auto'
+review: 'thorough'
+review_source: 'auto'
+lenses_ran: ['blind-hunter', 'edge-case-hunter', 'verification-gap', 'intent-alignment']
+review_loop_iteration: 0
+context: []
+baseline_commit: '4af19d362e22deb7396f644bc32963e6d74feb43'
+---
+
+<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+
+## Intent
+
+**Problem:** Stories 5.1/5.2 train a model and produce experimental scores, but nothing measures how well the model actually recognizes the synthetic dataset's simulated patterns — there is no leakage-free evaluation report, and the per-student feature aggregation SQL is now duplicated in `TrainingRepository` and `PredictionRepository` with no shared source of truth.
+
+**Approach:** Add a `python -m app.ml.evaluate` CLI that loads the latest `MLModelVersion`'s artifact, scores the full `EVAL_DEMO` cut (ground-truth labels, no `as_of()` truncation), and prints precision/recall/F1/confusion-matrix (mandatory, macro-averaged across all `SyntheticProfile` classes) plus ROC-AUC/PR-AUC (optional, one-vs-rest macro-averaged), always captioned as measuring "ability to recognize simulated patterns in the synthetic dataset" — never real predictive validity. Extract the duplicated per-student aggregation SQL into one shared helper reused by `TrainingRepository`, `PredictionRepository`, and the new evaluation repository.
+
+## Boundaries & Constraints
+
+**Always:** Evaluation reads students exclusively through a new `EvaluationRepository` (or equivalent) that filters `dataset_split == EVAL_DEMO`, requires a non-null `synthetic_profile` label, and never calls `filter_as_of` — it reads the complete outcome, exactly like `PredictionRepository` but with the label attached. The shared aggregation helper (extracted from `TrainingRepository`/`PredictionRepository`'s near-identical attendance/grade/assignment/observation SQL) is the single source of truth all three repositories call; `FEATURE_COLUMNS` ordering stays the contract between them. `python -m app.ml.evaluate` loads the single most-recently-trained `MLModelVersion` (same `trained_at` + `id` tiebreaker as `predict.py`), `joblib.load`s its artifact verbatim, and calls `.predict`/`.predict_proba` — never refits. Precision/recall/F1 are computed over all labels observed in `SyntheticProfile` (macro-averaged, `zero_division=0`); the confusion matrix uses the fixed label set `[p.value for p in SyntheticProfile]` so absent classes show as zero rows/columns rather than crashing. Every printed report includes, verbatim, the phrase "ability to recognize simulated patterns in the synthetic dataset" and never claims real-world predictive validity. The command runs only offline, opens its own `SessionLocal()`, and is never wired into `composition.py`/FastAPI or a scheduler. `app/ml/` continues to only import domain models/ports.
+
+**Never:** No persistence of evaluation results — this is a pure stdout-reporting CLI, matching the `train`/`predict` precedent. Never applies `as_of()` truncation (that's Story 5.4's live-serving concern only). Never retrains or re-fits the pipeline. No `presentation/` code, endpoint, or schema references evaluation metrics. Out of scope: any new DB table/migration; live inference loading (Story 5.4).
+
+## I/O & Edge-Case Matrix
+
+| Scenario | Input / State | Expected Output / Behavior | Error Handling |
+|----------|--------------|---------------------------|----------------|
+| Happy path | `EVAL_DEMO` students with labels exist; a trained `MLModelVersion` with a loadable artifact exists | Prints precision/recall/F1 (macro), 4x4 confusion matrix, ROC-AUC/PR-AUC (macro, one-vs-rest), and the "simulated patterns" disclaimer; exit 0 | No error expected |
+| No `MLModelVersion` exists | `ml_model_version` table empty | No report printed | Raises a domain error; CLI prints to stderr, exits non-zero |
+| No labeled `EVAL_DEMO` rows | Zero students with `dataset_split == EVAL_DEMO` and non-null `synthetic_profile` | No report printed | Raises a domain error; CLI prints to stderr, exits non-zero |
+| Only one class present in `EVAL_DEMO` labels | All eval rows share one `synthetic_profile` value | Precision/recall/F1/confusion matrix still print; ROC-AUC/PR-AUC reported as "not computable" instead of crashing | Noted in output, not fatal |
+| `EVAL_DEMO` row missing facts | Some feature values are `None` | Row still scored (same imputation as training/predict); included in metrics | Noted in printed summary, not fatal |
+
+</frozen-after-approval>
+
+## Code Map
+
+- `backend/app/ml/training_repository.py` — `FEATURE_COLUMNS`, `TrainingRow`, `fetch_training_rows()`'s attendance/grade/assignment/observation aggregation SQL (lines ~42-110) — extract the per-student aggregation into a new shared helper module; `TrainingRepository` keeps its `dataset_split==TRAIN` + non-null-label filter but delegates aggregation to the helper.
+- `backend/app/ml/prediction_repository.py` — `PredictionRepository.fetch_scoring_rows()`, `ScoringRow`, the `FEATURE_COLUMNS` parity guard (`if tuple(FEATURE_COLUMNS) != (...): raise RuntimeError(...)`) — same refactor: delegate aggregation to the shared helper, keep its own `EVAL_DEMO` filter and no-`as_of` behavior unchanged.
+- `backend/app/ml/predict.py` — `NoModelVersionError`, `NoScoringDataError`, the latest-`MLModelVersion` query (`order_by(trained_at.desc(), id.desc()).limit(1)`), `joblib.load` + `classes_`/`predict_proba` pattern, `main(argv=None)` try/except → stderr+exit(1) shape to mirror for `evaluate.py`.
+- `backend/app/ml/pipeline.py` — `build_pipeline()`; confirms `.classes_` contains all `SyntheticProfile` string values present in TRAIN (multi-class, not binary); not called here (no refit).
+- `backend/app/domain/student.py` — `DatasetSplit.EVAL_DEMO`, `SyntheticProfile` (4 members: `STABLE`, `FALLING_ATTENDANCE`, `FALLING_GRADES`, `COMBINED_DETERIORATION`) — the fixed label set for the confusion matrix.
+- `backend/app/domain/ml_model_version.py` — `MLModelVersion` dataclass shape.
+- `backend/app/infrastructure/db/models.py` — `MLModelVersionModel`, `StudentModel` (`dataset_split`/`synthetic_profile`) — no new table needed.
+- `backend/app/infrastructure/repositories/base.py` — `filter_as_of`/`filter_eval_demo_students` — confirms `evaluate` must not call `filter_as_of`.
+- `backend/tests/test_ml_predict.py` — `_SessionContext`, `_seed_eval_demo_student`, `_train_a_model`, `_seed_model_version` helpers and CLI-level `main()` test pattern (`monkeypatch.setattr(..., "SessionLocal", ...)`, `pytest.raises(SystemExit)`, `capsys`) to mirror for `test_ml_evaluate.py`.
+- `backend/tests/test_ml_train.py` — pattern for seeding multiple `TRAIN` students with distinct `synthetic_profile` labels (needed to exercise a non-degenerate multi-class confusion matrix in evaluation tests).
+- `docs/deferred-work.md` (entry for `spec-5-2`) — names this exact duplication and names Story 5.3 as the natural point to extract a shared helper; remove that entry once fixed (do not leave a stale deferred item for a fix that is now done).
+
+## Tasks & Acceptance
+
+**Execution:**
+- [ ] `backend/app/ml/feature_aggregation.py` — new module: `fetch_feature_rows(session, dataset_split) -> list[FeatureRow]` (`student_id` + the 4 `FEATURE_COLUMNS` values), extracted verbatim from the duplicated attendance/grade/assignment/observation aggregation SQL in `training_repository.py`/`prediction_repository.py` — single source of truth for feature computation
+- [ ] `backend/app/ml/training_repository.py` — refactor `fetch_training_rows()` to call `feature_aggregation.fetch_feature_rows(session, DatasetSplit.TRAIN)` for features, then join with each student's `synthetic_profile`, excluding null-label students — behavior must stay identical (existing tests pass unchanged)
+- [ ] `backend/app/ml/prediction_repository.py` — refactor `fetch_scoring_rows()` to call `feature_aggregation.fetch_feature_rows(session, DatasetSplit.EVAL_DEMO)` — behavior must stay identical (existing tests pass unchanged)
+- [ ] `backend/app/ml/evaluation_repository.py` — new `EvaluationRepository(session)` with `fetch_evaluation_rows() -> list[EvaluationRow]` (`student_id` + 4 features + `label: SyntheticProfile`), calling `feature_aggregation.fetch_feature_rows(session, DatasetSplit.EVAL_DEMO)` then joining non-null `synthetic_profile` per student — never calls `filter_as_of`
+- [ ] `backend/app/ml/evaluate.py` — new CLI: `NoModelVersionError`, `NoEvaluationDataError`; `run_evaluation(session) -> EvaluationReport` (loads latest `MLModelVersion` with the `trained_at`+`id` tiebreaker, `joblib.load`s artifact, builds `X`/`y_true` in `FEATURE_COLUMNS` order, computes `y_pred = pipeline.predict(X)`, macro precision/recall/F1 via `sklearn.metrics.precision_recall_fscore_support(..., labels=[p.value for p in SyntheticProfile], average="macro", zero_division=0)`, confusion matrix via `sklearn.metrics.confusion_matrix(..., labels=[p.value for p in SyntheticProfile])`, and macro one-vs-rest ROC-AUC/PR-AUC via `sklearn.preprocessing.label_binarize` + `roc_auc_score`/`average_precision_score`, reporting "not computable" instead of raising when fewer than 2 classes are present in `y_true`); `EvaluationReport` dataclass (precision, recall, f1, confusion_matrix, roc_auc, pr_auc, disclaimer); `main(argv=None)` mirrors `predict.py`'s try/except → stderr+exit(1) / print+exit(0) shape, printed report always includes the disclaimer text verbatim
+- [ ] `backend/tests/test_ml_evaluate.py` — new file: happy path (asserts printed metrics + confusion matrix + disclaimer phrase present, multi-class labels seeded), no-model-version error case, no-labeled-EVAL_DEMO-rows error case, single-class-in-eval-set case (ROC-AUC/PR-AUC "not computable", no crash), missing-facts non-fatal case, CLI-level `main()` stderr/exit-code coverage
+- [ ] `backend/tests/test_ml_train.py` / `backend/tests/test_ml_predict.py` — re-run unchanged to confirm the aggregation extraction preserved behavior (no new assertions required unless the refactor surfaces a gap)
+- [ ] `docs/deferred-work.md` — remove the Story-5.2-filed entry about duplicated aggregation SQL now that it is fixed
+
+**Acceptance Criteria:**
+- Given a trained `MLModelVersion` and labeled `EVAL_DEMO` students spanning more than one `SyntheticProfile`, when `python -m app.ml.evaluate` runs, then it prints macro precision/recall/F1, a 4x4 confusion matrix, ROC-AUC/PR-AUC, and the "ability to recognize simulated patterns" disclaimer, and exits 0.
+- Given the evaluation code, when inspected, then no row in its metrics derives from a `TRAIN`-split student, and feature aggregation for `TrainingRepository`, `PredictionRepository`, and `EvaluationRepository` all resolve to the same shared helper.
+- Given zero `MLModelVersion` rows or zero labeled `EVAL_DEMO` rows, when `python -m app.ml.evaluate` runs, then it exits non-zero with a clear stderr message.
+- Given the full codebase, when inspected, then no `presentation/` router or schema references evaluation metrics, and `evaluate.py` never calls `filter_as_of` or any `as_of()`-truncating helper.
+
+## Implementation Notes
+
+## Spec Change Log
+
+## Review Triage Log
+
+Pass 1 (thorough: blind-hunter, edge-case-hunter, verification-gap, intent-alignment). Verdict counts: medium=1, low=5, false=10, out of 19 findings (after grouping/dedup across lenses).
+
+- [verification-gap, pre-verified] `evaluate.py`'s class-reindexing/zero-fill branch (lines ~140-161), exercised only when `pipeline.classes_` is a strict subset of all 4 `SyntheticProfile` labels (TRAIN omitted a class), is never tested — every test's `_train_a_model` seeds all 4 labels, so `pipeline_classes == _ALL_LABELS` always and the zero-fill path never executes. → **medium**: confirmed — the code comment itself flags this as an anticipated scenario, and a broken reindex here would silently misalign or crash ROC-AUC/PR-AUC whenever a real TRAIN split omits a profile (plausible with small synthetic batches). Fix is test-only and direct. Kept, routed to patch.
+- [blind-hunter] Same untested class-omission branch, independently flagged. → merged into the entry above (same root cause).
+- [edge-case-hunter] `evaluate.py`: when `EVAL_DEMO` `y_true` has ≥2 distinct classes but not all 4 (e.g. 2-of-4), `roc_auc_score`/`average_precision_score` allegedly raise `ValueError` on an all-zero class column, crashing the CLI uncaught. → **false**: refuted directly by already-passing test evidence — `test_main_exits_zero_and_prints_report_on_success` seeds exactly this scenario (2 of 4 profiles present in `EVAL_DEMO`) and was confirmed independently (full suite run: 381 passed, this test among them, exit 0, only `UndefinedMetricWarning`/`UserWarning` emitted). Because `y_true` is passed to `roc_auc_score` already binarized (2D indicator array), sklearn's `type_of_target` dispatch routes it to the multilabel-indicator branch (`_average_binary_score`), which ignores the `multi_class` kwarg entirely and returns `nan`-with-warning for a degenerate column rather than raising — confirmed by the warning text matching exactly ("Only one class is present in y_true... not defined").
+- [edge-case-hunter] Same claim restated as "spec's 'not computable' guard only checks overall ≥2 classes, not each of the 4 labels individually, so a 2-or-3-of-4 split still crashes." → merged into the entry above (same refutation).
+- [edge-case-hunter] `evaluate.py:120`: `joblib.load` on a missing/corrupted artifact file raises uncaught instead of a clean stderr+exit(1) like the two documented domain errors. → **false**: refuted by direct precedent — this is the identical, already-accepted gap in `predict.py`'s own `joblib.load` call, refuted on these exact grounds in Story 5.2's review triage log, which itself traces back to `docs/deferred-work.md`'s Story 2.1 entry for `app/synthetic/generate.py`. `evaluate.py`'s Code Map explicitly directs mirroring `predict.py`'s shape.
+- [blind-hunter] Same missing/corrupt-artifact gap, independently flagged. → merged into the entry above (same refutation).
+- [blind-hunter] The aggregation refactor now runs `feature_aggregation.fetch_feature_rows()`'s 4 grouped queries for every student in a split, including ones later discarded for having no label — before the refactor, `TrainingRepository` filtered to labeled students up front. → **low**: real but negligible at the synthetic dataset's bounded scale (no user-facing effect, single-operator offline CLI), and the direct fix would reintroduce the per-repository label-filtering the shared helper deliberately avoids — the spec's own Design Notes scope the helper to be label-agnostic by design. Rejected per the low-finding rule (unlikely to matter + fix is more than a direct correction).
+- [blind-hunter] `TrainingRepository`/`EvaluationRepository` each issue a second DB round-trip to fetch labels, instead of folding the label into `fetch_feature_rows()`'s initial query. → **low**, same root-cause class as the entry above (shared helper trades a touch of efficiency for being label-agnostic, which the spec explicitly directs) — negligible cost, fix would complicate the helper's intentionally narrow scope. Rejected.
+- [blind-hunter] `main()` calls `get_settings()` but discards the return value, with no comment explaining why (presumably fail-fast config validation, mirroring `predict.py`/`train.py`). → **low**: real minor developer-confusion risk (a future reader could mistake it for dead code and remove it), and the fix (one-line comment) is a direct, trivial correction, so it does not meet the low-rejection bar (both unlikely-to-matter *and* non-trivial fix must hold to reject). Kept, routed to patch.
+- [blind-hunter] The spec's own Tasks & Acceptance checklist is left entirely unchecked, and Implementation Notes/Spec Change Log/Review Triage Log sections were empty prior to this review pass. → rejected: the only fix is editing this build's spec, explicitly out of triage scope per the Classify rules.
+- [blind-hunter] The printed confusion matrix's header row (joined with fixed 4-space separators) doesn't visually column-align with the fixed-width data rows for long labels like `COMBINED_DETERIORATION`. → **low**: cosmetic-only, unlikely to meaningfully confuse the single-operator audience of an experimental research CLI, and a true fix requires non-trivial per-column width computation. Rejected per the low-finding rule.
+- [blind-hunter] `test_main_exits_zero_and_prints_report_on_success` seeds only 2 of 4 profiles, so the CLI-level `main()` test never exercises the full 4-class confusion matrix/multi-class AUC computation end-to-end. → **false**: refuted — the full 4-class scenario is already directly exercised by `test_happy_path_prints_metrics_confusion_matrix_and_disclaimer`, which calls the same `run_evaluation()` function `main()` wraps; the CLI test's narrower scope is a deliberate choice to verify stdout/exit-code wiring, not a coverage gap in the underlying logic.
+- [blind-hunter] No test asserts cross-split isolation — a copy-pasted wrong `DatasetSplit` enum member in one of the three repositories' calls to `fetch_feature_rows()` would go undetected. → **false**: refuted — each test file seeds only its own split's fixtures (`test_ml_train.py` seeds only `TRAIN`, `test_ml_evaluate.py`/`test_ml_predict.py` seed only `EVAL_DEMO`), so swapping the enum in any call site would starve that repository of rows and raise its already-tested domain error (`NoTrainingDataError`/`NoScoringDataError`/`NoEvaluationDataError`), failing the corresponding happy-path test. Existing fixtures already catch this class of bug.
+- [blind-hunter] `missing_facts_count` only checks `attendance_rate`/`grade_average`/`assignment_completion_rate` for `None`, excluding `observation_count`. → **false**: refuted by identical precedent from Story 5.2's review of the same pattern in `predict.py` — `observation_count` is typed `int`, never `None` (defaults to `0`), so excluding it from the `None`-check is correct by design, not an oversight.
+- [intent-alignment] Evaluation results are stdout-only with no persisted/durable "report" artifact, one defensible reading of "nothing measures..." in the intent. → **false**: this is a deliberate, explicit spec decision (Boundaries: "No persistence of evaluation results — pure stdout-reporting CLI, matching the train/predict precedent"), consistent with established codebase convention from Stories 5.1/5.2.
+- [intent-alignment] `TrainingRepository.fetch_training_rows()` and `EvaluationRepository.fetch_evaluation_rows()` each run a near-identical new label-join query after the aggregation extraction — a duplication the intent's "no shared source of truth" framing could be read to also cover. → **false**: refuted directly by the spec's own Design Notes, which explicitly scope the extraction to the aggregation query only ("`TrainingRepository` and `PredictionRepository` keep their own `dataset_split`/label-filtering logic... only the inner aggregation query is now shared") — a deliberate, spec-directed boundary, not an oversight.
+- [intent-alignment] `evaluate.py` builds its feature matrix with a hardcoded field list (`row.attendance_rate, row.grade_average, ...`) rather than iterating `FEATURE_COLUMNS`, so the "single source of truth" ordering contract isn't programmatically enforced at this call site. → **false**: refuted by precedent — confirmed via direct read that `predict.py` uses the identical hardcoded field-listing pattern (not iterating `FEATURE_COLUMNS`), so `evaluate.py` faithfully mirrors `predict.py`'s established shape per the spec's own Code Map instruction, not a new defect introduced by this story.
+- [intent-alignment] `roc_auc_score` is called with `multi_class="ovr"` alongside an already-binarized `y_true`, which is "not the documented multiclass path," raising doubt about whether the computed value is correct. → **false**: refuted — sklearn's `type_of_target` dispatch routes a 2D binarized `y_true` to the multilabel-indicator branch, which ignores `multi_class` entirely and computes the same macro one-vs-rest average via `_average_binary_score` that the documented multiclass path would produce; confirmed empirically by passing tests and the manual dev-DB run (ROC-AUC 0.9949, within bounds, consistent with the near-diagonal confusion matrix observed).
+- [intent-alignment] The spec's own structural acceptance criteria (no `TRAIN`-split leakage, shared-helper usage across all three repositories, no `presentation/` references) are verifiable only by inspection, not by any automated test. → **false**: mirrors the identical, already-accepted gap in Stories 5.1/5.2's own reviews for the same class of structural claim — established codebase convention, not a regression introduced by this story.
+
+**Patch entries dispatched** (2, after grouping by root cause):
+1. `backend/app/ml/evaluate.py` / `backend/tests/test_ml_evaluate.py` — the class-reindexing/zero-fill branch (used when a trained model's `classes_` is a strict subset of all 4 `SyntheticProfile` labels) is untested — add a test that trains a model on only 2-3 of the 4 labels, evaluates against `EVAL_DEMO` rows spanning ≥2 classes including one absent from TRAIN, and asserts `roc_auc`/`pr_auc` are still valid floats in `[0.0, 1.0]`.
+2. `backend/app/ml/evaluate.py` — `main()` calls `get_settings()` but discards the result with no explanation — add a one-line comment clarifying it's a fail-fast config/env validation step, mirroring `predict.py`/`train.py`.
+
+## Design Notes
+
+Precision/recall/F1 are computed multi-class (macro-averaged over all 4 `SyntheticProfile` labels), not the binary STABLE-vs-not framing Story 5.2 uses for its research `score` — the trained `Pipeline` is a genuine multi-class classifier (`classes_` holds all labels seen during TRAIN fit), and nothing in the epic context limits evaluation to a binary framing; macro-averaging with a fixed label list keeps the confusion matrix stable even if TRAIN happened to omit a class. ROC-AUC/PR-AUC, being inherently binary/one-vs-rest, are reported as macro-averaged one-vs-rest scores via `label_binarize`; if `y_true` contains fewer than 2 distinct classes these are undefined by construction, so the report states "not computable" rather than raising — this keeps the mandatory metrics (precision/recall/F1/confusion matrix) always available even in a degenerate eval set. Feature aggregation extraction: move the attendance/grade/assignment/observation SQL verbatim into `feature_aggregation.py`; `TrainingRepository` and `PredictionRepository` keep their own `dataset_split`/label-filtering logic (still structurally separate from the web path's `SqlAlchemyStudentRepository`), only the inner aggregation query is now shared.
+
+## Verification
+
+**Commands:**
+- `cd backend && uv run pytest tests/test_ml_evaluate.py -q` -- expected: all new tests pass
+- `cd backend && uv run pytest tests/test_ml_train.py tests/test_ml_predict.py -q` -- expected: unchanged, all pass after the aggregation refactor
+- `cd backend && uv run pytest -q` -- expected: full suite green (aside from the 4 pre-existing unrelated failures already logged in `docs/deferred-work.md`)
+- `cd backend && uv run python -m app.ml.train && uv run python -m app.ml.evaluate` (against the dev DB) -- expected: train writes a model version; evaluate prints precision/recall/F1/confusion-matrix/ROC-AUC/PR-AUC plus the disclaimer, exit 0
+
+**Manual checks (if no CLI):**
+- Confirm the printed report never uses language implying real-world predictive validity (grep for words like "accurate predictor of dropout" — must not appear).
