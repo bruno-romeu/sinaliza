@@ -60,6 +60,7 @@ def migration_engine(engine: Engine) -> Engine:
         connection.execute(text("DROP TABLE IF EXISTS follow_ups"))
         connection.execute(text("DROP TABLE IF EXISTS trajectory_change_sources"))
         connection.execute(text("DROP TABLE IF EXISTS trajectory_changes"))
+        connection.execute(text("DROP TABLE IF EXISTS ml_model_version"))
         connection.execute(text("DROP TABLE IF EXISTS synthetic_generation_runs"))
         connection.execute(text("DROP TABLE IF EXISTS assignment_submissions"))
         connection.execute(text("DROP TABLE IF EXISTS assignments"))
@@ -89,6 +90,14 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
 
     command.upgrade(cfg, "head")
     command.downgrade(cfg, "base")
+
+    # spec-5-1: `ml_model_version` must be cleanly dropped by `downgrade()`.
+    with migration_engine.connect() as connection:
+        ml_model_version_dropped = connection.execute(
+            text("SELECT to_regclass('public.ml_model_version') IS NULL")
+        ).scalar_one()
+    assert ml_model_version_dropped is True
+
     # This second upgrade is exactly the step that used to raise
     # `DuplicateObject: type "user_role" already exists`.
     command.upgrade(cfg, "head")
@@ -117,6 +126,9 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         ).scalar_one()
         synthetic_generation_runs_exists = connection.execute(
             text("SELECT to_regclass('public.synthetic_generation_runs') IS NOT NULL")
+        ).scalar_one()
+        ml_model_version_exists = connection.execute(
+            text("SELECT to_regclass('public.ml_model_version') IS NOT NULL")
         ).scalar_one()
         trajectory_changes_exists = connection.execute(
             text("SELECT to_regclass('public.trajectory_changes') IS NOT NULL")
@@ -150,6 +162,7 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
     assert assignment_submissions_exists is True
     assert pedagogical_observations_exists is True
     assert synthetic_generation_runs_exists is True
+    assert ml_model_version_exists is True
     assert trajectory_changes_exists is True
     assert trajectory_change_sources_exists is True
     assert follow_ups_exists is True
