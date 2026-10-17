@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 10-14-2026 23:38
+last_updated: 10-16-2026 00:00
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -66,8 +66,8 @@ development_status:
   4-5-acompanhamentos-em-andamento-na-página-inicial: done
   epic-4-retrospective: done
 
-  epic-5: backlog
-  5-1-pipeline-de-pré-processamento-e-treino-do-modelo-offline: backlog
+  epic-5: in-progress
+  5-1-pipeline-de-pré-processamento-e-treino-do-modelo-offline: review
   5-2-geração-de-score-experimental-como-dado-de-pesquisa: backlog
   5-3-avaliação-do-modelo-com-split-de-dataset-sem-vazamento: backlog
   5-4-demonstração-ao-vivo-truncada-em-hoje-sem-vazamento-de-futur: backlog
@@ -229,7 +229,7 @@ action_items:
       text there too or make an explicit, user-facing documented decision that the
       raw timeline is exempt."
     owner: "dev"
-    status: open
+    status: done
     ref: "docs/epic-4-retro-2026-10-14.md"
   - id: "epic-4-retro-item-18-open-question-decide-whether-followup-mu"
     epic: 4

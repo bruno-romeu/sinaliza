@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # `datetime.date`'s range and raise an unhandled `OverflowError`.
     trajectory_window_days: int = Field(default=30, gt=0, le=3650)
 
+    # Where `python -m app.ml.train` (spec-5-1) writes serialized `Pipeline`
+    # artifacts. Offline-only — never read by the web process or FastAPI
+    # `Depends` (AD-3); Story 5.2's live-inference loader will read this same
+    # setting to locate an `MLModelVersion.artifact_path`.
+    ml_artifact_dir: str = "./ml_artifacts"
+
 
 @lru_cache
 def get_settings() -> Settings:
