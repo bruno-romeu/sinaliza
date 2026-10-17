@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 10-16-2026 01:00
+last_updated: 10-17-2026 03:00
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -68,7 +68,7 @@ development_status:
 
   epic-5: in-progress
   5-1-pipeline-de-pré-processamento-e-treino-do-modelo-offline: done
-  5-2-geração-de-score-experimental-como-dado-de-pesquisa: backlog
+  5-2-geração-de-score-experimental-como-dado-de-pesquisa: review
   5-3-avaliação-do-modelo-com-split-de-dataset-sem-vazamento: backlog
   5-4-demonstração-ao-vivo-truncada-em-hoje-sem-vazamento-de-futur: backlog
   epic-5-retrospective: optional
