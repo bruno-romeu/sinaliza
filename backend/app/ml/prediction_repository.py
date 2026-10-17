@@ -11,32 +11,24 @@ this reads the full `EVAL_DEMO` cut with no `as_of()` truncation (same
 rationale as `ml/evaluate`, Story 5.3: this is offline research tooling, not
 the live-demo path).
 
-Reads every `StudentModel` row with `dataset_split == EVAL_DEMO`, joined with
-the same pedagogical fact sources `TrainingRepository` uses, reusing
-`FEATURE_COLUMNS` so feature ordering never drifts between training and
-scoring. Unlike `TrainingRepository`, there is no label and no label-based
-exclusion: every `EVAL_DEMO` student is scored, including one with no rows in
-a fact table (`None`/`0` features, same null-handling as training's
-`SimpleImputer`)."""
+Reads every `StudentModel` row with `dataset_split == EVAL_DEMO` via the
+shared `feature_aggregation.fetch_feature_rows()` helper (spec-5-3 — the
+single source of truth also used by `TrainingRepository`/
+`EvaluationRepository`), reusing `FEATURE_COLUMNS` so feature ordering never
+drifts between training and scoring. Unlike `TrainingRepository`, there is no
+label and no label-based exclusion: every `EVAL_DEMO` student is scored,
+including one with no rows in a fact table (`None`/`0` features, same
+null-handling as training's `SimpleImputer`)."""
 
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.domain.assignment_submission import AssignmentSubmissionStatus
-from app.domain.attendance import AttendanceStatus
 from app.domain.student import DatasetSplit
-from app.infrastructure.db.models import (
-    AssignmentSubmissionModel,
-    AttendanceRecordModel,
-    GradeModel,
-    PedagogicalObservationModel,
-    StudentModel,
-)
+from app.ml.feature_aggregation import fetch_feature_rows
 
 #: Reused directly from training (not redefined here) so scoring's feature
 #: vectors line up with what the pipeline was fit on (spec Code Map).
@@ -84,87 +76,14 @@ class PredictionRepository:
         self._session = session
 
     def fetch_scoring_rows(self) -> list[ScoringRow]:
-        students = self._session.execute(
-            select(StudentModel.id).where(StudentModel.dataset_split == DatasetSplit.EVAL_DEMO)
-        ).all()
-        if not students:
-            return []
-
-        student_ids = [student.id for student in students]
-
-        attendance_by_student = {
-            row.student_id: (row.present, row.total)
-            for row in self._session.execute(
-                select(
-                    AttendanceRecordModel.student_id,
-                    func.count(AttendanceRecordModel.id).label("total"),
-                    func.sum(
-                        case((AttendanceRecordModel.status == AttendanceStatus.PRESENT, 1), else_=0)
-                    ).label("present"),
-                )
-                .where(AttendanceRecordModel.student_id.in_(student_ids))
-                .group_by(AttendanceRecordModel.student_id)
-            ).all()
-        }
-
-        grade_average_by_student = {
-            row.student_id: float(row.average)
-            for row in self._session.execute(
-                select(GradeModel.student_id, func.avg(GradeModel.value).label("average"))
-                .where(GradeModel.student_id.in_(student_ids))
-                .group_by(GradeModel.student_id)
-            ).all()
-        }
-
-        submission_by_student = {
-            row.student_id: (row.delivered, row.total)
-            for row in self._session.execute(
-                select(
-                    AssignmentSubmissionModel.student_id,
-                    func.count(AssignmentSubmissionModel.id).label("total"),
-                    func.sum(
-                        case(
-                            (
-                                AssignmentSubmissionModel.status
-                                == AssignmentSubmissionStatus.DELIVERED,
-                                1,
-                            ),
-                            else_=0,
-                        )
-                    ).label("delivered"),
-                )
-                .where(AssignmentSubmissionModel.student_id.in_(student_ids))
-                .group_by(AssignmentSubmissionModel.student_id)
-            ).all()
-        }
-
-        observation_count_by_student = {
-            row.student_id: row.total
-            for row in self._session.execute(
-                select(
-                    PedagogicalObservationModel.student_id,
-                    func.count(PedagogicalObservationModel.id).label("total"),
-                )
-                .where(PedagogicalObservationModel.student_id.in_(student_ids))
-                .group_by(PedagogicalObservationModel.student_id)
-            ).all()
-        }
-
-        rows: list[ScoringRow] = []
-        for student in students:
-            present, total = attendance_by_student.get(student.id, (0, 0))
-            attendance_rate = (present / total) if total else None
-
-            delivered, submission_total = submission_by_student.get(student.id, (0, 0))
-            assignment_completion_rate = (delivered / submission_total) if submission_total else None
-
-            rows.append(
-                ScoringRow(
-                    student_id=student.id,
-                    attendance_rate=attendance_rate,
-                    grade_average=grade_average_by_student.get(student.id),
-                    assignment_completion_rate=assignment_completion_rate,
-                    observation_count=observation_count_by_student.get(student.id, 0),
-                )
+        feature_rows = fetch_feature_rows(self._session, DatasetSplit.EVAL_DEMO)
+        return [
+            ScoringRow(
+                student_id=row.student_id,
+                attendance_rate=row.attendance_rate,
+                grade_average=row.grade_average,
+                assignment_completion_rate=row.assignment_completion_rate,
+                observation_count=row.observation_count,
             )
-        return rows
+            for row in feature_rows
+        ]
