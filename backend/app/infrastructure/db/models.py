@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric
+from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, Float, ForeignKey, Integer, Numeric
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import String, Text
 from sqlalchemy import UniqueConstraint
@@ -357,4 +357,26 @@ class MLModelVersionModel(Base):
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     artifact_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     trained_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class MLPredictionModel(Base):
+    """One row per `EVAL_DEMO` student scored by a `python -m app.ml.predict`
+    run (spec-5-2). Append-only by design (spec Never): re-running the CLI
+    against the same latest `MLModelVersion` inserts a fresh batch of rows
+    rather than updating or deduping prior ones — `model_version_id` is what
+    ties a row back to the `MLModelVersion` whose fitted `Pipeline` produced
+    its `score`. Never written by the web process, never read by
+    `presentation/` (AD-3's boundary applied to this research artifact)."""
+
+    __tablename__ = "ml_prediction"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+    )
+    model_version_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("ml_model_version.id"), nullable=False, index=True
+    )
+    score: Mapped[float] = mapped_column(Float, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
