@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 10-20-2026 20:19
+last_updated: 10-20-2026 20:35
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -74,7 +74,7 @@ development_status:
   epic-5-retrospective: done
 
   epic-6: in-progress
-  6-1-empacotamento-containerizado-dos-três-serviços: review
+  6-1-empacotamento-containerizado-dos-três-serviços: done
   6-2-provisionamento-da-vm-sempre-ativa-plano-a-b: backlog
   6-3-plano-de-contingência-de-hospedagem-plano-c-documentado: backlog
   6-4-sistema-hospedado-e-acessível-para-avaliação: backlog
