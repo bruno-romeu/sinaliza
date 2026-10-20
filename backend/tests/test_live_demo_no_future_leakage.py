@@ -1,9 +1,14 @@
 """spec-5-4: one consolidated, demo-specific proof that the live demo's read
-surfaces (`GET /students/{id}/trajectory`, `GET /home`, `GET /home/search`)
-never expose a fact dated after `SINALIZA_DEMO_AS_OF`/`as_of()`, and never
-expose a `TRAIN`-split student — a guarantee that was previously only proven
-per-repository (`test_trajectory.py`, `test_home.py`) or by code inspection,
-never as one named end-to-end invariant covering the actual live demo path.
+surfaces (`GET /students/{id}/trajectory`, `GET /home`) never expose a fact
+dated after `SINALIZA_DEMO_AS_OF`/`as_of()` for any of the four fact types
+(attendance, grade, assignment submission, pedagogical observation), and that
+`GET /home/search` never exposes a `TRAIN`-split student — a guarantee that
+was previously only proven per-repository (`test_trajectory.py`,
+`test_home.py`) or by code inspection, never as one named end-to-end
+invariant covering the actual live demo path. (Search's own future-leakage
+behavior per fact type is out of this file's scope — already covered,
+per-fact-type, by the repository-level `as_of()` tests referenced above;
+this file only proves search's `TRAIN`-invisibility.)
 
 Also regression-covers the one real gap this story's investigation found:
 `GetHomeService`'s only read of `TrajectoryChange` (`list_recent`) had no
@@ -31,6 +36,7 @@ from app.infrastructure.db.models import (
     AttendanceRecordModel,
     ClassroomModel,
     EnrollmentModel,
+    GradeModel,
     StudentModel,
     TrajectoryChangeModel,
 )
@@ -97,6 +103,24 @@ def test_trajectory_and_home_never_reflect_facts_after_as_of(
                 date=date(2026, 9, 26),
                 status=AttendanceStatus.ABSENT_UNJUSTIFIED,
             ),
+            GradeModel(
+                student_id=seeded_enrolled_student.id,
+                classroom_id=seeded_classroom.id,
+                subject="Matemática",
+                period_id=seeded_academic_period.id,
+                date=date(2026, 9, 20),
+                value=Decimal("8.00"),
+            ),
+            # Dated after as_of() — a leaked value would pull grade_average
+            # away from 8.00.
+            GradeModel(
+                student_id=seeded_enrolled_student.id,
+                classroom_id=seeded_classroom.id,
+                subject="Matemática",
+                period_id=seeded_academic_period.id,
+                date=date(2026, 9, 26),
+                value=Decimal("2.00"),
+            ),
         ]
     )
     db_session.commit()
@@ -107,9 +131,13 @@ def test_trajectory_and_home_never_reflect_facts_after_as_of(
         headers=headers,
     )
     assert trajectory_response.status_code == 200
+    body = trajectory_response.json()
     # Only the pre-as_of PRESENT record is in window — a leaked post-as_of
     # ABSENT record would pull this below 1.0.
-    assert Decimal(trajectory_response.json()["attendance_rate"]) == Decimal("1.0000")
+    assert Decimal(body["attendance_rate"]) == Decimal("1.0000")
+    # Only the pre-as_of 8.00 grade counts — a leaked post-as_of 2.00 grade
+    # would pull this average down.
+    assert Decimal(body["grade_average"]) == Decimal("8.00")
 
     # A change detected and persisted exactly at as_of() is the only one
     # Home should ever show for this student.

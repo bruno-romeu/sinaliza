@@ -33,7 +33,8 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import delete, exists, select
+from sqlalchemy import Date as SA_Date
+from sqlalchemy import cast, delete, exists, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -155,10 +156,18 @@ class SqlAlchemyTrajectoryChangeRepository:
         forward-moving demo time — but a demo rehearsal that rewinds
         `SINALIZA_DEMO_AS_OF` to an earlier date after a prior run already
         persisted a later-dated change would otherwise still surface that
-        change in Home, a "future" leak relative to the rewound date."""
-        stmt = filter_as_of(
-            select(TrajectoryChangeModel), TrajectoryChangeModel.detected_at
-        ).order_by(TrajectoryChangeModel.detected_at.desc(), TrajectoryChangeModel.id.desc())
+        change in Home, a "future" leak relative to the rewound date.
+
+        `detected_at` is cast to `Date` first, mirroring
+        `sqlalchemy_pedagogical_observation_repository.py`'s precedent for
+        timestamp columns — comparing the raw `timestamptz` to `as_of()`'s
+        plain `date` would let Postgres resolve the date literal at the
+        session timezone's midnight rather than UTC midnight, silently
+        shifting the truncation boundary on a non-UTC session."""
+        detected_at_date = cast(TrajectoryChangeModel.detected_at, SA_Date)
+        stmt = filter_as_of(select(TrajectoryChangeModel), detected_at_date).order_by(
+            TrajectoryChangeModel.detected_at.desc(), TrajectoryChangeModel.id.desc()
+        )
         stmt = stmt.limit(limit)
         models = self._session.execute(stmt).scalars().all()
         return [
