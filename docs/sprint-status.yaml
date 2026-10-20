@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 10-20-2026 02:10
+last_updated: 10-19-2026 22:57
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -71,7 +71,7 @@ development_status:
   5-2-geração-de-score-experimental-como-dado-de-pesquisa: done
   5-3-avaliação-do-modelo-com-split-de-dataset-sem-vazamento: done
   5-4-demonstração-ao-vivo-truncada-em-hoje-sem-vazamento-de-futur: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
 
   epic-6: backlog
   6-1-empacotamento-containerizado-dos-três-serviços: backlog
@@ -268,3 +268,30 @@ action_items:
     owner: "dev"
     status: open
     ref: "docs/epic-4-retro-2026-10-14.md"
+  - id: "epic-5-retro-item-1-feature-columns-drift-guard"
+    epic: 5
+    action: "[fix-now] Close the FEATURE_COLUMNS drift-protection gap: add the same
+      drift guard currently only in backend/app/ml/prediction_repository.py:56-71
+      to backend/app/ml/train.py and backend/app/ml/evaluation_repository.py/evaluate.py,
+      or better, have all three CLIs iterate FEATURE_COLUMNS directly instead of hardcoding
+      the feature-vector field order."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-5-retro-2026-10-20.md"
+  - id: "epic-5-retro-item-2-defer-get-by-id-as-of-filter"
+    epic: 5
+    action: "[defer] SqlAlchemyTrajectoryChangeRepository.get_by_id (GET/POST follow-ups)
+      has no as_of() filter - same leak class Story 5.4 fixed for list_recent, one
+      method away. Already logged in docs/deferred-work.md."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-5-retro-2026-10-20.md"
+  - id: "epic-5-retro-item-3-escalate-merge-before-done-gate"
+    epic: 5
+    action: "[process-lesson][escalate] epic-3-retro-item-3 (merge-before-done gate)
+      had a live near-miss this epic (Story 5.4 sprint-status briefly marked done
+      on the feature branch before merge, caught and reverted same session). Recommend
+      building an automated gate before Epic 6 rather than continued manual vigilance."
+    owner: "dev"
+    status: open
+    ref: "docs/epic-5-retro-2026-10-20.md"
