@@ -6,6 +6,7 @@ _bmad/
 _bmad-output/
 
 .env
+docker-compose.override.yml
 
 # Backend (Python)
 backend/.venv/
