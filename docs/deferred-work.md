@@ -81,3 +81,9 @@
 - source_spec: none
   summary: epic-4-retro-item-19 — correct `docs/epic-4-context.md:45`, which claims `FollowUp.next_review_date` is read by a live query in `GET /home` — never implemented; the field stays unused end to end across all 5 stories.
   evidence: Split from the fix-now security item (epic-4-retro-item-17) because each is an independently shippable deliverable. Ref: `docs/epic-4-retro-2026-10-14.md`.
+
+## Deferred from: code review of story-5.4 (2026-10-20)
+
+- source_spec: `docs/spec-5-4-demonstracao-ao-vivo-truncada-em-hoje-sem-vazamento-de-futuro.md`
+  summary: `SqlAlchemyTrajectoryChangeRepository.get_by_id` (the only read behind `GET /follow-ups/{id}` and `POST /follow-ups`) applies no `as_of()`/`filter_as_of` truncation — the identical "demo rewind leaks a later-dated row" bug class this story just fixed for `list_recent`, one method away in the same file.
+  evidence: Confirmed by direct read — `get_by_id` does a plain `self._session.get(TrajectoryChangeModel, change_id)` with no date filter at all, unlike `list_recent` (now fixed in this story to call `filter_as_of`). A demo rehearsal that persists a `TrajectoryChange` under a later `SINALIZA_DEMO_AS_OF`, then rewinds to an earlier date, could still open or act on that follow-up by id even though the change itself would no longer surface in Home/Trajectory. Out of this story's scope (follow-ups aren't one of the Home/Trajectory/Trajectory-Detail live-demo surfaces this story targets) and not introduced by this diff — pre-existing since Story 4.1. Fix: apply the same `cast(TrajectoryChangeModel.detected_at, SA_Date)` + `filter_as_of` pattern to `get_by_id`'s query, or explicitly document why follow-up access is exempt from the truncation invariant.
