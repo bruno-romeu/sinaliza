@@ -43,6 +43,7 @@ from app.infrastructure.db.models import (
     TrajectoryChangeModel,
     TrajectoryChangeSourceModel,
 )
+from app.infrastructure.repositories.base import filter_as_of
 
 
 class SqlAlchemyTrajectoryChangeRepository:
@@ -146,12 +147,19 @@ class SqlAlchemyTrajectoryChangeRepository:
     def list_recent(self, limit: int) -> list[TrajectoryChange]:
         """Home's only read of `TrajectoryChange` (spec-3-3 Boundaries &
         Constraints): the `limit` most recent rows by `detected_at` desc,
-        never a second page, never filtered/sorted any other way."""
-        stmt = (
-            select(TrajectoryChangeModel)
-            .order_by(TrajectoryChangeModel.detected_at.desc(), TrajectoryChangeModel.id.desc())
-            .limit(limit)
-        )
+        never a second page, never filtered/sorted any other way.
+
+        Also applies `filter_as_of` on `detected_at` (spec-5-4): `detected_at`
+        is always written as `as_of()`'s own pinned date at insert time
+        (`get_student_trajectory.py`), so this is a no-op under normal
+        forward-moving demo time — but a demo rehearsal that rewinds
+        `SINALIZA_DEMO_AS_OF` to an earlier date after a prior run already
+        persisted a later-dated change would otherwise still surface that
+        change in Home, a "future" leak relative to the rewound date."""
+        stmt = filter_as_of(
+            select(TrajectoryChangeModel), TrajectoryChangeModel.detected_at
+        ).order_by(TrajectoryChangeModel.detected_at.desc(), TrajectoryChangeModel.id.desc())
+        stmt = stmt.limit(limit)
         models = self._session.execute(stmt).scalars().all()
         return [
             TrajectoryChange(
