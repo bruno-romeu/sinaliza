@@ -210,41 +210,6 @@ def _train_a_model(
     return db_session.query(MLModelVersionModel).one()
 
 
-def _seed_model_version(
-    db_session: Session, tmp_path: Path, version_label: str, trained_at: datetime
-) -> MLModelVersionModel:
-    """Fits a tiny real `Pipeline` on all 4 labels and dumps it to its own
-    artifact file, mirroring `test_ml_predict.py`'s helper of the same
-    name."""
-    pipeline = build_pipeline()
-    feature_matrix = [
-        [0.9, 7.0, 1.0, 2],
-        [0.1, 3.0, 0.2, 0],
-        [0.5, 5.0, 0.5, 1],
-        [0.2, 2.0, 0.1, 0],
-    ]
-    labels = [
-        SyntheticProfile.STABLE.value,
-        SyntheticProfile.FALLING_ATTENDANCE.value,
-        SyntheticProfile.FALLING_GRADES.value,
-        SyntheticProfile.COMBINED_DETERIORATION.value,
-    ]
-    pipeline.fit(feature_matrix, labels)
-    artifact_path = tmp_path / f"model-{version_label}.joblib"
-    joblib.dump(pipeline, artifact_path)
-
-    model_version = MLModelVersionModel(
-        id=uuid.uuid4(),
-        version=version_label,
-        artifact_path=str(artifact_path),
-        trained_at=trained_at,
-        created_at=trained_at,
-    )
-    db_session.add(model_version)
-    db_session.commit()
-    return model_version
-
-
 def _seed_model_version_trained_on_subset_of_labels(
     db_session: Session, tmp_path: Path, version_label: str, trained_at: datetime
 ) -> MLModelVersionModel:
