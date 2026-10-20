@@ -1,0 +1,25 @@
+# Both `backend/Dockerfile` and `frontend/Dockerfile` build with
+# `context: .` (repo root, see docker-compose.yml and frontend/Dockerfile's
+# design note — the frontend stage needs to see `backend/` alongside
+# `frontend/`). Docker/BuildKit only consults a `.dockerignore` at the
+# context root for a `context: .` build — this file is the single source of
+# truth for both builds (no per-service `.dockerignore` files exist).
+# Patterns are gitignore-style — no leading slash means "match at any depth".
+
+# backend
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+ml_artifacts/
+openapi.json
+.env
+
+# frontend
+node_modules/
+dist/
+schema.d.ts
+
+# repo-wide
+.git/

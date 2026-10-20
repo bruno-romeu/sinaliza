@@ -710,6 +710,28 @@ Nunca incluir dados reais de estudantes em fixtures ou commits.
 
 ---
 
+# Execução com Docker
+
+O sistema é empacotado em três serviços (`postgres`, `backend`, `frontend`) descritos em `docker-compose.yml`, na raiz do repositório.
+
+Para rodar localmente ou em uma VM:
+
+```bash
+cp backend/.env.example .env   # .env na raiz — o Compose carrega esse arquivo automaticamente
+docker compose up --build
+```
+
+O `frontend` (Nginx) fica disponível em `http://localhost/` e faz proxy de `/api/*` para o `backend`. Dados do Postgres persistem em um volume nomeado entre reinicializações.
+
+Para atualizar uma instância já publicada:
+
+```bash
+git pull
+docker compose up --build
+```
+
+---
+
 # Roadmap
 
 ## Etapa 1 — Domínio e Dados
