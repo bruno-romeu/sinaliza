@@ -1,0 +1,46 @@
+# spec-6-1: the reproducible `docker compose up --build` entrypoint — three
+# services (Postgres, FastAPI/Uvicorn, Nginx+React), all `restart:
+# unless-stopped` for automatic recovery after a VM crash/reboot (AD-9).
+# No CI/CD, no cron/scheduler/background worker in any service (RNF-06, AD-1).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sinaliza}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sinaliza}
+      POSTGRES_DB: ${POSTGRES_DB:-sinaliza}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-sinaliza}']
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sinaliza}:${POSTGRES_PASSWORD:-sinaliza}@postgres:5432/${POSTGRES_DB:-sinaliza}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '80:80'
+
+volumes:
+  postgres_data:
