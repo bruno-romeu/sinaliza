@@ -6,8 +6,9 @@ and plain-bash scripts a human runs manually — nothing here is invoked by
 CI, a cron job, or a scheduled task.
 
 Plan A (Oracle Cloud Ampere A1) and Plan B (`VM.Standard.E2.1.Micro`
-fallback) only. Plan C (Render/Neon/Vercel contingency) is Story 6.3 and
-is not covered here.
+fallback) tooling is below. Plan C (Render/Neon/Vercel contingency,
+activated only if no Oracle VM provisions in time) is documented
+separately in `plan-c-contingency-runbook.md` — see that section below.
 
 ## Contents
 
@@ -38,3 +39,27 @@ is not covered here.
 ```
 
 See `vm-provisioning-runbook.md` for full context on each step.
+
+## Plan C (contingency) — Story 6.3
+
+Activated only if no Oracle VM (Plan A or B, above) provisions in time for
+the deadline. No Render/Neon/Vercel account exists in this environment —
+these files are documentation and operator scripts only, not a live
+deployment.
+
+- **`plan-c-contingency-runbook.md`** — start here if Plan C is activated.
+  Neon (Postgres), Render (backend), Vercel (frontend) setup steps, the
+  manual pre-warm procedure, and an explicit statement of RNF-01's
+  cold-start waiver on this plan — read that section first.
+- **`vercel.json`** — Vercel rewrite config (`/api/*` → the Render backend
+  URL) so the frontend's existing same-origin `/api` calls keep working
+  across two different hosts, with no CORS config and no frontend code
+  change.
+- **`prewarm.sh`** — run by hand a few minutes before a live demo on
+  Plan C, to force the Render/Neon cold start to resolve before the
+  audience sees it. Never scheduled — see the script's own header.
+
+```bash
+# Before a live demo on Plan C only:
+./deploy/prewarm.sh https://<render-backend-url>
+```
