@@ -86,6 +86,18 @@
   summary: epic-4-retro-item-19 — correct `docs/epic-4-context.md:45`, which claims `FollowUp.next_review_date` is read by a live query in `GET /home` — never implemented; the field stays unused end to end across all 5 stories.
   evidence: Split from the fix-now security item (epic-4-retro-item-17) because each is an independently shippable deliverable. Ref: `docs/epic-4-retro-2026-10-14.md`.
 
+## Deferred from: implementation of story-6.2 (2026-10-20)
+
+- source_spec: `docs/spec-6-2-provisionamento-da-vm-sempre-ativa-plano-a-b.md`
+  summary: Building/running `docker compose up --build` from a Windows checkout can fail on `backend/docker-entrypoint.sh` (`exec ./docker-entrypoint.sh: no such file or directory`) because the repo has no `.gitattributes` forcing LF for shell scripts, so a Windows clone with `core.autocrlf=true` (a common Git-for-Windows default) checks the file out with CRLF line endings, which Docker's `COPY`+`exec` does not tolerate. This does **not** affect the real Oracle Cloud VM target (Ubuntu/Linux clones keep LF by default — confirmed the committed git blob itself is clean LF, `git cat-file -p HEAD:backend/docker-entrypoint.sh | grep -c $'\r'` = 0); it only affects local Docker builds/testing on Windows.
+  evidence: Confirmed via `file backend/docker-entrypoint.sh` in this worktree reporting CRLF terminators, a real local `docker compose up --build` run failing the `backend` container on exactly that exec error, and `git config core.autocrlf` = `true` in this environment, while the committed blob (`git cat-file -p HEAD:...`) has zero `\r` bytes — so the defect is checkout-time (Windows-local), not a repo-content defect, and does not block the Linux-hosted VM deployment this story's runbook targets. Out of Story 6.2's scope (boundaries forbid `backend/` changes) and not introduced by this story's diff — pre-existing since Story 6.1. Fix (low priority, convenience only): add a `.gitattributes` with `*.sh text eol=lf` so Windows-based local Docker testing works without each developer manually configuring `core.autocrlf=input`.
+
+## Deferred from: code review of story-6.2 (2026-10-20)
+
+- source_spec: `docs/spec-6-2-provisionamento-da-vm-sempre-ativa-plano-a-b.md`
+  summary: `deploy/verify-always-on.sh`, `deploy/smoke-test.sh`, and `deploy/enable-swap.sh` have no committed, reproducible fixture exercising their actual logic (docker-state parsing, latency parsing, swap idempotency) — only `bash -n` (syntax check) is committed evidence; this session's functional validation used an ephemeral busybox fixture and local stub HTTP servers that are not part of the diff and cannot be rerun by a future reader.
+  evidence: Confirmed via `## Implementation Notes` in the spec, which describes the fixtures as built "outside the repo"/in scratchpad, never committed. A future logic regression in any of the three scripts (a changed `docker compose ps --format` string, a changed case pattern, a changed fstab-anchor string) would pass `bash -n` cleanly and ship with zero evidence of ever having been exercised against real `docker`/`curl` output. Fixing this properly means committing a lightweight multi-container compose fixture under `deploy/` (or similar) purely to test the verification scripts themselves — more than a trivial patch, and out of step with this project's explicit no-CI, "SSH + `docker compose logs` only" operations model (Epic 6 context). Revisit if these scripts grow more complex or a CI story is ever added.
+
 ## Deferred from: code review of story-5.4 (2026-10-20)
 
 - source_spec: `docs/spec-5-4-demonstracao-ao-vivo-truncada-em-hoje-sem-vazamento-de-futuro.md`
