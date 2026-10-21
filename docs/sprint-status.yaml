@@ -153,8 +153,8 @@ action_items:
       into a prebuild/CI step so npm ci && npm run build succeeds unaided from a fresh
       clone; revisit alongside Epic 6's CI/build scope."
     owner: "dev"
-    status: open
-    ref: "docs/epic-1-retro-2026-09-26.md"
+    status: done
+    ref: "docs/epic-1-retro-2026-09-26.md; closed by docs/spec-6-1-empacotamento-containerizado-dos-tres-servicos.md (frontend/Dockerfile generates both artifacts during the image build via app.export_openapi + generate:api-types)"
   - id: "epic-2-retro-item-1-migration-enum-self-heal"
     epic: 2
     action: "[fix-now] Write a corrective Alembic migration that idempotently adds
