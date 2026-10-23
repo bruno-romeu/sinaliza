@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import {
   ApiError,
@@ -10,7 +10,8 @@ import {
   type Classroom,
   type Student,
 } from '../../api/client'
-import { Header } from '../../components/Header'
+import { Notice, RosterRow, Section, SelectField, TextField } from '../../components/ui'
+import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 function todayIsoDate(): string {
   const now = new Date()
@@ -42,16 +43,6 @@ function validateValue(raw: string): string | null {
   return null
 }
 
-const fieldStyle: CSSProperties = {
-  minHeight: 'var(--min-hit-target)',
-  padding: '0 12px',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface)',
-  color: 'var(--color-text)',
-  fontSize: 15,
-}
-
 interface RowState {
   value: string
   saving: boolean
@@ -68,10 +59,6 @@ interface RowState {
  */
 export function Notas() {
   const { token } = useAuth()
-  const classroomSelectId = useId()
-  const subjectInputId = useId()
-  const periodSelectId = useId()
-  const dateInputId = useId()
 
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [classroomsError, setClassroomsError] = useState<string | null>(null)
@@ -205,141 +192,60 @@ export function Notas() {
   }
 
   return (
-    <div>
-      <Header />
-      <main
-        style={{
-          maxWidth: 'var(--spacing-content-max-width)',
-          margin: '0 auto',
-          padding: 'var(--spacing-section-gap) 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 32,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>Lançamento de notas</h1>
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Selecione a turma, disciplina, período letivo e data para registrar a nota de cada
-            estudante.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
-            <label htmlFor={classroomSelectId} style={{ fontWeight: 600 }}>
-              Turma
-            </label>
-            <select
-              id={classroomSelectId}
-              value={selectedClassroomId}
-              onChange={(event) => setSelectedClassroomId(event.target.value)}
-              style={fieldStyle}
-            >
-              <option value="">Selecione…</option>
-              {classrooms.map((classroom) => (
-                <option key={classroom.id} value={classroom.id}>
-                  {classroom.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 200 }}>
-            <label htmlFor={subjectInputId} style={{ fontWeight: 600 }}>
-              Disciplina
-            </label>
-            <input
-              id={subjectInputId}
-              type="text"
-              value={subject}
-              onChange={(event) => setSubject(event.target.value)}
-              placeholder="Ex.: Matemática"
-              maxLength={255}
-              style={fieldStyle}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
-            <label htmlFor={periodSelectId} style={{ fontWeight: 600 }}>
-              Período letivo
-            </label>
-            <select
-              id={periodSelectId}
-              value={selectedPeriodId}
-              onChange={(event) => setSelectedPeriodId(event.target.value)}
-              style={fieldStyle}
-            >
-              <option value="">Selecione…</option>
-              {periods.map((period) => (
-                <option key={period.id} value={period.id}>
-                  {period.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 180 }}>
-            <label htmlFor={dateInputId} style={{ fontWeight: 600 }}>
-              Data
-            </label>
-            <input
-              id={dateInputId}
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              style={fieldStyle}
-            />
-          </div>
-        </div>
-
-        {classroomsError && (
-          <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-            {classroomsError}
-          </p>
-        )}
-
-        {periodsError && (
-          <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-            {periodsError}
-          </p>
-        )}
-
-        {selectedClassroomId && studentsLoading && (
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>Carregando estudantes…</p>
-        )}
-
-        {selectedClassroomId && studentsError && (
-          <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-            {studentsError}
-          </p>
-        )}
-
-        {selectedClassroomId && !studentsLoading && !studentsError && students.length === 0 && (
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Nenhum estudante matriculado nesta turma.
-          </p>
-        )}
-
-        {students.length > 0 && !canSave && (
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Selecione disciplina, período letivo e data para lançar notas.
-          </p>
-        )}
-
-        {students.length > 0 && (
-          <ul
-            style={{
-              listStyle: 'none',
-              margin: 0,
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-            }}
+    <LancamentoLayout
+      title="Notas"
+      description="Defina turma, disciplina, bimestre e data, e lance a nota de cada estudante. Cada linha salva sozinha."
+      contextTitle="Turma e avaliação"
+      contextError={classroomsError ?? periodsError}
+      context={
+        <>
+          <SelectField
+            label="Turma"
+            value={selectedClassroomId}
+            onChange={(event) => setSelectedClassroomId(event.target.value)}
           >
+            <option value="">Selecione…</option>
+            {classrooms.map((classroom) => (
+              <option key={classroom.id} value={classroom.id}>
+                {classroom.name}
+              </option>
+            ))}
+          </SelectField>
+          <TextField
+            label="Disciplina"
+            value={subject}
+            onChange={(event) => setSubject(event.target.value)}
+            placeholder="Ex.: Matemática"
+          />
+          <SelectField
+            label="Período letivo"
+            value={selectedPeriodId}
+            onChange={(event) => setSelectedPeriodId(event.target.value)}
+          >
+            <option value="">Selecione…</option>
+            {periods.map((period) => (
+              <option key={period.id} value={period.id}>
+                {period.label}
+              </option>
+            ))}
+          </SelectField>
+          <TextField label="Data" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+        </>
+      }
+    >
+      <Section id="lancamento-alunos" title="Estudantes">
+        <p className="sz-muted">Valores de 0 a 10, com até duas casas decimais.</p>
+        <RosterStates
+          selected={Boolean(selectedClassroomId)}
+          loading={studentsLoading}
+          error={studentsError}
+          empty={!studentsLoading && !studentsError && students.length === 0}
+        />
+        {students.length > 0 && !canSave && <Notice tone="info">Selecione disciplina, período letivo e data para lançar notas.</Notice>}
+        {students.length > 0 && (
+          <ul className="sz-roster">
             {students.map((student) => (
-              <NotaRow
+              <GradeRow
                 key={student.id}
                 student={student}
                 rowState={rowStates[student.id]}
@@ -350,12 +256,12 @@ export function Notas() {
             ))}
           </ul>
         )}
-      </main>
-    </div>
+      </Section>
+    </LancamentoLayout>
   )
 }
 
-function NotaRow({
+function GradeRow({
   student,
   rowState,
   canSave,
@@ -368,77 +274,38 @@ function NotaRow({
   onValueChange: (value: string) => void
   onSave: () => void
 }) {
+  const nameId = useId()
   const valueId = useId()
   const messageId = useId()
-
   if (!rowState) return null
-
   return (
-    <li
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 16,
-        padding: '16px 20px',
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-      }}
-    >
-      <span style={{ flex: '1 1 200px', fontWeight: 600 }}>{student.name}</span>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <label htmlFor={valueId} style={{ fontSize: 13, fontWeight: 600 }}>
-          Valor
+    <li>
+      <RosterRow
+        nameId={nameId}
+        name={student.name}
+        status={rowStatus(rowState)}
+        message={rowState.message}
+        messageId={messageId}
+        onSave={onSave}
+        saveDisabled={!canSave}
+      >
+        <label className="sz-sr" htmlFor={valueId}>
+          Nota de {student.name}
         </label>
         <input
           id={valueId}
           type="number"
+          inputMode="decimal"
           min={0}
           max={10}
           step={0.01}
+          placeholder="0 a 10"
           value={rowState.value}
           onChange={(event) => onValueChange(event.target.value)}
           aria-invalid={rowState.isError || undefined}
-          aria-describedby={rowState.message ? messageId : undefined}
-          style={{ ...fieldStyle, minWidth: 100 }}
+          aria-describedby={messageId}
         />
-      </div>
-
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={rowState.saving || !canSave}
-        style={{
-          minHeight: 'var(--min-hit-target)',
-          minWidth: 'var(--min-hit-target)',
-          padding: '0 16px',
-          borderRadius: 'var(--radius-md)',
-          border: 'none',
-          background: 'var(--color-primary)',
-          color: 'var(--color-surface)',
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: rowState.saving || !canSave ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {rowState.saving ? 'Salvando…' : 'Salvar'}
-      </button>
-
-      <div
-        id={messageId}
-        role={rowState.isError ? 'alert' : 'status'}
-        aria-live="polite"
-        style={{
-          flexBasis: '100%',
-          minHeight: 20,
-          fontSize: 14,
-          color: rowState.isError ? 'var(--color-attention)' : 'var(--color-success)',
-        }}
-      >
-        {rowState.message}
-      </div>
+      </RosterRow>
     </li>
   )
 }

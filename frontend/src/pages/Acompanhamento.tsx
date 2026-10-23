@@ -1,5 +1,5 @@
-import { useEffect, useId, useState, type ChangeEvent, type CSSProperties, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState, type ChangeEvent } from 'react'
+import { useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import {
   ApiError,
@@ -9,24 +9,29 @@ import {
   type FollowUpDetail,
   type TrajectoryChangeEvidenceGroup,
 } from '../api/client'
-import { EvidenceCard } from '../components/EvidenceCard'
-import { FollowUpStatusPill } from '../components/FollowUpStatusPill'
-import { Header } from '../components/Header'
+import {
+  Button,
+  ButtonLink,
+  Disclosure,
+  EvidenceCard,
+  FOLLOW_UP_STATUS,
+  Notice,
+  Page,
+  ScreenHead,
+  Section,
+  SelectField,
+  Skeleton,
+  StatusPill,
+  TextAreaField,
+  Timeline,
+} from '../components/ui'
 
 type FollowUpStatusValue = FollowUpDetail['status']
 type FollowUpActionItem = FollowUpDetail['actions'][number]
 type ChangeType = TrajectoryChangeEvidenceGroup['trajectory_change']['type']
 
-const STATUS_OPTIONS: { value: FollowUpStatusValue; label: string }[] = [
-  { value: 'EM_OBSERVACAO', label: 'Em observação' },
-  { value: 'ACOMPANHAMENTO_ATIVO', label: 'Ativo' },
-  { value: 'AGUARDANDO_RETORNO', label: 'Aguardando retorno' },
-  { value: 'ENCERRADO', label: 'Encerrado' },
-]
+const STATUS_ORDER: FollowUpStatusValue[] = ['EM_OBSERVACAO', 'ACOMPANHAMENTO_ATIVO', 'AGUARDANDO_RETORNO', 'ENCERRADO']
 
-// Duplicated from `EstudanteTrajetoria.tsx` (same labels, spec Code Map — no
-// shared module exists for it; extracting one for two call sites across two
-// files is a larger, unscoped refactor the intent doesn't ask for).
 const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
   ATTENDANCE_DROP: 'Queda de frequência',
   GRADE_DROP: 'Queda de notas',
@@ -34,133 +39,24 @@ const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
   COMBINED_DETERIORATION: 'Mudança combinada',
 }
 
-const fieldStyle: CSSProperties = {
-  padding: '0 12px',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface)',
-  color: 'var(--color-text)',
-  fontSize: 15,
+function formatDateBr(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('pt-BR')
 }
 
-const selectStyle: CSSProperties = {
-  ...fieldStyle,
-  minHeight: 'var(--min-hit-target)',
-}
-
-const cardStyle: CSSProperties = {
-  background: 'var(--color-surface)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-md)',
-  padding: 'var(--spacing-card-padding)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 12,
+// `detected_at` is the detection *date* stored at UTC midnight (same rule as
+// the Home): format it in UTC so it does not slip to the previous day.
+function formatDetectedBr(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
 }
 
 function formatDateTimeBr(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('pt-BR')
-}
-
-/**
- * Collapsible section header — same `aria-expanded`/`aria-controls`/`+`/`−`
- * button pattern as `EstudanteTrajetoria.tsx`'s "Fator preocupante" section
- * (spec Boundaries & Constraints, RNF-08, UX-DR20), copied inline here rather
- * than extracted into a shared component (spec Design Notes). Default open —
- * unlike that section, this screen's whole purpose is reviewing history.
- */
-function CollapsibleSection({
-  title,
-  children,
-}: {
-  title: string
-  children: ReactNode
-}) {
-  const [open, setOpen] = useState(true)
-  const contentId = useId()
-
-  return (
-    <section style={cardStyle}>
-      <h2 style={{ margin: 0 }}>
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={contentId}
-          onClick={() => setOpen((current) => !current)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            width: '100%',
-            minHeight: 'var(--min-hit-target)',
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            fontSize: 18,
-            fontWeight: 700,
-            color: 'var(--color-text)',
-            cursor: 'pointer',
-            textAlign: 'left',
-          }}
-        >
-          <span>{title}</span>
-          <span aria-hidden="true">{open ? '−' : '+'}</span>
-        </button>
-      </h2>
-      {open && <div id={contentId}>{children}</div>}
-    </section>
-  )
-}
-
-/**
- * Chronological list of every registered `FollowUpAction`, oldest first
- * (RF-14). Zero actions renders an explicit message instead of a blank list
- * (spec Boundaries & Constraints — "transparência em vez de validação
- * forçada").
- */
-function ActionHistory({ actions }: { actions: FollowUpActionItem[] }) {
-  return (
-    <CollapsibleSection title="Histórico de ações">
-      {actions.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-          Nenhuma ação registrada até o momento.
-        </p>
-      ) : (
-        <ol
-          style={{
-            listStyle: 'none',
-            margin: 0,
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-          }}
-        >
-          {actions.map((action) => (
-            <li
-              key={action.id}
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                padding: '12px 16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 4,
-              }}
-            >
-              <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                {formatDateTimeBr(action.created_at)}
-              </span>
-              <span>{action.description}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </CollapsibleSection>
-  )
+  return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
 type LoadState =
@@ -170,17 +66,10 @@ type LoadState =
   | { status: 'error' }
 
 /**
- * Tela de Acompanhamento (`/acompanhamentos/:followUpId`). Story 4.1 built
- * the status pill and the reused evidence card with a link back to the
- * student's trajectory (UX-DR4). Story 4.2 adds the status `<select>`
- * (`StatusSelector`) and the free-text action form (`ActionForm`) below.
- * Full chronological history (past actions + evidence list) and Home's
- * active-follow-ups section remain Stories 4.3/4.5 scope — not implemented
- * here.
- *
- * Same loading/error/not-found conventions as `EstudanteTrajetoria.tsx`
- * (Story 3.4): skeleton while loading, factual message + retry on error,
- * factual message + link to Home when the follow-up doesn't exist.
+ * Tela de Acompanhamento (`/acompanhamentos/:followUpId`, RF-20). Visual:
+ * design system `TelaAcompanhamento`, escopo "API atual": status, registro
+ * de ação, histórico de ações e as evidências que originaram o caso.
+ * Encerrar pede confirmação dentro da tela e não apaga nem esconde nada.
  */
 export function Acompanhamento() {
   const { followUpId } = useParams<{ followUpId: string }>()
@@ -211,101 +100,55 @@ export function Acompanhamento() {
   }, [token, followUpId, loadAttempt])
 
   return (
-    <div>
-      <Header />
-      <main
-        style={{
-          maxWidth: 'var(--spacing-content-max-width)',
-          margin: '0 auto',
-          padding: 'var(--spacing-section-gap) 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 32,
-        }}
-      >
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>Acompanhamento</h1>
+    <Page>
+      {loadState.status !== 'loaded' && <ScreenHead kicker="Coordenação pedagógica" title="Acompanhamento" />}
 
-        {loadState.status === 'loading' && (
-          <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {[0, 1].map((i) => (
-              <div
-                key={i}
-                style={{
-                  height: 64,
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-border)',
-                  opacity: 0.4,
-                }}
-              />
-            ))}
+      {loadState.status === 'loading' && (
+        <div className="sz-section">
+          <Skeleton heights={[64, 120, 120]} />
+        </div>
+      )}
+
+      {loadState.status === 'not_found' && (
+        <div className="sz-section" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p className="sz-muted">Acompanhamento não encontrado.</p>
+          <div>
+            <ButtonLink to="/home" variant="secondary" icon="voltar">
+              Voltar para a Home
+            </ButtonLink>
           </div>
-        )}
+        </div>
+      )}
 
-        {loadState.status === 'not_found' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-              Acompanhamento não encontrado.
-            </p>
-            <div>
-              <Link
-                to="/home"
-                style={{
-                  minHeight: 'var(--min-hit-target)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  color: 'var(--color-primary)',
-                }}
-              >
-                Voltar para a Home
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {loadState.status === 'error' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-              Não foi possível carregar os dados agora.
-            </p>
-            <div>
-              <button
-                type="button"
-                onClick={() => setLoadAttempt((n) => n + 1)}
-                style={{
-                  minHeight: 'var(--min-hit-target)',
-                  minWidth: 'var(--min-hit-target)',
-                  padding: '0 16px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-surface)',
-                  color: 'var(--color-text)',
-                  fontSize: 15,
-                  cursor: 'pointer',
-                }}
-              >
+      {loadState.status === 'error' && (
+        <div className="sz-section">
+          <Notice
+            tone="attention"
+            action={
+              <Button variant="secondary" onClick={() => setLoadAttempt((n) => n + 1)}>
                 Tentar novamente
-              </button>
-            </div>
-          </div>
-        )}
+              </Button>
+            }
+          >
+            Não foi possível carregar os dados agora.
+          </Notice>
+        </div>
+      )}
 
-        {loadState.status === 'loaded' && followUpId && (
-          <AcompanhamentoContent
-            followUpId={followUpId}
-            detail={loadState.detail}
-            onStatusChange={(status) =>
-              setLoadState({ status: 'loaded', detail: { ...loadState.detail, status } })
-            }
-            onActionRegistered={(action) =>
-              setLoadState({
-                status: 'loaded',
-                detail: { ...loadState.detail, actions: [...loadState.detail.actions, action] },
-              })
-            }
-          />
-        )}
-      </main>
-    </div>
+      {loadState.status === 'loaded' && followUpId && (
+        <AcompanhamentoContent
+          followUpId={followUpId}
+          detail={loadState.detail}
+          onStatusChange={(status) => setLoadState({ status: 'loaded', detail: { ...loadState.detail, status } })}
+          onActionRegistered={(action) =>
+            setLoadState({
+              status: 'loaded',
+              detail: { ...loadState.detail, actions: [...loadState.detail.actions, action] },
+            })
+          }
+        />
+      )}
+    </Page>
   )
 }
 
@@ -320,63 +163,114 @@ function AcompanhamentoContent({
   onStatusChange: (status: FollowUpStatusValue) => void
   onActionRegistered: (action: FollowUpActionItem) => void
 }) {
+  const [notice, setNotice] = useState<{ tone: 'success' | 'info'; text: string } | null>(null)
+  const actionCount = detail.actions.length
+
   return (
     <>
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <span style={{ color: 'var(--color-text-secondary)' }}>{detail.student_name}</span>
-        <FollowUpStatusPill status={detail.status} />
+      <section aria-label="Resumo do acompanhamento">
+        <ScreenHead kicker="Coordenação pedagógica › Acompanhamento" title={detail.student_name}>
+          <div className="sz-head-row">
+            <StatusPill status={detail.status} />
+          </div>
+          <p className="sz-summary">
+            Aberto em {formatDateBr(detail.created_at)} ·{' '}
+            <b>
+              {actionCount} {actionCount === 1 ? 'ação registrada' : 'ações registradas'}
+            </b>
+          </p>
+        </ScreenHead>
       </section>
+
+      {notice && (
+        <div style={{ marginTop: 24 }}>
+          <Notice tone={notice.tone}>{notice.text}</Notice>
+        </div>
+      )}
 
       <StatusSelector
         followUpId={followUpId}
+        studentName={detail.student_name}
         status={detail.status}
-        onStatusChange={onStatusChange}
+        onStatusChange={(status) => {
+          onStatusChange(status)
+          setNotice(
+            status === 'ENCERRADO'
+              ? { tone: 'success', text: 'Acompanhamento encerrado. O histórico e as evidências continuam disponíveis.' }
+              : { tone: 'info', text: `Status alterado para ${FOLLOW_UP_STATUS[status].label}.` },
+          )
+        }}
       />
 
+      <ActionForm followUpId={followUpId} onActionRegistered={onActionRegistered} />
+
+      <ActionHistory actions={detail.actions} />
+
       {detail.trajectory_changes.map((group) => (
-        <CollapsibleSection
-          key={group.trajectory_change.id}
-          title={CHANGE_TYPE_LABEL[group.trajectory_change.type]}
-        >
+        <Disclosure key={group.trajectory_change.id} title={CHANGE_TYPE_LABEL[group.trajectory_change.type]}>
           <EvidenceCard
-            title="Evidências"
-            description={group.trajectory_change.description}
-            detectedAt={group.trajectory_change.detected_at}
+            kicker={`Mudança detectada em ${formatDetectedBr(group.trajectory_change.detected_at)}`}
+            title={group.trajectory_change.description}
+            description="Mudança de trajetória vinculada a este acompanhamento."
             evidence={group.evidence}
             linkTo={`/estudantes/${detail.student_id}`}
             linkLabel={`Ver na trajetória de ${detail.student_name}`}
           />
-        </CollapsibleSection>
+        </Disclosure>
       ))}
-
-      <ActionHistory actions={detail.actions} />
-
-      <ActionForm followUpId={followUpId} onActionRegistered={onActionRegistered} />
     </>
   )
 }
 
 /**
+ * Chronological list of every registered `FollowUpAction`, oldest first
+ * (RF-14). Zero actions renders an explicit message instead of a blank list
+ * (spec Boundaries & Constraints — "transparência em vez de validação
+ * forçada").
+ */
+function ActionHistory({ actions }: { actions: FollowUpActionItem[] }) {
+  return (
+    <Disclosure title="Histórico de ações">
+      {actions.length === 0 ? (
+        <p className="sz-muted">Nenhuma ação registrada até o momento.</p>
+      ) : (
+        <Timeline
+          items={actions.map((action) => ({
+            key: action.id,
+            date: formatDateTimeBr(action.created_at),
+            text: action.description,
+            icon: 'check' as const,
+            label: 'Ação',
+            color: 'var(--action)',
+          }))}
+        />
+      )}
+    </Disclosure>
+  )
+}
+
+/**
  * Native `<select>` with exactly the 4 closed `FollowUpStatus` values — never
- * free text (RF-13, UX-DR8). Selecting "Encerrado" asks for a simple
- * `window.confirm` before calling the API; any other target status calls the
- * API immediately (UX-DR19 — only the destructive/irreversible transition is
- * gated). Declining the confirmation makes no request and reverts the select
- * to the prior status.
+ * free text (RF-13, UX-DR8). Choosing "Encerrado" opens an inline
+ * confirmation (no modal, no `window.confirm`); any other status calls the
+ * API immediately. Cancelling makes no request and the select keeps the
+ * current status.
  */
 function StatusSelector({
   followUpId,
+  studentName,
   status,
   onStatusChange,
 }: {
   followUpId: string
+  studentName: string
   status: FollowUpStatusValue
   onStatusChange: (status: FollowUpStatusValue) => void
 }) {
   const { token } = useAuth()
-  const selectId = useId()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmingClose, setConfirmingClose] = useState(false)
 
   async function applyStatusChange(nextStatus: FollowUpStatusValue) {
     if (!token) return
@@ -386,8 +280,7 @@ function StatusSelector({
       const updated = await changeFollowUpStatus(token, followUpId, { status: nextStatus })
       onStatusChange(updated.status)
     } catch (caught) {
-      const message =
-        caught instanceof ApiError ? caught.message : 'Não foi possível atualizar o status agora.'
+      const message = caught instanceof ApiError ? caught.message : 'Não foi possível atualizar o status agora.'
       setError(message)
     } finally {
       setSaving(false)
@@ -397,54 +290,61 @@ function StatusSelector({
   function handleChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextStatus = event.target.value as FollowUpStatusValue
     if (nextStatus === status) return
-
     if (nextStatus === 'ENCERRADO') {
-      const confirmed = window.confirm(
-        'Tem certeza que deseja encerrar este acompanhamento? Esta ação não pode ser desfeita.',
-      )
-      if (!confirmed) {
-        // Revert — the <select>'s value is controlled by `status`, which
-        // hasn't changed, so simply not calling the API is enough; React
-        // will re-render the <select> back to the current status.
-        return
-      }
+      setConfirmingClose(true)
+      return
     }
-
+    setConfirmingClose(false)
     void applyStatusChange(nextStatus)
   }
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 280 }}>
-      <label htmlFor={selectId} style={{ fontWeight: 600 }}>
-        Status do acompanhamento
-      </label>
-      <select
-        id={selectId}
-        value={status}
-        onChange={handleChange}
-        disabled={saving}
-        style={selectStyle}
-      >
-        {STATUS_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {error && (
-        <p role="alert" style={{ color: 'var(--color-attention)', margin: 0, fontSize: 14 }}>
-          {error}
-        </p>
+    <Section id="acompanhamento-status" title="Status do acompanhamento">
+      <div style={{ maxWidth: 360 }}>
+        <SelectField
+          label="Status atual"
+          value={status}
+          onChange={handleChange}
+          disabled={saving}
+          error={error}
+          hint="Sempre um dos 4 estados. Encerrar não apaga nem esconde nada."
+        >
+          {STATUS_ORDER.map((value) => (
+            <option key={value} value={value}>
+              {FOLLOW_UP_STATUS[value].label}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+      {confirmingClose && (
+        <div className="sz-confirm" role="group" aria-labelledby="confirmar-encerramento">
+          <p id="confirmar-encerramento">
+            <b>Encerrar o acompanhamento de {studentName}?</b> O histórico de ações e as evidências continuam
+            acessíveis, e o status pode ser alterado de novo depois.
+          </p>
+          <div className="sz-confirm-actions">
+            <Button
+              onClick={() => {
+                setConfirmingClose(false)
+                void applyStatusChange('ENCERRADO')
+              }}
+            >
+              Encerrar acompanhamento
+            </Button>
+            <Button variant="secondary" onClick={() => setConfirmingClose(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
       )}
-    </section>
+    </Section>
   )
 }
 
 /**
- * Free-text action form (textarea + disabled-while-empty submit) — mirrors
- * `Observacoes.tsx`'s `ObservacaoRow`/`canSave` pattern. Submitting never
- * replaces a prior action: every submission is a fresh row (RF-13, RF-14).
- * No read-back/list of past actions here (Story 4.3 scope).
+ * Free-text action form (textarea + disabled-while-empty submit).
+ * Submitting never replaces a prior action: every submission is a fresh row
+ * (RF-13, RF-14).
  */
 function ActionForm({
   followUpId,
@@ -454,8 +354,6 @@ function ActionForm({
   onActionRegistered: (action: FollowUpActionItem) => void
 }) {
   const { token } = useAuth()
-  const textId = useId()
-  const messageId = useId()
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -475,8 +373,7 @@ function ActionForm({
       setMessage('Registro salvo.')
       setIsError(false)
     } catch (caught) {
-      const errorMessage =
-        caught instanceof ApiError ? caught.message : 'Não foi possível salvar o registro agora.'
+      const errorMessage = caught instanceof ApiError ? caught.message : 'Não foi possível salvar o registro agora.'
       setMessage(errorMessage)
       setIsError(true)
     } finally {
@@ -485,71 +382,27 @@ function ActionForm({
   }
 
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        padding: '16px 20px',
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-      }}
-    >
-      <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Registrar ação</h2>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <label htmlFor={textId} style={{ fontSize: 13, fontWeight: 600 }}>
-          Ação
-        </label>
-        <textarea
-          id={textId}
-          value={text}
-          onChange={(event) => {
-            setText(event.target.value)
-            setMessage(null)
-            setIsError(false)
-          }}
-          aria-describedby={message ? messageId : undefined}
-          rows={3}
-          style={{ ...fieldStyle, padding: '8px 12px', resize: 'vertical', fontFamily: 'inherit' }}
-        />
-      </div>
-
-      <div>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving || !canSave}
-          style={{
-            minHeight: 'var(--min-hit-target)',
-            minWidth: 'var(--min-hit-target)',
-            padding: '0 16px',
-            borderRadius: 'var(--radius-md)',
-            border: 'none',
-            background: 'var(--color-primary)',
-            color: 'var(--color-surface)',
-            fontSize: 15,
-            fontWeight: 600,
-            cursor: saving || !canSave ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {saving ? 'Salvando…' : 'Salvar'}
-        </button>
-      </div>
-
-      <div
-        id={messageId}
-        role={isError ? 'alert' : 'status'}
-        aria-live="polite"
-        style={{
-          minHeight: 20,
-          fontSize: 14,
-          color: isError ? 'var(--color-attention)' : 'var(--color-success)',
+    <Section id="acompanhamento-acao" title="Registrar ação">
+      <TextAreaField
+        label="Descreva a ação tomada"
+        value={text}
+        rows={4}
+        placeholder="Ex.: Conversamos com a família sobre…"
+        hint="Fatos observáveis, sem julgamentos sobre o estudante."
+        onChange={(event) => {
+          setText(event.target.value)
+          setMessage(null)
+          setIsError(false)
         }}
-      >
-        {message}
+      />
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Button onClick={handleSave} disabled={saving || !canSave}>
+          {saving ? 'Salvando…' : 'Registrar ação'}
+        </Button>
       </div>
-    </section>
+      <div aria-live="polite">
+        {message && <Notice tone={isError ? 'attention' : 'success'} role={isError ? 'alert' : 'status'}>{message}</Notice>}
+      </div>
+    </Section>
   )
 }
