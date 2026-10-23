@@ -164,7 +164,7 @@ def test_trajectory_happy_path_returns_200_with_six_indicators(
     assert body["trajectory_change"] is None
     assert body["concerning_factor"] == {
         "kind": "ATTENDANCE",
-        "description": "Mudança recente: queda de frequência — 3º Bimestre Teste",
+        "description": "Sinal isolado: queda de frequência no 3º Bimestre Teste",
     }
 
 
@@ -546,8 +546,8 @@ def test_trajectory_two_confirmed_signals_creates_trajectory_change_with_sources
     assert change["type"] == "ATTENDANCE_DROP"
     assert change["period_id"] == str(seeded_academic_period.id)
     assert change["description"] == (
-        "Mudança recente: queda de frequência e registro pedagógico recente "
-        "— 3º Bimestre Teste"
+        "Queda de frequência e registro pedagógico recente "
+        "no 3º Bimestre Teste"
     )
     detected_at = datetime.fromisoformat(change["detected_at"].replace("Z", "+00:00"))
     assert detected_at == datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
@@ -605,7 +605,7 @@ def test_trajectory_pedagogical_observation_after_as_of_is_excluded_from_signal(
     assert body["trajectory_change"] is None
     assert body["concerning_factor"] == {
         "kind": "ATTENDANCE",
-        "description": "Mudança recente: queda de frequência — 3º Bimestre Teste",
+        "description": "Sinal isolado: queda de frequência no 3º Bimestre Teste",
     }
     assert db_session.execute(select(TrajectoryChangeModel)).scalars().all() == []
 
@@ -648,7 +648,7 @@ def test_trajectory_recompute_same_period_replaces_description_and_sources(
     first_change = first.json()["trajectory_change"]
     assert first_change["type"] == "COMBINED_DETERIORATION"
     assert first_change["description"] == (
-        "Mudança recente: queda de frequência e queda de notas — 3º Bimestre Teste"
+        "Queda de frequência e queda de notas no 3º Bimestre Teste"
     )
 
     first_row = db_session.execute(select(TrajectoryChangeModel)).scalars().one()
@@ -697,8 +697,8 @@ def test_trajectory_recompute_same_period_replaces_description_and_sources(
     second_change = second.json()["trajectory_change"]
     assert second_change["type"] == "COMBINED_DETERIORATION"
     assert second_change["description"] == (
-        "Mudança recente: queda de frequência e aumento de atividades "
-        "pendentes — 3º Bimestre Teste"
+        "Queda de frequência e aumento de atividades "
+        "pendentes no 3º Bimestre Teste"
     )
     assert second_change["detected_at"] != first_change["detected_at"]
     assert second_change["detected_at"].startswith("2026-09-25")

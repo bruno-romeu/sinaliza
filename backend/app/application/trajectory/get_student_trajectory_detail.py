@@ -26,6 +26,10 @@ duplicates it — and layers three new reads on top:
    this").
 3. **Observations** — the most recent 10 `PedagogicalObservation`s in the
    trailing 365 days, desc by date, for the page's timeline section.
+4. **Student and open follow-up** (spec-ui-1) — the student's name and
+   classroom for the page title, and the id of the requesting user's open
+   (non-`ENCERRADO`) `FollowUp` for this student, so the page can offer
+   "Ver acompanhamento" instead of opening a duplicate.
 
 `chart_indicator` is chosen deterministically from `trajectory_change.type`
 (spec Boundaries & Constraints table); absent a change, `attendance_rate` is
@@ -53,11 +57,14 @@ from app.application.trajectory.ports import (
     AssignmentSubmissionRepositoryPort,
     AttendanceRepositoryPort,
     GradeRepositoryPort,
+    OpenFollowUpLookupPort,
     PedagogicalObservationRepositoryPort,
+    StudentProfileRepositoryPort,
     TrajectoryChangeSourceRepositoryPort,
 )
 from app.domain.academic_period import AcademicPeriod
 from app.domain.as_of import as_of
+from app.domain.student import StudentProfile
 from app.domain.trajectory import TrajectoryIndicators, compute_trajectory_indicators
 from app.domain.trajectory_change import TrajectoryChange, TrajectoryChangeType
 
@@ -106,6 +113,8 @@ class TrajectoryDetailResult:
     evidence: list[EvidenceItem]
     concerning_factor: ConcerningFactor | None
     observations: list[ObservationItem]
+    student: StudentProfile | None = None
+    open_follow_up_id: uuid.UUID | None = None
 
 
 class GetStudentTrajectoryDetailService:
@@ -119,6 +128,8 @@ class GetStudentTrajectoryDetailService:
         academic_period_repository: AcademicPeriodRepositoryPort,
         pedagogical_observation_repository: PedagogicalObservationRepositoryPort,
         trajectory_change_source_repository: TrajectoryChangeSourceRepositoryPort,
+        student_profile_repository: StudentProfileRepositoryPort | None = None,
+        follow_up_repository: OpenFollowUpLookupPort | None = None,
     ) -> None:
         self._trajectory_service = trajectory_service
         self._attendance_repository = attendance_repository
@@ -128,6 +139,8 @@ class GetStudentTrajectoryDetailService:
         self._academic_period_repository = academic_period_repository
         self._pedagogical_observation_repository = pedagogical_observation_repository
         self._trajectory_change_source_repository = trajectory_change_source_repository
+        self._student_profile_repository = student_profile_repository
+        self._follow_up_repository = follow_up_repository
 
     def execute(
         self, student_id: uuid.UUID, window_days: int, requesting_user_id: uuid.UUID
@@ -150,6 +163,17 @@ class GetStudentTrajectoryDetailService:
         evidence = self._resolve_evidence(result.trajectory_change, requesting_user_id)
         observations = self._recent_observations(student_id, requesting_user_id)
 
+        student = (
+            self._student_profile_repository.get_profile(student_id)
+            if self._student_profile_repository is not None
+            else None
+        )
+        open_follow_up = (
+            self._follow_up_repository.find_open_for_student(student_id, requesting_user_id)
+            if self._follow_up_repository is not None
+            else None
+        )
+
         return TrajectoryDetailResult(
             chart_indicator=chart_indicator,
             series=series,
@@ -158,6 +182,8 @@ class GetStudentTrajectoryDetailService:
             evidence=evidence,
             concerning_factor=result.concerning_factor,
             observations=observations,
+            student=student,
+            open_follow_up_id=open_follow_up.id if open_follow_up is not None else None,
         )
 
     @staticmethod

@@ -285,7 +285,20 @@ export function EstudanteTrajetoria() {
           gap: 32,
         }}
       >
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>Trajetória do estudante</h1>
+        {/* spec-ui-1: the detail endpoint now carries the student's name and
+            classroom; the generic title stays as the fallback while loading. */}
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>
+            {loadState.status === 'loaded' && loadState.detail.student
+              ? loadState.detail.student.name
+              : 'Trajetória do estudante'}
+          </h1>
+          {loadState.status === 'loaded' && loadState.detail.student?.classroom_name && (
+            <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
+              {loadState.detail.student.classroom_name}
+            </p>
+          )}
+        </div>
 
         {loadState.status === 'loading' && (
           <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -509,34 +522,57 @@ function TrajectoryDetailContent({
         )}
       </section>
 
-      {/* Follow-up action — enabled once a change was detected (Story 4.1). */}
+      {/* Follow-up action — enabled once a change was detected (Story 4.1).
+          spec-ui-1: when the user already has an open follow-up for this
+          student, link to it instead of offering to open another one. */}
       <section style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
-        <button
-          type="button"
-          disabled={!hasChange || openFollowUpState.status === 'submitting'}
-          onClick={handleOpenFollowUp}
-          title={
-            hasChange
-              ? undefined
-              : 'Acompanhamento vinculado a evidências requer uma mudança detectada.'
-          }
-          style={{
-            minHeight: 'var(--min-hit-target)',
-            padding: '0 20px',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--color-border)',
-            background: hasChange ? 'var(--color-primary)' : 'var(--color-surface)',
-            color: hasChange ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-            fontSize: 15,
-            cursor: hasChange && openFollowUpState.status !== 'submitting' ? 'pointer' : 'not-allowed',
-          }}
-        >
-          {openFollowUpState.status === 'submitting' ? 'Abrindo…' : 'Abrir acompanhamento'}
-        </button>
-        {openFollowUpState.status === 'error' && (
-          <p role="alert" style={{ margin: 0, color: 'var(--color-attention)' }}>
-            Não foi possível abrir o acompanhamento agora.
-          </p>
+        {detail.open_follow_up_id ? (
+          <Link
+            to={`/acompanhamentos/${detail.open_follow_up_id}`}
+            style={{
+              minHeight: 'var(--min-hit-target)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '0 20px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-primary)',
+              color: 'var(--color-surface)',
+              fontWeight: 700,
+              textDecoration: 'none',
+            }}
+          >
+            Ver acompanhamento
+          </Link>
+        ) : (
+          <>
+            <button
+              type="button"
+              disabled={!hasChange || openFollowUpState.status === 'submitting'}
+              onClick={handleOpenFollowUp}
+              title={
+                hasChange
+                  ? undefined
+                  : 'Acompanhamento vinculado a evidências requer uma mudança detectada.'
+              }
+              style={{
+                minHeight: 'var(--min-hit-target)',
+                padding: '0 20px',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border)',
+                background: hasChange ? 'var(--color-primary)' : 'var(--color-surface)',
+                color: hasChange ? 'var(--color-surface)' : 'var(--color-text-secondary)',
+                fontSize: 15,
+                cursor: hasChange && openFollowUpState.status !== 'submitting' ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {openFollowUpState.status === 'submitting' ? 'Abrindo…' : 'Abrir acompanhamento'}
+            </button>
+            {openFollowUpState.status === 'error' && (
+              <p role="alert" style={{ margin: 0, color: 'var(--color-attention)' }}>
+                Não foi possível abrir o acompanhamento agora.
+              </p>
+            )}
+          </>
         )}
       </section>
     </>

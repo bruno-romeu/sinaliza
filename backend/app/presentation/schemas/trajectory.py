@@ -93,6 +93,12 @@ class ObservationItemOut(BaseModel):
     text: str
 
 
+class StudentSummaryOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    classroom_name: str | None
+
+
 class TrajectoryDetailOut(BaseModel):
     # `chart_indicator` is chosen deterministically from `trajectory_change`'s
     # `type` (spec Boundaries & Constraints), defaulting to `attendance_rate`
@@ -104,3 +110,7 @@ class TrajectoryDetailOut(BaseModel):
     evidence: list[EvidenceItemOut]
     concerning_factor: ConcerningFactorOut | None
     observations: list[ObservationItemOut]
+    # spec-ui-1: who the page is about, and the requesting user's open
+    # follow-up for this student (if any), so the UI never opens a duplicate.
+    student: StudentSummaryOut | None = None
+    open_follow_up_id: uuid.UUID | None = None
