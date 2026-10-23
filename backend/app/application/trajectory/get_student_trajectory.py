@@ -56,6 +56,7 @@ from app.domain.as_of import as_of
 from app.domain.convergence import (
     SOURCE_TYPE_BY_SIGNAL_KIND,
     SignalKind,
+    build_concerning_description,
     build_description,
     evaluate_assignments_signal,
     evaluate_attendance_signal,
@@ -287,8 +288,9 @@ class GetStudentTrajectoryService:
             return persisted_change, None
 
         if result.concerning_signal is not None:
-            kinds = frozenset({result.concerning_signal.kind})
-            description = build_description(kinds, current_period.label)
+            description = build_concerning_description(
+                result.concerning_signal.kind, current_period.label
+            )
             return None, ConcerningFactor(kind=result.concerning_signal.kind, description=description)
 
         return None, None

@@ -14,7 +14,7 @@ import uuid
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.domain.student import Student, StudentSearchResult
+from app.domain.student import Student, StudentProfile, StudentSearchResult
 from app.infrastructure.db.models import ClassroomModel, EnrollmentModel, StudentModel
 from app.infrastructure.repositories.base import filter_eval_demo_students
 
@@ -57,6 +57,26 @@ class SqlAlchemyStudentRepository:
         if model is None:
             return None
         return Student(id=model.id, name=model.name, dataset_split=model.dataset_split)
+
+    def get_profile(self, student_id: uuid.UUID) -> StudentProfile | None:
+        """Name + classroom for the Trajectory page title (spec-ui-1). Same
+        `EVAL_DEMO` filter as `get_by_id`. If the student has more than one
+        enrollment, the most recent academic year wins (then classroom name,
+        for a deterministic pick)."""
+        stmt = (
+            select(StudentModel, ClassroomModel.name)
+            .outerjoin(EnrollmentModel, EnrollmentModel.student_id == StudentModel.id)
+            .outerjoin(ClassroomModel, ClassroomModel.id == EnrollmentModel.classroom_id)
+            .where(StudentModel.id == student_id)
+            .order_by(ClassroomModel.academic_year.desc().nulls_last(), ClassroomModel.name)
+            .limit(1)
+        )
+        stmt = filter_eval_demo_students(stmt)
+        row = self._session.execute(stmt).first()
+        if row is None:
+            return None
+        student, classroom_name = row
+        return StudentProfile(id=student.id, name=student.name, classroom_name=classroom_name)
 
     def search(self, query: str, limit: int) -> list[StudentSearchResult]:
         """Home's student search (spec-3-3 Boundaries & Constraints):
