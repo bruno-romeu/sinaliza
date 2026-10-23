@@ -18,14 +18,25 @@ from app.domain.academic_period import AcademicPeriod
 from app.domain.assignment import Assignment
 from app.domain.assignment_submission import AssignmentSubmission
 from app.domain.attendance import AttendanceRecord
+from app.domain.follow_up import FollowUp
 from app.domain.grade import Grade
 from app.domain.pedagogical_observation import PedagogicalObservation
-from app.domain.student import Student
+from app.domain.student import Student, StudentProfile
 from app.domain.trajectory_change import TrajectoryChange, TrajectoryChangeSource
 
 
 class StudentRepositoryPort(Protocol):
     def get_by_id(self, student_id: uuid.UUID) -> Student | None: ...
+
+
+class StudentProfileRepositoryPort(Protocol):
+    def get_profile(self, student_id: uuid.UUID) -> StudentProfile | None: ...
+
+
+class OpenFollowUpLookupPort(Protocol):
+    def find_open_for_student(
+        self, student_id: uuid.UUID, responsible_user_id: uuid.UUID
+    ) -> FollowUp | None: ...
 
 
 class AttendanceRepositoryPort(Protocol):

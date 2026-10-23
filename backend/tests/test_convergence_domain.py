@@ -17,6 +17,7 @@ from app.domain.attendance import AttendanceRecord, AttendanceStatus
 from app.domain.convergence import (
     Signal,
     SignalKind,
+    build_concerning_description,
     build_description,
     decide_change_type,
     evaluate_assignments_signal,
@@ -263,7 +264,7 @@ def test_decide_change_type_raises_without_a_core_signal() -> None:
 def test_build_description_single_kind() -> None:
     text = build_description(frozenset({SignalKind.ATTENDANCE}), "3º Bimestre")
 
-    assert text == "Mudança recente: queda de frequência — 3º Bimestre"
+    assert text == "Queda de frequência no 3º Bimestre"
 
 
 def test_build_description_two_kinds_uses_fixed_order_and_e() -> None:
@@ -271,7 +272,7 @@ def test_build_description_two_kinds_uses_fixed_order_and_e() -> None:
         frozenset({SignalKind.PEDAGOGICAL_OBSERVATION, SignalKind.ATTENDANCE}), "3º Bimestre"
     )
 
-    assert text == "Mudança recente: queda de frequência e registro pedagógico recente — 3º Bimestre"
+    assert text == "Queda de frequência e registro pedagógico recente no 3º Bimestre"
 
 
 def test_build_description_three_kinds() -> None:
@@ -280,9 +281,28 @@ def test_build_description_three_kinds() -> None:
     )
 
     assert text == (
-        "Mudança recente: queda de frequência, queda de notas e aumento de "
-        "atividades pendentes — 3º Bimestre"
+        "Queda de frequência, queda de notas e aumento de "
+        "atividades pendentes no 3º Bimestre"
     )
+
+
+def test_build_description_has_no_dash_and_no_prefix() -> None:
+    """spec-ui-1: on-screen text never uses dashes, and the change label is
+    the surface's job, not part of the description."""
+    text = build_description(
+        frozenset({SignalKind.ATTENDANCE, SignalKind.GRADE}), "3º Bimestre"
+    )
+
+    assert "—" not in text
+    assert "–" not in text
+    assert not text.startswith("Mudança recente")
+
+
+def test_build_concerning_description_reads_as_isolated_signal() -> None:
+    text = build_concerning_description(SignalKind.GRADE, "3º Bimestre")
+
+    assert text == "Sinal isolado: queda de notas no 3º Bimestre"
+    assert "Mudança" not in text
 
 
 def test_build_description_never_uses_diagnostic_language() -> None:

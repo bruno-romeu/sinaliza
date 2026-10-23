@@ -18,12 +18,6 @@ const cardStyle = {
   gap: 12,
 } as const
 
-function formatDateBr(value: string): string {
-  const date = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('pt-BR')
-}
-
 function formatDetectedAt(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
@@ -60,7 +54,7 @@ export function EvidenceCard({
       {description !== undefined && (
         <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
           {description}
-          {detectedAt !== undefined && ` — ${formatDetectedAt(detectedAt)}`}
+          {detectedAt !== undefined && ` · detectada em ${formatDetectedAt(detectedAt)}`}
         </p>
       )}
       <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -79,9 +73,9 @@ export function EvidenceCard({
             <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
               {SOURCE_TYPE_LABEL[item.source_type]}
             </span>
-            <span>
-              {item.description} — {formatDateBr(item.date)}
-            </span>
+            {/* The backend description already carries the date ("Falta não
+                justificada em 20/09/2026"), so it is not repeated here. */}
+            <span>{item.description}</span>
           </li>
         ))}
       </ul>

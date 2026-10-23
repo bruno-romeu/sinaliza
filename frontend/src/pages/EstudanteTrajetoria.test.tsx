@@ -61,7 +61,7 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
           type: 'ATTENDANCE_DROP',
           period_id: 'p2',
           detected_at: '2026-09-24T00:00:00Z',
-          description: 'Mudança recente: queda de frequência — 3º Bimestre',
+          description: 'Queda de frequência no 3º Bimestre',
         },
         evidence: [
           { source_type: 'ATTENDANCE_RECORD', description: 'Falta não justificada em 20/09/2026', date: '2026-09-20' },
@@ -146,7 +146,7 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
         evidence: [],
         concerning_factor: {
           kind: 'ATTENDANCE',
-          description: 'Mudança recente: queda de frequência — 3º Bimestre',
+          description: 'Sinal isolado: queda de frequência no 3º Bimestre',
         },
         observations: [],
       }),
@@ -157,12 +157,12 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     const toggle = await screen.findByRole('button', { name: 'Fator preocupante' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('Mudança recente: queda de frequência — 3º Bimestre')).not.toBeInTheDocument()
+    expect(screen.queryByText('Sinal isolado: queda de frequência no 3º Bimestre')).not.toBeInTheDocument()
 
     fireEvent.click(toggle)
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByText('Mudança recente: queda de frequência — 3º Bimestre')).toBeInTheDocument()
+    expect(screen.getByText('Sinal isolado: queda de frequência no 3º Bimestre')).toBeInTheDocument()
   })
 
   it('shows a factual not-found message with a link back to Home for an unknown student', async () => {
@@ -198,7 +198,7 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
       type: 'ATTENDANCE_DROP',
       period_id: 'p2',
       detected_at: '2026-09-24T00:00:00Z',
-      description: 'Mudança recente: queda de frequência — 3º Bimestre',
+      description: 'Queda de frequência no 3º Bimestre',
     },
     evidence: [
       { source_type: 'ATTENDANCE_RECORD', description: 'Falta não justificada em 20/09/2026', date: '2026-09-20' },
@@ -289,5 +289,40 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     const button = await screen.findByRole('button', { name: 'Abrir acompanhamento' })
     expect(button).toBeDisabled()
+  })
+
+  // --- spec-ui-1: student name + open follow-up -------------------------------------
+
+  it('titles the page with the student name and classroom when the API sends them', async () => {
+    fetchMock = vi.fn(async () =>
+      jsonResponse({
+        ...DETAIL_CALM,
+        student: { id: 'student-1', name: 'Ana Beatriz Souza', classroom_name: 'Turma Aurora' },
+        open_follow_up_id: null,
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ana Beatriz Souza' })).toBeInTheDocument()
+    expect(screen.getByText('Turma Aurora')).toBeInTheDocument()
+  })
+
+  it('links to the open follow-up instead of offering to open a duplicate', async () => {
+    fetchMock = vi.fn(async () =>
+      jsonResponse({
+        ...DETAIL_WITH_CHANGE,
+        student: { id: 'student-1', name: 'Ana Beatriz Souza', classroom_name: 'Turma Aurora' },
+        open_follow_up_id: 'follow-up-1',
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+
+    const link = await screen.findByRole('link', { name: 'Ver acompanhamento' })
+    expect(link).toHaveAttribute('href', '/acompanhamentos/follow-up-1')
+    expect(screen.queryByRole('button', { name: 'Abrir acompanhamento' })).not.toBeInTheDocument()
   })
 })

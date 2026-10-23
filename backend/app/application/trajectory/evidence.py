@@ -15,6 +15,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 
 from app.application.trajectory.ports import (
     AssignmentSubmissionRepositoryPort,
@@ -157,8 +158,19 @@ def _attendance_description(record: AttendanceRecord) -> str:
     return f"{_ATTENDANCE_STATUS_LABEL[record.status]} em {_format_date_br(record.date)}"
 
 
+def _format_grade_br(value: Decimal) -> str:
+    """"4.50" -> "4,5", "7.00" -> "7,0", "7.25" -> "7,25" (spec-ui-1): comma
+    decimal separator, at least one and at most two decimal places."""
+    text = f"{value:.2f}".rstrip("0")
+    if text.endswith("."):
+        text += "0"
+    return text.replace(".", ",")
+
+
 def _grade_description(grade: Grade) -> str:
-    return f"Nota {grade.value} em {grade.subject} — {_format_date_br(grade.date)}"
+    # spec-ui-1: "em {data}" instead of a dash before the date.
+    value = _format_grade_br(grade.value)
+    return f"Nota {value} em {grade.subject} em {_format_date_br(grade.date)}"
 
 
 def _assignment_submission_description(submission: AssignmentSubmission) -> str:
