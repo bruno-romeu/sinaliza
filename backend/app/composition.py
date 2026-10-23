@@ -185,6 +185,8 @@ def get_get_student_trajectory_detail_service(
         academic_period_repository=SqlAlchemyAcademicPeriodRepository(db),
         pedagogical_observation_repository=SqlAlchemyPedagogicalObservationRepository(db),
         trajectory_change_source_repository=trajectory_change_repository,
+        student_profile_repository=SqlAlchemyStudentRepository(db),
+        follow_up_repository=SqlAlchemyFollowUpRepository(db),
     )
 
 

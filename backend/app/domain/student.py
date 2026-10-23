@@ -59,3 +59,14 @@ class StudentSearchResult:
     id: uuid.UUID
     name: str
     classroom_name: str
+
+
+@dataclass(frozen=True)
+class StudentProfile:
+    """Who the Trajectory page is about (spec-ui-1): the student's name plus
+    the classroom they are enrolled in, for the page title. `classroom_name`
+    is `None` only if the student has no enrollment row."""
+
+    id: uuid.UUID
+    name: str
+    classroom_name: str | None

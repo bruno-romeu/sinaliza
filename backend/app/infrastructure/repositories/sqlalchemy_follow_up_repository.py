@@ -1,5 +1,5 @@
 """Implements `FollowUpRepositoryPort` on top of SQLAlchemy. Plain inserts
-only (no upsert needed, spec Code Map) — a `FollowUp` is always a fresh row,
+only (no upsert needed, spec Code Map). A new `FollowUp` is always a fresh row;
 never updated by this repository (status transitions are Story 4.2+ scope,
 spec Never: "the router never mutates `FollowUp` state directly")."""
 
@@ -55,6 +55,43 @@ class SqlAlchemyFollowUpRepository:
             )
         self._session.commit()
         return follow_up
+
+    def find_open_for_student(
+        self, student_id: uuid.UUID, responsible_user_id: uuid.UUID
+    ) -> FollowUp | None:
+        stmt = (
+            select(FollowUpModel)
+            .where(
+                FollowUpModel.student_id == student_id,
+                FollowUpModel.responsible_user_id == responsible_user_id,
+                FollowUpModel.status != FollowUpStatus.ENCERRADO,
+            )
+            .order_by(FollowUpModel.created_at.desc(), FollowUpModel.id.desc())
+            .limit(1)
+        )
+        model = self._session.execute(stmt).scalars().first()
+        if model is None:
+            return None
+        return FollowUp(
+            id=model.id,
+            student_id=model.student_id,
+            status=model.status,
+            reason=model.reason,
+            responsible_user_id=model.responsible_user_id,
+            next_review_date=model.next_review_date,
+            created_at=model.created_at,
+        )
+
+    def add_evidence(self, evidence: FollowUpEvidence) -> FollowUpEvidence:
+        self._session.add(
+            FollowUpEvidenceModel(
+                id=evidence.id,
+                follow_up_id=evidence.follow_up_id,
+                trajectory_change_id=evidence.trajectory_change_id,
+            )
+        )
+        self._session.commit()
+        return evidence
 
     def get_by_id(self, follow_up_id: uuid.UUID) -> FollowUp | None:
         model = self._session.get(FollowUpModel, follow_up_id)

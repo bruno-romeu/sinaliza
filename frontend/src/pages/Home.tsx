@@ -324,7 +324,11 @@ export function Home() {
                         <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
                           <span style={{ fontWeight: 600 }}>{change.student_name}</span>
                           <span style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>
-                            {typeInfo.label} — {change.description}
+                            {/* spec-ui-1: the description already names the
+                                signals and the period ("Queda de frequência no
+                                3º Bimestre"), so the type label is not repeated
+                                and no dash is used. */}
+                            {change.description}
                           </span>
                         </span>
                         <span style={{ color: 'var(--color-text-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}>

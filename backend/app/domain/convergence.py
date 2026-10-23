@@ -231,14 +231,31 @@ def _join_pt_br(phrases: Sequence[str]) -> str:
     return ", ".join(phrases[:-1]) + " e " + phrases[-1]
 
 
-def build_description(confirmed_kinds: frozenset[SignalKind], period_label: str) -> str:
-    """"Mudança recente: {lista de sinais em PT-BR} — {period.label}" (spec
-    Design Notes, Voice and Tone) — always factual, never diagnostic/
-    predictive language."""
+def _signals_in_period(confirmed_kinds: frozenset[SignalKind], period_label: str) -> str:
     ordered_phrases = [
         _DESCRIPTION_PHRASE_BY_KIND[kind] for kind in _DESCRIPTION_ORDER if kind in confirmed_kinds
     ]
-    return f"Mudança recente: {_join_pt_br(ordered_phrases)} — {period_label}"
+    return f"{_join_pt_br(ordered_phrases)} no {period_label}"
+
+
+def build_description(confirmed_kinds: frozenset[SignalKind], period_label: str) -> str:
+    """"{Lista de sinais em PT-BR} no {period.label}", e.g. "Queda de
+    frequência e queda de notas no 3º Bimestre" (spec Design Notes, Voice and
+    Tone): always factual, never diagnostic/predictive language.
+
+    spec-ui-1: no "Mudança recente:" prefix (every surface that shows this
+    text already labels it as a change) and no dash before the period (the
+    design system's voice rule forbids dashes in on-screen text)."""
+    text = _signals_in_period(confirmed_kinds, period_label)
+    return text[:1].upper() + text[1:]
+
+
+def build_concerning_description(kind: SignalKind, period_label: str) -> str:
+    """Text for a concerning factor, a single signal that has not converged
+    into a change (spec-ui-1): "Sinal isolado: queda de notas no 3º
+    Bimestre". Deliberately distinct from `build_description`, so an
+    unconfirmed signal never reads like a detected change."""
+    return f"Sinal isolado: {_signals_in_period(frozenset({kind}), period_label)}"
 
 
 def evaluate_convergence(signals: Sequence[Signal]) -> ConvergenceResult:
