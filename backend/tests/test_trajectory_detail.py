@@ -201,7 +201,7 @@ def test_detail_with_single_confirmed_signal_has_concerning_factor_and_no_eviden
     assert body["trajectory_change"] is None
     assert body["concerning_factor"] == {
         "kind": "ATTENDANCE",
-        "description": "Mudança recente: queda de frequência — 3º Bimestre Teste",
+        "description": "Sinal isolado: queda de frequência no 3º Bimestre Teste",
     }
     # No stable id for a concerning factor -> no evidence list.
     assert body["evidence"] == []
