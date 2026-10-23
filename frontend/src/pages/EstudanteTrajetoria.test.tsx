@@ -132,7 +132,7 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     await screen.findByText('Trajetória estável')
     // No fabricated range -> the chart renders the trend line with no band,
     // never a crash (code review finding, Story 3.4).
-    expect(container.querySelector('rect')).not.toBeInTheDocument()
+    expect(container.querySelector('svg[role="img"] .band')).not.toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Gráfico de frequência por bimestre/ })).toBeInTheDocument()
   })
 
@@ -155,7 +155,7 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     renderPage()
 
-    const toggle = await screen.findByRole('button', { name: 'Fator preocupante' })
+    const toggle = await screen.findByRole('button', { name: /Fator preocupante/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('Sinal isolado: queda de frequência no 3º Bimestre')).not.toBeInTheDocument()
 

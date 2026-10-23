@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import {
   ApiError,
@@ -14,14 +14,15 @@ import {
   type Classroom,
   type Student,
 } from '../../api/client'
-import { Header } from '../../components/Header'
+import { Button, ChoiceGroup, Notice, RosterRow, Section, SelectField, TextField } from '../../components/ui'
+import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 type SubmissionStatusValue = AssignmentSubmissionCreateRequest['status']
 
 const STATUS_OPTIONS: { value: SubmissionStatusValue; label: string }[] = [
   { value: 'DELIVERED', label: 'Entregue' },
-  { value: 'NOT_DELIVERED', label: 'Não entregue' },
   { value: 'PARTIAL', label: 'Parcial' },
+  { value: 'NOT_DELIVERED', label: 'Não entregue' },
 ]
 
 function todayIsoDate(): string {
@@ -30,16 +31,6 @@ function todayIsoDate(): string {
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
-}
-
-const fieldStyle: CSSProperties = {
-  minHeight: 'var(--min-hit-target)',
-  padding: '0 12px',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface)',
-  color: 'var(--color-text)',
-  fontSize: 15,
 }
 
 interface RowState {
@@ -60,12 +51,6 @@ interface RowState {
  */
 export function Atividades() {
   const { token } = useAuth()
-  const classroomSelectId = useId()
-  const subjectInputId = useId()
-  const periodSelectId = useId()
-  const dueDateInputId = useId()
-  const assignmentSelectId = useId()
-  const submissionDateInputId = useId()
 
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [classroomsError, setClassroomsError] = useState<string | null>(null)
@@ -242,269 +227,119 @@ export function Atividades() {
   }
 
   return (
-    <div>
-      <Header />
-      <main
-        style={{
-          maxWidth: 'var(--spacing-content-max-width)',
-          margin: '0 auto',
-          padding: 'var(--spacing-section-gap) 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 32,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>
-            Lançamento de atividades
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Selecione a turma para cadastrar uma atividade e registrar o status de entrega de cada
-            estudante.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220, maxWidth: 320 }}>
-          <label htmlFor={classroomSelectId} style={{ fontWeight: 600 }}>
-            Turma
-          </label>
-          <select
-            id={classroomSelectId}
-            value={selectedClassroomId}
-            onChange={(event) => setSelectedClassroomId(event.target.value)}
-            style={fieldStyle}
-          >
-            <option value="">Selecione…</option>
-            {classrooms.map((classroom) => (
-              <option key={classroom.id} value={classroom.id}>
-                {classroom.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {classroomsError && (
-          <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-            {classroomsError}
-          </p>
-        )}
-        {periodsError && (
-          <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-            {periodsError}
-          </p>
-        )}
-
-        {selectedClassroomId && (
-          <section
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-              padding: '16px 20px',
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Cadastrar atividade</h2>
-
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 200 }}>
-                <label htmlFor={subjectInputId} style={{ fontWeight: 600 }}>
-                  Disciplina
-                </label>
-                <input
-                  id={subjectInputId}
-                  type="text"
-                  value={subject}
-                  onChange={(event) => setSubject(event.target.value)}
-                  placeholder="Ex.: Matemática"
-                  maxLength={255}
-                  style={fieldStyle}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
-                <label htmlFor={periodSelectId} style={{ fontWeight: 600 }}>
-                  Período letivo
-                </label>
-                <select
-                  id={periodSelectId}
-                  value={periodId}
-                  onChange={(event) => setPeriodId(event.target.value)}
-                  style={fieldStyle}
-                >
-                  <option value="">Selecione…</option>
-                  {periods.map((period) => (
-                    <option key={period.id} value={period.id}>
-                      {period.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 180 }}>
-                <label htmlFor={dueDateInputId} style={{ fontWeight: 600 }}>
-                  Data de entrega
-                </label>
-                <input
-                  id={dueDateInputId}
-                  type="date"
-                  value={dueDate}
-                  onChange={(event) => setDueDate(event.target.value)}
-                  style={fieldStyle}
-                />
-              </div>
-            </div>
-
+    <LancamentoLayout
+      title="Atividades"
+      description="Cadastre uma atividade da turma e registre o status de entrega de cada estudante. Cada linha salva sozinha."
+      contextTitle="Turma e atividade"
+      contextError={classroomsError ?? periodsError}
+      context={
+        <SelectField label="Turma" value={selectedClassroomId} onChange={(event) => setSelectedClassroomId(event.target.value)}>
+          <option value="">Selecione…</option>
+          {classrooms.map((classroom) => (
+            <option key={classroom.id} value={classroom.id}>
+              {classroom.name}
+            </option>
+          ))}
+        </SelectField>
+      }
+    >
+      {selectedClassroomId && (
+        <Section id="lancamento-nova-atividade" title="Cadastrar atividade">
+          <div className="sz-ctx" style={{ alignItems: 'end' }}>
+            <TextField
+              label="Disciplina"
+              value={subject}
+              onChange={(event) => setSubject(event.target.value)}
+              placeholder="Ex.: Matemática"
+            />
+            <SelectField label="Período letivo" value={periodId} onChange={(event) => setPeriodId(event.target.value)}>
+              <option value="">Selecione…</option>
+              {periods.map((period) => (
+                <option key={period.id} value={period.id}>
+                  {period.label}
+                </option>
+              ))}
+            </SelectField>
+            <TextField label="Data de entrega" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
             <div>
-              <button
-                type="button"
-                onClick={handleCreateAssignment}
-                disabled={creatingAssignment || !canCreateAssignment}
-                style={{
-                  minHeight: 'var(--min-hit-target)',
-                  minWidth: 'var(--min-hit-target)',
-                  padding: '0 16px',
-                  borderRadius: 'var(--radius-md)',
-                  border: 'none',
-                  background: 'var(--color-primary)',
-                  color: 'var(--color-surface)',
-                  fontSize: 15,
-                  fontWeight: 600,
-                  cursor: creatingAssignment || !canCreateAssignment ? 'not-allowed' : 'pointer',
-                }}
-              >
+              <Button icon="mais" onClick={handleCreateAssignment} disabled={creatingAssignment || !canCreateAssignment}>
                 {creatingAssignment ? 'Cadastrando…' : 'Cadastrar atividade'}
-              </button>
+              </Button>
             </div>
+          </div>
+          {assignmentMessage && (
+            <Notice tone={assignmentMessageIsError ? 'attention' : 'success'} role={assignmentMessageIsError ? 'alert' : 'status'}>
+              {assignmentMessage}
+            </Notice>
+          )}
+          {assignmentsError && <Notice tone="attention">{assignmentsError}</Notice>}
+        </Section>
+      )}
 
-            {assignmentMessage && (
-              <p
-                role={assignmentMessageIsError ? 'alert' : 'status'}
-                aria-live="polite"
-                style={{
-                  margin: 0,
-                  fontSize: 14,
-                  color: assignmentMessageIsError
-                    ? 'var(--color-attention)'
-                    : 'var(--color-success)',
-                }}
-              >
-                {assignmentMessage}
-              </p>
-            )}
+      {selectedClassroomId && !assignmentsError && assignments.length === 0 && (
+        <p className="sz-muted sz-section">
+          Nenhuma atividade cadastrada nesta turma ainda. Cadastre uma atividade acima para registrar o status de
+          entrega.
+        </p>
+      )}
 
-            {assignmentsError && (
-              <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-                {assignmentsError}
-              </p>
-            )}
-          </section>
-        )}
-
-        {selectedClassroomId && !assignmentsError && assignments.length === 0 && (
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Nenhuma atividade cadastrada nesta turma ainda. Cadastre uma atividade acima para
-            registrar o status de entrega.
-          </p>
-        )}
-
-        {selectedClassroomId && assignments.length > 0 && (
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Status de entrega</h2>
-
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
-                <label htmlFor={assignmentSelectId} style={{ fontWeight: 600 }}>
-                  Atividade
-                </label>
-                <select
-                  id={assignmentSelectId}
-                  value={selectedAssignmentId}
-                  onChange={(event) => setSelectedAssignmentId(event.target.value)}
-                  style={fieldStyle}
-                >
-                  <option value="">Selecione…</option>
-                  {assignments.map((assignment) => (
-                    <option key={assignment.id} value={assignment.id}>
-                      {assignment.subject} — {assignment.due_date}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 180 }}>
-                <label htmlFor={submissionDateInputId} style={{ fontWeight: 600 }}>
-                  Data
-                </label>
-                <input
-                  id={submissionDateInputId}
-                  type="date"
-                  value={submissionDate}
-                  onChange={(event) => setSubmissionDate(event.target.value)}
-                  style={fieldStyle}
+      {selectedClassroomId && assignments.length > 0 && (
+        <Section id="lancamento-entregas" title="Status de entrega">
+          <div className="sz-ctx">
+            <SelectField
+              label="Atividade"
+              value={selectedAssignmentId}
+              onChange={(event) => setSelectedAssignmentId(event.target.value)}
+            >
+              <option value="">Selecione…</option>
+              {assignments.map((assignment) => (
+                <option key={assignment.id} value={assignment.id}>
+                  {assignment.subject} · prazo {formatDateBr(assignment.due_date)}
+                </option>
+              ))}
+            </SelectField>
+            <TextField
+              label="Data"
+              type="date"
+              value={submissionDate}
+              onChange={(event) => setSubmissionDate(event.target.value)}
+            />
+          </div>
+          {selectedAssignmentId && (
+            <RosterStates
+              selected
+              loading={studentsLoading}
+              error={studentsError}
+              empty={!studentsLoading && !studentsError && students.length === 0}
+            />
+          )}
+          {students.length > 0 && !canSaveSubmission && (
+            <Notice tone="info">Selecione a atividade e a data para registrar o status de entrega.</Notice>
+          )}
+          {students.length > 0 && (
+            <ul className="sz-roster">
+              {students.map((student) => (
+                <SubmissionRow
+                  key={student.id}
+                  student={student}
+                  rowState={rowStates[student.id]}
+                  canSave={canSaveSubmission}
+                  onStatusChange={(status) => updateRow(student.id, { status, message: null, isError: false })}
+                  onSave={() => handleSaveSubmission(student.id)}
                 />
-              </div>
-            </div>
-
-            {selectedAssignmentId && studentsLoading && (
-              <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                Carregando estudantes…
-              </p>
-            )}
-
-            {selectedAssignmentId && studentsError && (
-              <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-                {studentsError}
-              </p>
-            )}
-
-            {selectedAssignmentId &&
-              !studentsLoading &&
-              !studentsError &&
-              students.length === 0 && (
-                <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                  Nenhum estudante matriculado nesta turma.
-                </p>
-              )}
-
-            {students.length > 0 && !canSaveSubmission && (
-              <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                Selecione a atividade e a data para registrar o status de entrega.
-              </p>
-            )}
-
-            {students.length > 0 && (
-              <ul
-                style={{
-                  listStyle: 'none',
-                  margin: 0,
-                  padding: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 16,
-                }}
-              >
-                {students.map((student) => (
-                  <SubmissionRow
-                    key={student.id}
-                    student={student}
-                    rowState={rowStates[student.id]}
-                    canSave={canSaveSubmission}
-                    onStatusChange={(status) =>
-                      updateRow(student.id, { status, message: null, isError: false })
-                    }
-                    onSave={() => handleSaveSubmission(student.id)}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
-      </main>
-    </div>
+              ))}
+            </ul>
+          )}
+        </Section>
+      )}
+    </LancamentoLayout>
   )
+}
+
+function formatDateBr(value: string): string {
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('pt-BR')
 }
 
 function SubmissionRow({
@@ -520,78 +355,26 @@ function SubmissionRow({
   onStatusChange: (status: SubmissionStatusValue) => void
   onSave: () => void
 }) {
-  const statusId = useId()
-  const messageId = useId()
-
+  const nameId = useId()
   if (!rowState) return null
-
   return (
-    <li
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 16,
-        padding: '16px 20px',
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-      }}
-    >
-      <span style={{ flex: '1 1 200px', fontWeight: 600 }}>{student.name}</span>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <label htmlFor={statusId} style={{ fontSize: 13, fontWeight: 600 }}>
-          Status
-        </label>
-        <select
-          id={statusId}
+    <li>
+      <RosterRow
+        nameId={nameId}
+        name={student.name}
+        status={rowStatus(rowState)}
+        message={rowState.message}
+        onSave={onSave}
+        saveDisabled={!canSave}
+      >
+        <ChoiceGroup
+          label={`Entrega de ${student.name}`}
+          hideLabel
           value={rowState.status}
-          onChange={(event) => onStatusChange(event.target.value as SubmissionStatusValue)}
-          aria-describedby={rowState.message ? messageId : undefined}
-          style={{ ...fieldStyle, minWidth: 160 }}
-        >
-          {STATUS_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={rowState.saving || !canSave}
-        style={{
-          minHeight: 'var(--min-hit-target)',
-          minWidth: 'var(--min-hit-target)',
-          padding: '0 16px',
-          borderRadius: 'var(--radius-md)',
-          border: 'none',
-          background: 'var(--color-primary)',
-          color: 'var(--color-surface)',
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: rowState.saving || !canSave ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {rowState.saving ? 'Salvando…' : 'Salvar'}
-      </button>
-
-      <div
-        id={messageId}
-        role={rowState.isError ? 'alert' : 'status'}
-        aria-live="polite"
-        style={{
-          flexBasis: '100%',
-          minHeight: 20,
-          fontSize: 14,
-          color: rowState.isError ? 'var(--color-attention)' : 'var(--color-success)',
-        }}
-      >
-        {rowState.message}
-      </div>
+          onChange={onStatusChange}
+          options={STATUS_OPTIONS}
+        />
+      </RosterRow>
     </li>
   )
 }

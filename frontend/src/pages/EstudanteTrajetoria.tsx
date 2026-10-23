@@ -1,23 +1,36 @@
-import { useEffect, useId, useState } from 'react'
-import { Link, useNavigate, useParams, type NavigateFunction } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import {
   ApiError,
   getStudentTrajectoryDetail,
   openFollowUp,
-  type ObservationItem,
   type TrajectoryDetail,
 } from '../api/client'
-import { EvidenceCard } from '../components/EvidenceCard'
-import { Header } from '../components/Header'
+import {
+  Button,
+  ButtonLink,
+  CalmState,
+  ConcernFactor,
+  EvidenceCard,
+  Notice,
+  Page,
+  ScreenHead,
+  Section,
+  Skeleton,
+  Tag,
+  Timeline,
+  TrajectoryChart,
+  type Indicator,
+} from '../components/ui'
 
 type ChartIndicator = TrajectoryDetail['chart_indicator']
 type ChangeType = NonNullable<TrajectoryDetail['trajectory_change']>['type']
 
-const CHART_INDICATOR_LABEL: Record<ChartIndicator, string> = {
-  attendance_rate: 'Frequência',
-  grade_average: 'Nota média',
-  missing_assignments_count: 'Atividades pendentes',
+const CHART_INDICATOR: Record<ChartIndicator, { label: string; indicator: Indicator }> = {
+  attendance_rate: { label: 'Frequência', indicator: 'frequencia' },
+  grade_average: { label: 'Nota média', indicator: 'notas' },
+  missing_assignments_count: { label: 'Atividades pendentes', indicator: 'entregas' },
 }
 
 const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
@@ -27,12 +40,22 @@ const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
   COMBINED_DETERIORATION: 'Mudança combinada',
 }
 
-function formatIndicatorValue(indicator: ChartIndicator, value: string | null): string {
+const CONCERNING_KIND_LABEL: Record<NonNullable<TrajectoryDetail['concerning_factor']>['kind'], string> = {
+  ATTENDANCE: 'Sinal isolado em frequência',
+  GRADE: 'Sinal isolado em notas',
+  ASSIGNMENTS: 'Sinal isolado em atividades',
+  PEDAGOGICAL_OBSERVATION: 'Sinal isolado em registro pedagógico',
+}
+
+function toNumber(value: string | null): number | null {
+  return value === null ? null : Number(value)
+}
+
+function formatIndicatorValue(indicator: ChartIndicator, value: number | null): string {
   if (value === null) return 'Sem dado'
-  const num = Number(value)
-  if (indicator === 'attendance_rate') return `${Math.round(num * 100)}%`
-  if (indicator === 'grade_average') return num.toFixed(1)
-  return String(Math.round(num))
+  if (indicator === 'attendance_rate') return `${Math.round(value * 100)}%`
+  if (indicator === 'grade_average') return value.toFixed(1).replace('.', ',')
+  return String(Math.round(value))
 }
 
 function formatDateBr(value: string): string {
@@ -41,214 +64,23 @@ function formatDateBr(value: string): string {
   return date.toLocaleDateString('pt-BR')
 }
 
-const sectionStyle = { display: 'flex', flexDirection: 'column', gap: 16 } as const
-const cardStyle = {
-  background: 'var(--color-surface)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-md)',
-  padding: 'var(--spacing-card-padding)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 12,
-} as const
-const srOnlyStyle = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: 'hidden',
-  clip: 'rect(0, 0, 0, 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
-} as const
-
-// --- Chart --------------------------------------------------------------------------
-
-const CHART_WIDTH = 640
-const CHART_HEIGHT = 240
-const CHART_PADDING = { top: 20, right: 20, bottom: 32, left: 20 }
-
-function TrajectoryChart({ detail }: { detail: TrajectoryDetail }) {
-  const { chart_indicator: indicator, series, habitual_range: habitualRange, trajectory_change } =
-    detail
-  const indicatorLabel = CHART_INDICATOR_LABEL[indicator]
-  const chartTitleId = useId()
-
-  const numericSeries = series.map((point) => ({
-    ...point,
-    numericValue: point.value === null ? null : Number(point.value),
-  }))
-  const knownValues = numericSeries
-    .map((point) => point.numericValue)
-    .filter((value): value is number => value !== null)
-  const habitualLow = habitualRange ? Number(habitualRange.low) : null
-  const habitualHigh = habitualRange ? Number(habitualRange.high) : null
-
-  const allValues = [
-    ...knownValues,
-    ...(habitualLow !== null ? [habitualLow] : []),
-    ...(habitualHigh !== null ? [habitualHigh] : []),
-  ]
-  const minValue = allValues.length > 0 ? Math.min(...allValues) : 0
-  const maxValue = allValues.length > 0 ? Math.max(...allValues) : 1
-  const valueSpan = maxValue - minValue || 1
-
-  const innerWidth = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right
-  const innerHeight = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom
-
-  const xForIndex = (index: number) =>
-    series.length <= 1
-      ? CHART_PADDING.left + innerWidth / 2
-      : CHART_PADDING.left + (index / (series.length - 1)) * innerWidth
-
-  const yForValue = (value: number) =>
-    CHART_PADDING.top + innerHeight - ((value - minValue) / valueSpan) * innerHeight
-
-  const linePoints = numericSeries
-    .map((point, index) =>
-      point.numericValue === null ? null : `${xForIndex(index)},${yForValue(point.numericValue)}`,
-    )
-    .filter((point): point is string => point !== null)
-    .join(' ')
-
-  const changePointIndex =
-    trajectory_change !== null
-      ? series.findIndex((point) => point.period_id === trajectory_change.period_id)
-      : -1
-  const changePoint =
-    changePointIndex >= 0 ? numericSeries[changePointIndex] : undefined
-
-  const accessibleName =
-    `Gráfico de ${indicatorLabel.toLowerCase()} por bimestre` +
-    (trajectory_change !== null ? `, com mudança destacada em ${changePoint?.period_label ?? ''}` : '')
-
-  return (
-    <div>
-      <div style={{ position: 'relative' }}>
-        <svg
-          role="img"
-          aria-labelledby={chartTitleId}
-          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-          style={{ width: '100%', height: 'auto', display: 'block' }}
-        >
-          <title id={chartTitleId}>{accessibleName}</title>
-
-          {habitualLow !== null && habitualHigh !== null && (
-            <rect
-              x={CHART_PADDING.left}
-              y={yForValue(habitualHigh)}
-              width={innerWidth}
-              height={Math.max(yForValue(habitualLow) - yForValue(habitualHigh), 1)}
-              fill="var(--color-primary)"
-              opacity={0.12}
-            />
-          )}
-
-          {linePoints && (
-            <polyline
-              points={linePoints}
-              fill="none"
-              stroke="var(--color-primary)"
-              strokeWidth={2}
-            />
-          )}
-
-          {numericSeries.map((point, index) =>
-            point.numericValue === null ? null : (
-              <circle
-                key={point.period_id}
-                cx={xForIndex(index)}
-                cy={yForValue(point.numericValue)}
-                r={4}
-                fill="var(--color-primary)"
-              />
-            ),
-          )}
-
-          {changePoint && changePoint.numericValue !== null && (
-            <circle
-              cx={xForIndex(changePointIndex)}
-              cy={yForValue(changePoint.numericValue)}
-              r={8}
-              fill="var(--color-attention)"
-              aria-hidden="true"
-            />
-          )}
-
-          {series.map((point, index) => (
-            <text
-              key={point.period_id}
-              x={xForIndex(index)}
-              y={CHART_HEIGHT - 8}
-              fontSize={11}
-              textAnchor="middle"
-              fill="var(--color-text-secondary)"
-            >
-              {point.period_label}
-            </text>
-          ))}
-        </svg>
-
-        {changePoint && changePoint.numericValue !== null && (
-          <button
-            type="button"
-            aria-label={`Mudança detectada em ${changePoint.period_label}: ${trajectory_change?.description ?? ''}`}
-            style={{
-              position: 'absolute',
-              left: `${(xForIndex(changePointIndex) / CHART_WIDTH) * 100}%`,
-              top: `${(yForValue(changePoint.numericValue) / CHART_HEIGHT) * 100}%`,
-              transform: 'translate(-50%, -50%)',
-              width: 'var(--min-hit-target)',
-              height: 'var(--min-hit-target)',
-              borderRadius: '50%',
-              border: '2px solid var(--color-surface)',
-              background: 'transparent',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          />
-        )}
-      </div>
-
-      {/* WCAG 1.1.1 text-table alternative to the chart above. */}
-      <table style={srOnlyStyle}>
-        <caption>{accessibleName}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Bimestre</th>
-            <th scope="col">{indicatorLabel}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {series.map((point) => (
-            <tr key={point.period_id}>
-              <td>{point.period_label}</td>
-              <td>{formatIndicatorValue(indicator, point.value)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-// --- Page -----------------------------------------------------------------------------
-
 type LoadState =
   | { status: 'loading' }
   | { status: 'loaded'; detail: TrajectoryDetail }
   | { status: 'not_found' }
   | { status: 'error' }
 
+/**
+ * Trajetória do Estudante (RF-19). Visual: design system `TelaTrajetoria`,
+ * escopo "API atual": um indicador escolhido pelo backend, faixa habitual
+ * fixa, fator preocupante só quando não há mudança, registros só com
+ * observações.
+ */
 export function EstudanteTrajetoria() {
   const { studentId } = useParams<{ studentId: string }>()
   const { token } = useAuth()
-  const navigate = useNavigate()
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
   const [loadAttempt, setLoadAttempt] = useState(0)
-  const [concerningFactorOpen, setConcerningFactorOpen] = useState(false)
-  const concerningFactorContentId = useId()
 
   useEffect(() => {
     if (!token || !studentId) return
@@ -272,111 +104,66 @@ export function EstudanteTrajetoria() {
     }
   }, [token, studentId, loadAttempt])
 
+  const student = loadState.status === 'loaded' ? loadState.detail.student : null
+
   return (
-    <div>
-      <Header />
-      <main
-        style={{
-          maxWidth: 'var(--spacing-content-max-width)',
-          margin: '0 auto',
-          padding: 'var(--spacing-section-gap) 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 32,
-        }}
+    <Page>
+      {/* spec-ui-1: the detail endpoint carries the student's name and
+          classroom; the generic title stays as the fallback while loading. */}
+      <ScreenHead
+        kicker={student?.classroom_name ? `Coordenação pedagógica › ${student.classroom_name}` : 'Coordenação pedagógica'}
+        title={student ? student.name : 'Trajetória do estudante'}
+        display
+        center
       >
-        {/* spec-ui-1: the detail endpoint now carries the student's name and
-            classroom; the generic title stays as the fallback while loading. */}
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>
-            {loadState.status === 'loaded' && loadState.detail.student
-              ? loadState.detail.student.name
-              : 'Trajetória do estudante'}
-          </h1>
-          {loadState.status === 'loaded' && loadState.detail.student?.classroom_name && (
-            <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-              {loadState.detail.student.classroom_name}
-            </p>
-          )}
+        {loadState.status === 'loaded' && (
+          <div className="sz-head-row">
+            {student?.classroom_name && <Tag>{student.classroom_name}</Tag>}
+            {loadState.detail.open_follow_up_id ? (
+              <Tag>Com acompanhamento aberto</Tag>
+            ) : (
+              <Tag>Sem acompanhamento</Tag>
+            )}
+          </div>
+        )}
+      </ScreenHead>
+
+      {loadState.status === 'loading' && (
+        <div className="sz-section">
+          <Skeleton heights={[280, 120, 72]} />
         </div>
+      )}
 
-        {loadState.status === 'loading' && (
-          <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                style={{
-                  height: i === 0 ? 220 : 64,
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-border)',
-                  opacity: 0.4,
-                }}
-              />
-            ))}
+      {loadState.status === 'not_found' && (
+        <div className="sz-section" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p className="sz-muted">Estudante não encontrado.</p>
+          <div>
+            <ButtonLink to="/home" variant="secondary" icon="voltar">
+              Voltar para a Home
+            </ButtonLink>
           </div>
-        )}
+        </div>
+      )}
 
-        {loadState.status === 'not_found' && (
-          <div style={sectionStyle}>
-            <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-              Estudante não encontrado.
-            </p>
-            <div>
-              <Link
-                to="/home"
-                style={{
-                  minHeight: 'var(--min-hit-target)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  color: 'var(--color-primary)',
-                }}
-              >
-                Voltar para a Home
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {loadState.status === 'error' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-              Não foi possível carregar os dados agora.
-            </p>
-            <div>
-              <button
-                type="button"
-                onClick={() => setLoadAttempt((n) => n + 1)}
-                style={{
-                  minHeight: 'var(--min-hit-target)',
-                  minWidth: 'var(--min-hit-target)',
-                  padding: '0 16px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-surface)',
-                  color: 'var(--color-text)',
-                  fontSize: 15,
-                  cursor: 'pointer',
-                }}
-              >
+      {loadState.status === 'error' && (
+        <div className="sz-section">
+          <Notice
+            tone="attention"
+            action={
+              <Button variant="secondary" onClick={() => setLoadAttempt((n) => n + 1)}>
                 Tentar novamente
-              </button>
-            </div>
-          </div>
-        )}
+              </Button>
+            }
+          >
+            Não foi possível carregar os dados agora.
+          </Notice>
+        </div>
+      )}
 
-        {loadState.status === 'loaded' && studentId && (
-          <TrajectoryDetailContent
-            detail={loadState.detail}
-            concerningFactorOpen={concerningFactorOpen}
-            setConcerningFactorOpen={setConcerningFactorOpen}
-            concerningFactorContentId={concerningFactorContentId}
-            studentId={studentId}
-            token={token}
-            navigate={navigate}
-          />
-        )}
-      </main>
-    </div>
+      {loadState.status === 'loaded' && studentId && (
+        <TrajectoryDetailContent detail={loadState.detail} studentId={studentId} token={token} />
+      )}
+    </Page>
   )
 }
 
@@ -384,33 +171,40 @@ type OpenFollowUpState = { status: 'idle' } | { status: 'submitting' } | { statu
 
 function TrajectoryDetailContent({
   detail,
-  concerningFactorOpen,
-  setConcerningFactorOpen,
-  concerningFactorContentId,
   studentId,
   token,
-  navigate,
 }: {
   detail: TrajectoryDetail
-  concerningFactorOpen: boolean
-  setConcerningFactorOpen: (updater: (open: boolean) => boolean) => void
-  concerningFactorContentId: string
   studentId: string
   token: string | null
-  navigate: NavigateFunction
 }) {
-  const hasChange = detail.trajectory_change !== null
+  const navigate = useNavigate()
+  const change = detail.trajectory_change
+  const hasChange = change !== null
   const hasConcerningFactor = detail.concerning_factor !== null
   const isCalm = !hasChange && !hasConcerningFactor
   const [openFollowUpState, setOpenFollowUpState] = useState<OpenFollowUpState>({ status: 'idle' })
 
-  const handleOpenFollowUp = () => {
-    if (!token || detail.trajectory_change === null) return
+  const chart = CHART_INDICATOR[detail.chart_indicator]
+  const points = detail.series.map((point) => ({
+    key: point.period_id,
+    label: point.period_label,
+    value: toNumber(point.value),
+  }))
+  const changeIndex = change ? detail.series.findIndex((point) => point.period_id === change.period_id) : -1
+  const changePeriodLabel = changeIndex >= 0 ? detail.series[changeIndex].period_label : undefined
+  const band = detail.habitual_range
+    ? { low: Number(detail.habitual_range.low), high: Number(detail.habitual_range.high) }
+    : null
+  const summary =
+    `Gráfico de ${chart.label.toLowerCase()} por bimestre` +
+    (hasChange ? `, com mudança destacada em ${changePeriodLabel ?? ''}` : '') +
+    ', comparado à faixa habitual do próprio estudante.'
+
+  function handleOpenFollowUp() {
+    if (!token || change === null) return
     setOpenFollowUpState({ status: 'submitting' })
-    openFollowUp(token, {
-      student_id: studentId,
-      trajectory_change_id: detail.trajectory_change.id,
-    })
+    openFollowUp(token, { student_id: studentId, trajectory_change_id: change.id })
       .then((followUp) => {
         navigate(`/acompanhamentos/${followUp.id}`)
       })
@@ -419,162 +213,106 @@ function TrajectoryDetailContent({
       })
   }
 
+  function goToEvidence() {
+    const card = document.getElementById('evidencia-mudanca')
+    if (!card) return
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    card.focus({ preventScroll: true })
+  }
+
   return (
     <>
       {/* Chart section — reached first via keyboard. */}
-      <section style={sectionStyle}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-          {CHART_INDICATOR_LABEL[detail.chart_indicator]} ao longo do tempo
-        </h2>
-        <TrajectoryChart detail={detail} />
-      </section>
-
-      {/* Evidence section — only when a change was detected. No `linkTo` here:
-          this page already *is* the trajectory destination that link would
-          point at (spec Code Map). */}
-      {hasChange && (
-        <EvidenceCard
-          title={CHANGE_TYPE_LABEL[detail.trajectory_change!.type]}
-          description={detail.trajectory_change!.description}
-          detectedAt={detail.trajectory_change!.detected_at}
-          evidence={detail.evidence}
+      <Section id="trajetoria-grafico" title="Trajetória · últimos bimestres">
+        <TrajectoryChart
+          summary={summary}
+          indicator={chart.indicator}
+          indicatorLabel={chart.label}
+          points={points}
+          band={band}
+          bandLabel={detail.student ? `Faixa habitual de ${detail.student.name.split(' ')[0]}` : 'Faixa habitual do estudante'}
+          changeIndex={changeIndex >= 0 ? changeIndex : undefined}
+          changeDescription={change?.description}
+          format={(value) => formatIndicatorValue(detail.chart_indicator, value)}
+          onChangePoint={goToEvidence}
         />
+      </Section>
+
+      {/* Evidence section — only when a change was detected. No link here:
+          this page already *is* the trajectory destination. */}
+      {change && (
+        <Section id="trajetoria-mudanca" title="O que mudou">
+          <EvidenceCard
+            id="evidencia-mudanca"
+            kicker={changePeriodLabel ? `Mudança detectada · ${changePeriodLabel}` : 'Mudança detectada'}
+            title={CHANGE_TYPE_LABEL[change.type]}
+            description={change.description}
+            evidence={detail.evidence}
+          />
+        </Section>
       )}
 
-      {/* Concerning-factor section — exactly one confirmed signal, closed by default. */}
-      {hasConcerningFactor && !hasChange && (
-        <section style={cardStyle}>
-          <h2 style={{ margin: 0 }}>
-            <button
-              type="button"
-              aria-expanded={concerningFactorOpen}
-              aria-controls={concerningFactorContentId}
-              onClick={() => setConcerningFactorOpen((open) => !open)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                minHeight: 'var(--min-hit-target)',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                fontSize: 18,
-                fontWeight: 700,
-                color: 'var(--color-text)',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <span>Fator preocupante</span>
-              <span aria-hidden="true">{concerningFactorOpen ? '−' : '+'}</span>
-            </button>
-          </h2>
-          {concerningFactorOpen && (
-            <div id={concerningFactorContentId}>
-              <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-                {detail.concerning_factor!.description}
-              </p>
-            </div>
-          )}
-        </section>
+      {/* Concerning factor — one isolated signal, closed by default. */}
+      {detail.concerning_factor && !hasChange && (
+        <Section id="trajetoria-observacao" title="Em observação">
+          <ConcernFactor title={CONCERNING_KIND_LABEL[detail.concerning_factor.kind]}>
+            <p>{detail.concerning_factor.description}</p>
+            <p>Um único sinal fora da faixa habitual ainda não caracteriza mudança de padrão.</p>
+          </ConcernFactor>
+        </Section>
       )}
 
-      {/* Calm-state card — equal visual weight, replaces evidence/concerning sections. */}
+      {/* Calm state — same visual care as a change, since it is most cases. */}
       {isCalm && (
-        <section style={cardStyle}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Trajetória estável</h2>
-          <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
+        <Section id="trajetoria-situacao" title="Situação atual">
+          <CalmState title="Trajetória estável">
             Nenhuma mudança relevante detectada dentro do período vigente.
-          </p>
-        </section>
+          </CalmState>
+        </Section>
       )}
 
-      {/* Observations timeline. */}
-      <section style={sectionStyle}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Registros pedagógicos recentes</h2>
+      <Section id="trajetoria-registros" title="Registros pedagógicos recentes">
         {detail.observations.length === 0 ? (
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Nenhum registro pedagógico nos últimos 12 meses.
-          </p>
+          <p className="sz-muted">Nenhum registro pedagógico nos últimos 12 meses.</p>
         ) : (
-          <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {detail.observations.map((observation: ObservationItem, index) => (
-              <li
-                key={`${observation.date}-${index}`}
-                style={{
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                }}
-              >
-                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                  {formatDateBr(observation.date)}
-                </span>
-                <span>{observation.text}</span>
-              </li>
-            ))}
-          </ol>
+          <Timeline
+            items={detail.observations.map((observation, index) => ({
+              key: `${observation.date}-${index}`,
+              date: formatDateBr(observation.date).slice(0, 5),
+              text: observation.text,
+              indicator: 'observacao' as const,
+            }))}
+          />
         )}
-      </section>
+      </Section>
 
       {/* Follow-up action — enabled once a change was detected (Story 4.1).
           spec-ui-1: when the user already has an open follow-up for this
           student, link to it instead of offering to open another one. */}
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
-        {detail.open_follow_up_id ? (
-          <Link
-            to={`/acompanhamentos/${detail.open_follow_up_id}`}
-            style={{
-              minHeight: 'var(--min-hit-target)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '0 20px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-primary)',
-              color: 'var(--color-surface)',
-              fontWeight: 700,
-              textDecoration: 'none',
-            }}
-          >
-            Ver acompanhamento
-          </Link>
-        ) : (
-          <>
-            <button
-              type="button"
+      <div className="sz-actions" style={{ flexDirection: 'column', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <ButtonLink to="/lancamento/observacoes" variant="secondary" icon="observacao">
+            Registrar observação
+          </ButtonLink>
+          {detail.open_follow_up_id ? (
+            <ButtonLink to={`/acompanhamentos/${detail.open_follow_up_id}`} icon="seta">
+              Ver acompanhamento
+            </ButtonLink>
+          ) : (
+            <Button
+              icon="mais"
               disabled={!hasChange || openFollowUpState.status === 'submitting'}
               onClick={handleOpenFollowUp}
-              title={
-                hasChange
-                  ? undefined
-                  : 'Acompanhamento vinculado a evidências requer uma mudança detectada.'
-              }
-              style={{
-                minHeight: 'var(--min-hit-target)',
-                padding: '0 20px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--color-border)',
-                background: hasChange ? 'var(--color-primary)' : 'var(--color-surface)',
-                color: hasChange ? 'var(--color-surface)' : 'var(--color-text-secondary)',
-                fontSize: 15,
-                cursor: hasChange && openFollowUpState.status !== 'submitting' ? 'pointer' : 'not-allowed',
-              }}
+              title={hasChange ? undefined : 'Acompanhamento vinculado a evidências requer uma mudança detectada.'}
             >
               {openFollowUpState.status === 'submitting' ? 'Abrindo…' : 'Abrir acompanhamento'}
-            </button>
-            {openFollowUpState.status === 'error' && (
-              <p role="alert" style={{ margin: 0, color: 'var(--color-attention)' }}>
-                Não foi possível abrir o acompanhamento agora.
-              </p>
-            )}
-          </>
+            </Button>
+          )}
+        </div>
+        {openFollowUpState.status === 'error' && (
+          <Notice tone="attention">Não foi possível abrir o acompanhamento agora.</Notice>
         )}
-      </section>
+      </div>
     </>
   )
 }
