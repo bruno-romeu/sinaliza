@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from app.application.followups.change_follow_up_status import ChangeFollowUpStatusService
 from app.application.followups.errors import (
@@ -45,14 +45,25 @@ from app.presentation.schemas.trajectory import EvidenceItemOut, TrajectoryChang
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
-@router.post("/follow-ups", response_model=FollowUpOut, status_code=201)
+@router.post(
+    "/follow-ups",
+    response_model=FollowUpOut,
+    status_code=201,
+    responses={
+        200: {
+            "model": FollowUpOut,
+            "description": "Acompanhamento aberto já existente, reaproveitado.",
+        }
+    },
+)
 def open_follow_up(
     payload: OpenFollowUpRequest,
+    response: Response,
     current_user: CurrentUser = Depends(get_current_user),
     service: OpenFollowUpService = Depends(get_open_follow_up_service),
 ) -> FollowUpOut:
     try:
-        follow_up = service.execute(
+        result = service.execute(
             student_id=payload.student_id,
             trajectory_change_id=payload.trajectory_change_id,
             responsible_user_id=uuid.UUID(current_user.id),
@@ -70,6 +81,11 @@ def open_follow_up(
             message="A mudança de trajetória não pertence a este estudante.",
         ) from exc
 
+    follow_up = result.follow_up
+    # 201 when a new FollowUp was created, 200 when an open one was reused
+    # (spec-ui-1): the body is the same shape either way.
+    if not result.created:
+        response.status_code = 200
     return FollowUpOut(
         id=follow_up.id,
         student_id=follow_up.student_id,

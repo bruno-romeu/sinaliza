@@ -33,6 +33,7 @@ from app.presentation.schemas.trajectory import (
     HabitualRangeOut,
     ObservationItemOut,
     TrajectoryChangeOut,
+    StudentSummaryOut,
     TrajectoryDetailOut,
     TrajectoryOut,
     TrajectorySeriesPointOut,
@@ -170,4 +171,14 @@ def get_student_trajectory_detail(
             ObservationItemOut(date=observation.date, text=observation.text)
             for observation in result.observations
         ],
+        student=(
+            StudentSummaryOut(
+                id=result.student.id,
+                name=result.student.name,
+                classroom_name=result.student.classroom_name,
+            )
+            if result.student is not None
+            else None
+        ),
+        open_follow_up_id=result.open_follow_up_id,
     )

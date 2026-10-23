@@ -44,6 +44,20 @@ class FollowUpRepositoryPort(Protocol):
         `TrajectoryChange`+`TrajectoryChangeSource`, AD-7)."""
         ...
 
+    def find_open_for_student(
+        self, student_id: uuid.UUID, responsible_user_id: uuid.UUID
+    ) -> FollowUp | None:
+        """The most recent non-`ENCERRADO` `FollowUp` for this student whose
+        responsible user is `responsible_user_id`, or `None` (spec-ui-1).
+        Scoped to the responsible user because writes on a `FollowUp` are
+        (RF-22, epic-4-retro-item-18)."""
+        ...
+
+    def add_evidence(self, evidence: FollowUpEvidence) -> FollowUpEvidence:
+        """Plain insert+commit of one extra `FollowUpEvidence` row on an
+        existing `FollowUp` (spec-ui-1)."""
+        ...
+
     def get_by_id(self, follow_up_id: uuid.UUID) -> FollowUp | None:
         """Loads one `FollowUp` by id for `GetFollowUpService` — `None` when
         it does not exist (spec I/O Matrix, "Nonexistent follow-up")."""
