@@ -149,7 +149,7 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
 
     // The newly cadastrada atividade appears in the atividade selector.
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Matemática — 2026-09-30' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'Matemática · prazo 30/09/2026' })).toBeInTheDocument()
     })
   })
 
@@ -166,14 +166,14 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
     fireEvent.change(screen.getByLabelText('Turma'), { target: { value: 'classroom-1' } })
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Matemática — 2026-09-30' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'Matemática · prazo 30/09/2026' })).toBeInTheDocument()
     })
     fireEvent.change(screen.getByLabelText('Atividade'), { target: { value: 'assignment-1' } })
     fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-09-30' } })
 
     await screen.findByText('Estudante Teste')
 
-    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'PARTIAL' } })
+    fireEvent.click(screen.getByLabelText('Parcial'))
 
     const saveButton = screen.getByRole('button', { name: 'Salvar' })
     expect(saveButton).not.toBeDisabled()

@@ -98,7 +98,7 @@ describe('Notas — client-side out-of-range validation (spec I/O Matrix "Out-of
     })
     fireEvent.change(screen.getByLabelText('Período letivo'), { target: { value: 'period-1' } })
 
-    const valorInput = screen.getByLabelText('Valor')
+    const valorInput = screen.getByLabelText(/Nota de/)
     fireEvent.change(valorInput, { target: { value: '15' } })
 
     const saveButton = screen.getByRole('button', { name: 'Salvar' })
@@ -140,7 +140,7 @@ describe('Notas — client-side out-of-range validation (spec I/O Matrix "Out-of
     fireEvent.change(screen.getByLabelText('Período letivo'), { target: { value: 'period-1' } })
     fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-09-24' } })
 
-    const valorInput = screen.getByLabelText('Valor')
+    const valorInput = screen.getByLabelText(/Nota de/)
     fireEvent.change(valorInput, { target: { value: '8.5' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import {
   ApiError,
@@ -9,7 +9,8 @@ import {
   type Classroom,
   type Student,
 } from '../../api/client'
-import { Header } from '../../components/Header'
+import { Button, ChoiceGroup, RosterRow, Section, SelectField, TextField } from '../../components/ui'
+import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 type AttendanceStatusValue = AttendanceCreateRequest['status']
 
@@ -25,16 +26,6 @@ function todayIsoDate(): string {
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
-}
-
-const fieldStyle: CSSProperties = {
-  minHeight: 'var(--min-hit-target)',
-  padding: '0 12px',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface)',
-  color: 'var(--color-text)',
-  fontSize: 15,
 }
 
 interface RowState {
@@ -53,8 +44,6 @@ interface RowState {
  */
 export function Presenca() {
   const { token } = useAuth()
-  const classroomSelectId = useId()
-  const dateInputId = useId()
 
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [classroomsError, setClassroomsError] = useState<string | null>(null)
@@ -140,107 +129,72 @@ export function Presenca() {
   }
 
   return (
-    <div>
-      <Header />
-      <main
-        style={{
-          maxWidth: 'var(--spacing-content-max-width)',
-          margin: '0 auto',
-          padding: 'var(--spacing-section-gap) 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 32,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>Lançamento de presença</h1>
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Selecione a turma e a data para registrar a presença de cada estudante.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
-            <label htmlFor={classroomSelectId} style={{ fontWeight: 600 }}>
-              Turma
-            </label>
-            <select
-              id={classroomSelectId}
-              value={selectedClassroomId}
-              onChange={(event) => setSelectedClassroomId(event.target.value)}
-              style={fieldStyle}
-            >
-              <option value="">Selecione…</option>
-              {classrooms.map((classroom) => (
-                <option key={classroom.id} value={classroom.id}>
-                  {classroom.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 180 }}>
-            <label htmlFor={dateInputId} style={{ fontWeight: 600 }}>
-              Data
-            </label>
-            <input
-              id={dateInputId}
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              style={fieldStyle}
-            />
-          </div>
-        </div>
-
-        {classroomsError && (
-          <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-            {classroomsError}
-          </p>
-        )}
-
-        {selectedClassroomId && studentsLoading && (
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>Carregando estudantes…</p>
-        )}
-
-        {selectedClassroomId && studentsError && (
-          <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-            {studentsError}
-          </p>
-        )}
-
-        {selectedClassroomId && !studentsLoading && !studentsError && students.length === 0 && (
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Nenhum estudante matriculado nesta turma.
-          </p>
-        )}
-
-        {students.length > 0 && (
-          <ul
-            style={{
-              listStyle: 'none',
-              margin: 0,
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-            }}
+    <LancamentoLayout
+      title="Presença"
+      description="Selecione a turma e a data para registrar a presença de cada estudante. Cada linha salva sozinha."
+      contextTitle="Turma e data"
+      contextError={classroomsError}
+      context={
+        <>
+          <SelectField
+            label="Turma"
+            value={selectedClassroomId}
+            onChange={(event) => setSelectedClassroomId(event.target.value)}
           >
+            <option value="">Selecione…</option>
+            {classrooms.map((classroom) => (
+              <option key={classroom.id} value={classroom.id}>
+                {classroom.name}
+              </option>
+            ))}
+          </SelectField>
+          <TextField label="Data" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+        </>
+      }
+    >
+      <Section id="lancamento-alunos" title="Estudantes">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <p className="sz-muted">Todos começam como "Presente". Ajuste quem faltou e salve linha por linha.</p>
+          {students.length > 0 && (
+            <Button
+              variant="quiet"
+              icon="check"
+              onClick={() =>
+                setRowStates((prev) =>
+                  Object.fromEntries(
+                    Object.entries(prev).map(([id, row]) => [
+                      id,
+                      row.saving ? row : { ...row, status: 'PRESENT' as AttendanceStatusValue },
+                    ]),
+                  ),
+                )
+              }
+            >
+              Marcar todos como presentes
+            </Button>
+          )}
+        </div>
+        <RosterStates
+          selected={Boolean(selectedClassroomId)}
+          loading={studentsLoading}
+          error={studentsError}
+          empty={!studentsLoading && !studentsError && students.length === 0}
+        />
+        {students.length > 0 && (
+          <ul className="sz-roster">
             {students.map((student) => (
               <AttendanceRow
                 key={student.id}
                 student={student}
                 rowState={rowStates[student.id]}
-                onStatusChange={(status) =>
-                  updateRow(student.id, { status, message: null, isError: false })
-                }
+                onStatusChange={(status) => updateRow(student.id, { status, message: null, isError: false })}
                 onSave={() => handleSave(student.id)}
               />
             ))}
           </ul>
         )}
-      </main>
-    </div>
+      </Section>
+    </LancamentoLayout>
   )
 }
 
@@ -255,78 +209,25 @@ function AttendanceRow({
   onStatusChange: (status: AttendanceStatusValue) => void
   onSave: () => void
 }) {
-  const statusId = useId()
-  const messageId = useId()
-
+  const nameId = useId()
   if (!rowState) return null
-
   return (
-    <li
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 16,
-        padding: '16px 20px',
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-      }}
-    >
-      <span style={{ flex: '1 1 200px', fontWeight: 600 }}>{student.name}</span>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <label htmlFor={statusId} style={{ fontSize: 13, fontWeight: 600 }}>
-          Status
-        </label>
-        <select
-          id={statusId}
+    <li>
+      <RosterRow
+        nameId={nameId}
+        name={student.name}
+        status={rowStatus(rowState)}
+        message={rowState.message}
+        onSave={onSave}
+      >
+        <ChoiceGroup
+          label={`Presença de ${student.name}`}
+          hideLabel
           value={rowState.status}
-          onChange={(event) => onStatusChange(event.target.value as AttendanceStatusValue)}
-          aria-describedby={rowState.message ? messageId : undefined}
-          style={{ ...fieldStyle, minWidth: 200 }}
-        >
-          {STATUS_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={rowState.saving}
-        style={{
-          minHeight: 'var(--min-hit-target)',
-          minWidth: 'var(--min-hit-target)',
-          padding: '0 16px',
-          borderRadius: 'var(--radius-md)',
-          border: 'none',
-          background: 'var(--color-primary)',
-          color: 'var(--color-surface)',
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: rowState.saving ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {rowState.saving ? 'Salvando…' : 'Salvar'}
-      </button>
-
-      <div
-        id={messageId}
-        role={rowState.isError ? 'alert' : 'status'}
-        aria-live="polite"
-        style={{
-          flexBasis: '100%',
-          minHeight: 20,
-          fontSize: 14,
-          color: rowState.isError ? 'var(--color-attention)' : 'var(--color-success)',
-        }}
-      >
-        {rowState.message}
-      </div>
+          onChange={onStatusChange}
+          options={STATUS_OPTIONS}
+        />
+      </RosterRow>
     </li>
   )
 }

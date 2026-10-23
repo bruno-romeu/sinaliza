@@ -26,6 +26,9 @@ interface AuthContextValue {
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  /** true when the last session ended because the API rejected the token
+   * (`invalid_token`), so the login screen can say why the user is there. */
+  sessionExpired: boolean
 }
 
 const STORAGE_KEY = 'sinaliza.session'
@@ -62,12 +65,14 @@ function readStoredSession(): StoredSession | null {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSession | null>(() => readStoredSession())
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await loginRequest({ email, password })
     const next: StoredSession = { token: response.access_token, user: response.user }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     setSession(next)
+    setSessionExpired(false)
   }, [])
 
   const logout = useCallback(() => {
@@ -81,7 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Registered once for the provider's lifetime and torn down on unmount, so
   // a stale provider (e.g. between tests) can never keep handling responses.
   useEffect(() => {
-    setUnauthorizedHandler(logout)
+    setUnauthorizedHandler(() => {
+      setSessionExpired(true)
+      logout()
+    })
     return () => setUnauthorizedHandler(null)
   }, [logout])
 
@@ -92,8 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: session !== null,
       login,
       logout,
+      sessionExpired,
     }),
-    [session, login, logout],
+    [session, login, logout, sessionExpired],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

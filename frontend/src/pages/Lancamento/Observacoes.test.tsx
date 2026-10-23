@@ -76,10 +76,11 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
 
     await screen.findByText('Estudante Teste')
 
-    const saveButton = screen.getByRole('button', { name: 'Salvar' })
+    fireEvent.click(screen.getByRole('button', { name: 'Escrever observação' }))
+    const saveButton = screen.getByRole('button', { name: 'Salvar observação' })
     expect(saveButton).toBeDisabled()
 
-    const observacaoTextarea = screen.getByLabelText('Observação')
+    const observacaoTextarea = screen.getByLabelText(/Observação sobre/)
     fireEvent.change(observacaoTextarea, { target: { value: '   ' } })
     expect(saveButton).toBeDisabled()
 
@@ -105,11 +106,12 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
 
     await screen.findByText('Estudante Teste')
 
-    fireEvent.change(screen.getByLabelText('Observação'), {
+    fireEvent.click(screen.getByRole('button', { name: 'Escrever observação' }))
+    fireEvent.change(screen.getByLabelText(/Observação sobre/), {
       target: { value: 'Participou ativamente da aula e ajudou colegas.' },
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar observação' }))
 
     await screen.findByText('Registro salvo.')
 
