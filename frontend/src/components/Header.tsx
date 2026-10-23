@@ -1,114 +1,51 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { Button, ButtonLink } from './ui/Button'
+import { initials } from './ui/FollowupCard'
+import { Icon } from './ui/Icon'
 
 /**
- * Simple header reused by every authenticated screen: the user's name plus a
- * link back to Home — no persistent side navigation (DESIGN.md Layout &
- * Spacing; spec Boundaries & Constraints).
+ * Cabeçalho de todas as telas autenticadas (design system `AppHeader`):
+ * wordmark, volta à Home fora dela, uma única ação "Lançar registro" e a
+ * pessoa autenticada. Sem navegação lateral.
  */
 export function Header() {
   const { user, logout } = useAuth()
+  const { pathname } = useLocation()
+  const onHome = pathname === '/home'
+  const onLancamento = pathname.startsWith('/lancamento')
 
   return (
-    <header
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '16px 24px',
-        borderBottom: '1px solid var(--color-border)',
-        background: 'var(--color-surface)',
-      }}
-    >
-      <Link
-        to="/home"
-        style={{
-          color: 'var(--color-primary)',
-          fontWeight: 700,
-          fontSize: 18,
-          textDecoration: 'none',
-          minHeight: 'var(--min-hit-target)',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        Sinaliza
-      </Link>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        {/* "Lançamento" is reached from a global navigation action, not
-            contextually per-screen (spec Code Map / EXPERIENCE.md IA). */}
-        <Link
-          to="/lancamento/presenca"
-          style={{
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            minHeight: 'var(--min-hit-target)',
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          Lançamento de presença
+    <div className="sz-page" style={{ paddingBottom: 0 }}>
+      <header className="sz-header">
+        <Link className="sz-wordmark" to="/home">
+          <span className="sz-wordmark-dot" aria-hidden="true" />
+          Sinaliza
         </Link>
-        <Link
-          to="/lancamento/notas"
-          style={{
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            minHeight: 'var(--min-hit-target)',
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          Lançamento de notas
-        </Link>
-        <Link
-          to="/lancamento/atividades"
-          style={{
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            minHeight: 'var(--min-hit-target)',
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          Lançamento de atividades
-        </Link>
-        <Link
-          to="/lancamento/observacoes"
-          style={{
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            minHeight: 'var(--min-hit-target)',
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          Lançamento de observações
-        </Link>
-        <span>{user?.name}</span>
-        <button
-          type="button"
-          onClick={logout}
-          style={{
-            minHeight: 'var(--min-hit-target)',
-            minWidth: 'var(--min-hit-target)',
-            padding: '0 16px',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--color-border)',
-            background: 'var(--color-surface)',
-            color: 'var(--color-text)',
-            fontSize: 14,
-            cursor: 'pointer',
-          }}
-        >
-          Sair
-        </button>
-      </div>
-    </header>
+        <nav className="sz-header-nav" aria-label="Navegação principal">
+          {!onHome && (
+            <ButtonLink to="/home" variant="quiet" icon="voltar">
+              Voltar à Home
+            </ButtonLink>
+          )}
+          {!onLancamento && (
+            <ButtonLink to="/lancamento/presenca" variant="secondary" icon="mais">
+              Lançar registro
+            </ButtonLink>
+          )}
+          {user && (
+            <span className="sz-header-user">
+              <span className="sz-avatar" aria-hidden="true">
+                {initials(user.name)}
+              </span>
+              <span className="sz-header-name">{user.name}</span>
+            </span>
+          )}
+          <Button variant="quiet" onClick={logout} aria-label="Sair">
+            <Icon name="sair" size={18} />
+          </Button>
+        </nav>
+      </header>
+    </div>
   )
 }

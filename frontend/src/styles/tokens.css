@@ -1,61 +1,245 @@
-/* Design tokens lifted from docs/ux-designs/.../DESIGN.md — "clínico calmo":
-   surfaces light, teal as the only brand color, generous whitespace. */
+/* Sinaliza design system tokens. Fonte: design system "Sinaliza" (tokens.json).
+   Gerado; edite no design system e regenere em vez de mudar valores aqui. */
 
 :root {
-  --color-bg: #f5f9f8;
-  --color-surface: #ffffff;
-  --color-text: #1e3a36;
-  --color-text-secondary: #57746e;
-  --color-border: #d3e4e0;
-  --color-primary: #2c6e63;
-  --color-attention: #c97a3d;
-  --color-success: #4c9a7a;
+  /* Primitivos (escalas) */
+  --mare-50: #eefaf9;
+  --mare-100: #daf3f1;
+  --mare-200: #b5e8e5;
+  --mare-300: #82d5d2;
+  --mare-400: #4ebcb8;
+  --mare-500: #1ea29e;
+  --mare-600: #078784;
+  --mare-700: #006e6b;
+  --mare-800: #005553;
+  --mare-900: #023b3a;
+  --ipe-50: #fefaeb;
+  --ipe-100: #fff9e3;
+  --ipe-200: #fae8a7;
+  --ipe-300: #ecce60;
+  --ipe-400: #d3b009;
+  --ipe-500: #ac8e02;
+  --ipe-600: #907702;
+  --ipe-700: #756003;
+  --ipe-800: #5b4a00;
+  --ipe-900: #413400;
+  --jabuticaba-50: #fcf4fd;
+  --jabuticaba-100: #f7e6fa;
+  --jabuticaba-200: #f1cff5;
+  --jabuticaba-300: #e2afea;
+  --jabuticaba-400: #cb8ed4;
+  --jabuticaba-500: #b172bb;
+  --jabuticaba-600: #965c9f;
+  --jabuticaba-700: #7b4982;
+  --jabuticaba-800: #5f3865;
+  --jabuticaba-900: #432647;
+  --ceu-50: #eff8fe;
+  --ceu-100: #dcf0fe;
+  --ceu-200: #b9e3ff;
+  --ceu-300: #89cdfa;
+  --ceu-400: #5bb2e7;
+  --ceu-500: #3797ce;
+  --ceu-600: #207eb1;
+  --ceu-700: #106692;
+  --ceu-800: #0c4f71;
+  --ceu-900: #073750;
+  --folha-50: #f0faf1;
+  --folha-100: #dff3e1;
+  --folha-200: #c0e9c5;
+  --folha-300: #96d79f;
+  --folha-400: #6ebd7b;
+  --folha-500: #4fa35f;
+  --folha-600: #3a894a;
+  --folha-700: #2a6f39;
+  --folha-800: #20562b;
+  --folha-900: #143c1d;
+  --ambar-50: #fef5ee;
+  --ambar-100: #ffe8d7;
+  --ambar-200: #fed3b3;
+  --ambar-300: #fdb175;
+  --ambar-400: #e98f41;
+  --ambar-500: #cf7210;
+  --ambar-600: #af5e02;
+  --ambar-700: #8e4b01;
+  --ambar-800: #6f3900;
+  --ambar-900: #4f2700;
+  --areia-0: #ffffff;
+  --areia-50: #fbf7f1;
+  --areia-100: #f3f0e9;
+  --areia-200: #e6e3dc;
+  --areia-300: #d4d1ca;
+  --areia-400: #b0aea8;
+  --areia-500: #898680;
+  --areia-600: #6b6963;
+  --areia-700: #524f4a;
+  --areia-800: #393631;
+  --areia-900: #272520;
+  --areia-950: #191713;
+  --noite-700: #2e4143;
+  --noite-800: #1f3134;
+  --noite-850: #18282a;
+  --noite-900: #112021;
+  --noite-950: #0b1719;
 
+  /* Semânticos, tema claro */
+  --bg: var(--areia-50);
+  --surface: var(--areia-0);
+  --surface-sunken: var(--areia-100);
+  --line: var(--areia-200);
+  --line-strong: var(--areia-500);
+  --ink: var(--noite-900);
+  --ink-muted: var(--areia-700);
+  --action: var(--mare-700);
+  --action-hover: var(--mare-800);
+  --on-action: var(--areia-0);
+  --action-tint: var(--mare-50);
+  --focus-ring: var(--ceu-600);
+  --identity: var(--ipe-300);
+  --on-identity: var(--noite-900);
+  --identity-tint: var(--ipe-100);
+  --voice: var(--jabuticaba-700);
+  --voice-tint: var(--jabuticaba-50);
+  --attention: var(--ambar-600);
+  --attention-ink: var(--ambar-700);
+  --attention-tint: var(--ambar-50);
+  --on-attention: var(--areia-0);
+  --success: var(--folha-500);
+  --success-ink: var(--folha-700);
+  --success-tint: var(--folha-50);
+  --on-success: var(--noite-950);
+  --info: var(--ceu-600);
+  --info-ink: var(--ceu-700);
+  --info-tint: var(--ceu-50);
+  --band-fill: var(--ceu-100);
+  --band-line: var(--ceu-600);
+  --trajectory-line: var(--mare-700);
+  --ind-frequencia: var(--ceu-600);
+  --ind-notas: var(--jabuticaba-600);
+  --ind-entregas: var(--mare-600);
+  --ind-observacao: var(--ipe-700);
+  --status-observacao-bg: var(--areia-100);
+  --status-observacao-ink: var(--areia-700);
+  --status-ativo-bg: var(--mare-100);
+  --status-ativo-ink: var(--mare-800);
+  --status-aguardando-bg: var(--ipe-100);
+  --status-aguardando-ink: var(--ipe-800);
+  --status-encerrado-bg: var(--folha-100);
+  --status-encerrado-ink: var(--folha-800);
+
+  /* Espaço, raio, medidas, famílias */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-full: 9999px;
-
-  --spacing-content-max-width: 900px;
-  --spacing-section-gap: 52px;
-  --spacing-card-padding: 32px;
-
-  --min-hit-target: 44px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+  --size-content: 960px;
+  --size-hit: 44px;
+  --size-focus: 3px;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+  color-scheme: light;
 }
 
+/* Tema escuro: segue o sistema, a menos que a página force data-theme="light". */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #10201d;
-    --color-surface: #16302b;
-    --color-text: #e7f3f0;
-    --color-text-secondary: #9dbdb5;
-    --color-border: #244f47;
-    --color-primary: #5fbfa9;
-    --color-attention: #e0985a;
-    --color-success: #6fc79c;
+  :root:not([data-theme="light"]) {
+    --bg: var(--noite-950);
+    --surface: var(--noite-900);
+    --surface-sunken: var(--noite-850);
+    --line: var(--noite-700);
+    --line-strong: var(--areia-500);
+    --ink: var(--areia-50);
+    --ink-muted: var(--areia-300);
+    --action: var(--mare-300);
+    --action-hover: var(--mare-200);
+    --on-action: var(--noite-950);
+    --action-tint: var(--noite-800);
+    --focus-ring: var(--ceu-300);
+    --identity: var(--ipe-300);
+    --on-identity: var(--noite-900);
+    --identity-tint: var(--ipe-900);
+    --voice: var(--jabuticaba-300);
+    --voice-tint: var(--noite-800);
+    --attention: var(--ambar-400);
+    --attention-ink: var(--ambar-300);
+    --attention-tint: var(--noite-800);
+    --on-attention: var(--noite-950);
+    --success: var(--folha-400);
+    --success-ink: var(--folha-300);
+    --success-tint: var(--noite-800);
+    --on-success: var(--noite-950);
+    --info: var(--ceu-300);
+    --info-ink: var(--ceu-300);
+    --info-tint: var(--noite-800);
+    --band-fill: var(--noite-800);
+    --band-line: var(--ceu-400);
+    --trajectory-line: var(--mare-300);
+    --ind-frequencia: var(--ceu-300);
+    --ind-notas: var(--jabuticaba-300);
+    --ind-entregas: var(--mare-300);
+    --ind-observacao: var(--ipe-300);
+    --status-observacao-bg: var(--noite-800);
+    --status-observacao-ink: var(--areia-200);
+    --status-ativo-bg: var(--noite-800);
+    --status-ativo-ink: var(--mare-300);
+    --status-aguardando-bg: var(--noite-800);
+    --status-aguardando-ink: var(--ipe-300);
+    --status-encerrado-bg: var(--noite-800);
+    --status-encerrado-ink: var(--folha-300);
+    color-scheme: dark;
   }
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: 15px;
-  line-height: 1.65;
+:root[data-theme="dark"] {
+  --bg: var(--noite-950);
+  --surface: var(--noite-900);
+  --surface-sunken: var(--noite-850);
+  --line: var(--noite-700);
+  --line-strong: var(--areia-500);
+  --ink: var(--areia-50);
+  --ink-muted: var(--areia-300);
+  --action: var(--mare-300);
+  --action-hover: var(--mare-200);
+  --on-action: var(--noite-950);
+  --action-tint: var(--noite-800);
+  --focus-ring: var(--ceu-300);
+  --identity: var(--ipe-300);
+  --on-identity: var(--noite-900);
+  --identity-tint: var(--ipe-900);
+  --voice: var(--jabuticaba-300);
+  --voice-tint: var(--noite-800);
+  --attention: var(--ambar-400);
+  --attention-ink: var(--ambar-300);
+  --attention-tint: var(--noite-800);
+  --on-attention: var(--noite-950);
+  --success: var(--folha-400);
+  --success-ink: var(--folha-300);
+  --success-tint: var(--noite-800);
+  --on-success: var(--noite-950);
+  --info: var(--ceu-300);
+  --info-ink: var(--ceu-300);
+  --info-tint: var(--noite-800);
+  --band-fill: var(--noite-800);
+  --band-line: var(--ceu-400);
+  --trajectory-line: var(--mare-300);
+  --ind-frequencia: var(--ceu-300);
+  --ind-notas: var(--jabuticaba-300);
+  --ind-entregas: var(--mare-300);
+  --ind-observacao: var(--ipe-300);
+  --status-observacao-bg: var(--noite-800);
+  --status-observacao-ink: var(--areia-200);
+  --status-ativo-bg: var(--noite-800);
+  --status-ativo-ink: var(--mare-300);
+  --status-aguardando-bg: var(--noite-800);
+  --status-aguardando-ink: var(--ipe-300);
+  --status-encerrado-bg: var(--noite-800);
+  --status-encerrado-ink: var(--folha-300);
+  color-scheme: dark;
 }

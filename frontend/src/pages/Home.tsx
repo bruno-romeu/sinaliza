@@ -1,5 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import {
   ApiError,
@@ -9,18 +8,33 @@ import {
   type RecentChange,
   type StudentSearchResult,
 } from '../api/client'
-import { Header } from '../components/Header'
-import { FollowUpStatusPill } from '../components/FollowUpStatusPill'
+import {
+  Button,
+  CalmState,
+  ChangeRow,
+  FollowupCard,
+  Icon,
+  Notice,
+  Page,
+  ScreenHead,
+  Section,
+  Skeleton,
+  Tag,
+  TextField,
+  type Indicator,
+} from '../components/ui'
+import { Link } from 'react-router-dom'
 
 type ChangeType = RecentChange['type']
 
-// Icon marker mapping (Design Notes): a small icon + text label per
-// `TrajectoryChangeType` — never color alone (epic-3 accessibility floor).
-const CHANGE_TYPE_LABELS: Record<ChangeType, { icon: string; label: string }> = {
-  ATTENDANCE_DROP: { icon: '📉', label: 'Queda de frequência' },
-  GRADE_DROP: { icon: '📝', label: 'Queda de notas' },
-  MISSING_ASSIGNMENTS_INCREASE: { icon: '📌', label: 'Aumento de atividades pendentes' },
-  COMBINED_DETERIORATION: { icon: '⚠️', label: 'Mudança combinada' },
+// Indicador de cada tipo de mudança (design system: a cor diz de onde vem o
+// sinal). `COMBINED_DETERIORATION` envolve mais de um sinal e a API ainda não
+// diz quais, então não ganha chip (Contrato de dados, proposta `signal_kinds`).
+const CHANGE_TYPE_INDICATORS: Record<ChangeType, Indicator[]> = {
+  ATTENDANCE_DROP: ['frequencia'],
+  GRADE_DROP: ['notas'],
+  MISSING_ASSIGNMENTS_INCREASE: ['entregas'],
+  COMBINED_DETERIORATION: [],
 }
 
 function formatDetectedAt(detectedAt: string): string {
@@ -36,28 +50,18 @@ function formatDetectedAt(detectedAt: string): string {
   return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
 }
 
-const rowStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 16,
-  padding: '16px 20px',
-  background: 'var(--color-surface)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-md)',
-  textDecoration: 'none',
-  color: 'var(--color-text)',
-  minHeight: 'var(--min-hit-target)',
-} as const
+function plural(count: number, singular: string, pluralForm: string) {
+  return `${count} ${count === 1 ? singular : pluralForm}`
+}
 
 /**
  * Home: recent trajectory changes (read-only, never recomputed here) plus a
- * student search box — both link to `/estudantes/:studentId` (Story 3.4's
- * stub landing target). No ranking/score/"high-risk" KPI anywhere (spec
- * Boundaries & Constraints).
+ * student search box — both link to `/estudantes/:studentId`. No
+ * ranking/score/"high-risk" KPI anywhere (spec Boundaries & Constraints).
+ * Visual: design system `TelaHome`.
  */
 export function Home() {
   const { token } = useAuth()
-  const searchInputId = useId()
 
   const [recentChanges, setRecentChanges] = useState<RecentChange[] | null>(null)
   const [inProgressFollowUps, setInProgressFollowUps] = useState<InProgressFollowUp[] | null>(null)
@@ -134,211 +138,128 @@ export function Home() {
   const showingSearch = query.trim().length > 0
 
   return (
-    <div>
-      <Header />
-      <main
-        style={{
-          maxWidth: 'var(--spacing-content-max-width)',
-          margin: '0 auto',
-          padding: 'var(--spacing-section-gap) 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 32,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px' }}>Home</h1>
-          <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-            Mudanças recentes detectadas e busca de estudantes.
+    <Page>
+      <ScreenHead kicker="Coordenação pedagógica" title="Home">
+        {recentChanges !== null && inProgressFollowUps !== null && !loadError && (
+          <p className="sz-summary">
+            {recentChanges.length > 0 ? (
+              <>
+                <b>{plural(recentChanges.length, 'mudança', 'mudanças')}</b> para revisar
+              </>
+            ) : (
+              'Nada novo para revisar'
+            )}
+            {' · '}
+            <b>{plural(inProgressFollowUps.length, 'acompanhamento', 'acompanhamentos')}</b> em andamento
           </p>
-        </div>
+        )}
+      </ScreenHead>
 
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 420 }}>
-          <label htmlFor={searchInputId} style={{ fontWeight: 600 }}>
-            Buscar estudante por nome ou turma
-          </label>
-          <input
-            id={searchInputId}
-            type="text"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Ex.: Maria ou 7º Ano A"
-            style={{
-              minHeight: 'var(--min-hit-target)',
-              padding: '0 12px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text)',
-              fontSize: 15,
-            }}
-          />
-        </section>
+      <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <TextField
+          label="Buscar estudante por nome ou turma"
+          icon="busca"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Ex.: Maria ou 7º Ano A"
+          hint="A Home mostra só quem tem mudança recente ou acompanhamento. Use a busca para chegar aos demais."
+        />
+      </div>
 
-        {/* Always renders, independent of `showingSearch` (spec-4-5 Boundaries
-            & Constraints, UX-DR18) — the active-follow-ups count stays
-            visible even while search results are showing. */}
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Acompanhamentos em andamento</h2>
+      {showingSearch && (
+        <Section id="home-busca" title="Resultados da busca">
+          <p role="status" aria-live="polite" className="sz-muted">
+            {searching
+              ? 'Buscando…'
+              : results !== null
+                ? `${results.length} ${results.length === 1 ? 'estudante encontrado' : 'estudantes encontrados'}`
+                : ''}
+          </p>
 
-          {inProgressFollowUps === null && !loadError && (
-            <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[0, 1].map((i) => (
-                <div
-                  key={i}
-                  style={{
-                    height: 64,
-                    borderRadius: 'var(--radius-md)',
-                    background: 'var(--color-border)',
-                    opacity: 0.4,
-                  }}
-                />
-              ))}
-            </div>
+          {searchError && <Notice tone="attention">{searchError}</Notice>}
+
+          {!searching && !searchError && results !== null && results.length === 0 && (
+            <p className="sz-muted">Nenhum estudante encontrado com esse nome/turma.</p>
           )}
 
-          {inProgressFollowUps !== null && inProgressFollowUps.length === 0 && (
-            <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-              Nenhum acompanhamento em andamento no momento
-            </p>
-          )}
-
-          {inProgressFollowUps !== null && inProgressFollowUps.length > 0 && (
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {inProgressFollowUps.map((item) => (
-                <li key={item.id}>
-                  <Link to={`/acompanhamentos/${item.id}`} style={rowStyle}>
-                    <FollowUpStatusPill status={item.status} />
-                    <span style={{ fontWeight: 600 }}>{item.student_name}</span>
+          {results !== null && results.length > 0 && (
+            <ul className="sz-results">
+              {results.map((result) => (
+                <li key={result.id}>
+                  <Link to={`/estudantes/${result.id}`}>
+                    <Icon name="pessoa" size={20} style={{ color: 'var(--ink-muted)' }} />
+                    <span className="sz-results-name">{result.name}</span>
+                    <Tag>{result.classroom_name}</Tag>
+                    <Icon name="chevron-dir" size={20} className="sz-results-chev" />
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </Section>
+      )}
 
-        {showingSearch && (
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Resultados da busca</h2>
+      {!showingSearch && (
+        <Section id="home-mudancas" title="Mudanças recentes">
+          {recentChanges === null && !loadError && <Skeleton heights={[72, 72, 72]} />}
 
-            <p role="status" aria-live="polite" style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-              {searching
-                ? 'Buscando…'
-                : results !== null
-                  ? `${results.length} ${results.length === 1 ? 'estudante encontrado' : 'estudantes encontrados'}`
-                  : ''}
-            </p>
+          {loadError && (
+            <Notice
+              tone="attention"
+              action={
+                <Button variant="secondary" onClick={() => setLoadAttempt((n) => n + 1)}>
+                  Tentar novamente
+                </Button>
+              }
+            >
+              Não foi possível carregar os dados agora.
+            </Notice>
+          )}
 
-            {searchError && (
-              <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-                {searchError}
-              </p>
-            )}
+          {recentChanges !== null && !loadError && recentChanges.length === 0 && (
+            <CalmState kicker="Tudo dentro da faixa habitual" title="Nenhuma mudança a revisar hoje.">
+              Os estudantes com registros recentes seguem dentro da própria faixa habitual.
+            </CalmState>
+          )}
 
-            {!searching && !searchError && results !== null && results.length === 0 && (
-              <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                Nenhum estudante encontrado com esse nome/turma.
-              </p>
-            )}
-
-            {results !== null && results.length > 0 && (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {results.map((result) => (
-                  <li key={result.id}>
-                    <Link to={`/estudantes/${result.id}`} style={rowStyle}>
-                      <span style={{ fontWeight: 600 }}>{result.name}</span>
-                      <span style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>
-                        {result.classroom_name}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        )}
-
-        {!showingSearch && (
-          <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Mudanças recentes</h2>
-
-            {recentChanges === null && !loadError && (
-              <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    style={{
-                      height: 64,
-                      borderRadius: 'var(--radius-md)',
-                      background: 'var(--color-border)',
-                      opacity: 0.4,
-                    }}
+          {recentChanges !== null && !loadError && recentChanges.length > 0 && (
+            <ul className="sz-list">
+              {recentChanges.map((change, index) => (
+                <li key={`${change.student_id}-${index}`}>
+                  <ChangeRow
+                    to={`/estudantes/${change.student_id}`}
+                    name={change.student_name}
+                    description={change.description}
+                    date={formatDetectedAt(change.detected_at)}
+                    indicators={CHANGE_TYPE_INDICATORS[change.type]}
                   />
-                ))}
-              </div>
-            )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      )}
 
-            {loadError && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <p role="alert" style={{ color: 'var(--color-attention)', margin: 0 }}>
-                  Não foi possível carregar os dados agora.
-                </p>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setLoadAttempt((n) => n + 1)}
-                    style={{
-                      minHeight: 'var(--min-hit-target)',
-                      minWidth: 'var(--min-hit-target)',
-                      padding: '0 16px',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--color-border)',
-                      background: 'var(--color-surface)',
-                      color: 'var(--color-text)',
-                      fontSize: 15,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Tentar novamente
-                  </button>
-                </div>
-              </div>
-            )}
+      {/* Always renders, independent of `showingSearch` (spec-4-5 Boundaries
+          & Constraints, UX-DR18) — the active-follow-ups count stays
+          visible even while search results are showing. */}
+      <Section id="home-acompanhamentos" title="Acompanhamentos em andamento">
+        {inProgressFollowUps === null && !loadError && <Skeleton heights={[64, 64]} />}
 
-            {recentChanges !== null && !loadError && recentChanges.length === 0 && (
-              <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                Nenhuma mudança a revisar hoje.
-              </p>
-            )}
-
-            {recentChanges !== null && !loadError && recentChanges.length > 0 && (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {recentChanges.map((change, index) => {
-                  const typeInfo = CHANGE_TYPE_LABELS[change.type]
-                  return (
-                    <li key={`${change.student_id}-${index}`}>
-                      <Link to={`/estudantes/${change.student_id}`} style={rowStyle}>
-                        <span aria-hidden="true" style={{ fontSize: 20 }}>
-                          {typeInfo.icon}
-                        </span>
-                        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-                          <span style={{ fontWeight: 600 }}>{change.student_name}</span>
-                          <span style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>
-                            {typeInfo.label} — {change.description}
-                          </span>
-                        </span>
-                        <span style={{ color: 'var(--color-text-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}>
-                          {formatDetectedAt(change.detected_at)}
-                        </span>
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </section>
+        {inProgressFollowUps !== null && inProgressFollowUps.length === 0 && (
+          <p className="sz-muted">Nenhum acompanhamento em andamento no momento</p>
         )}
-      </main>
-    </div>
+
+        {inProgressFollowUps !== null && inProgressFollowUps.length > 0 && (
+          <ul className="sz-list">
+            {inProgressFollowUps.map((item) => (
+              <li key={item.id}>
+                <FollowupCard to={`/acompanhamentos/${item.id}`} name={item.student_name} status={item.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+    </Page>
   )
 }

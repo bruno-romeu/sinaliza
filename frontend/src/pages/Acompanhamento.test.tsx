@@ -135,7 +135,7 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    const select = screen.getByLabelText('Status do acompanhamento')
+    const select = screen.getByLabelText('Status atual')
     const options = within(select).getAllByRole('option')
     expect(options.map((option) => option.textContent)).toEqual([
       'Em observação',
@@ -154,15 +154,18 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
       throw new Error(`Unexpected fetch call in test: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
-    vi.stubGlobal('confirm', vi.fn(() => false))
-
     renderPage()
 
     await screen.findByText('Maria Silva')
-    const select = screen.getByLabelText('Status do acompanhamento') as HTMLSelectElement
+    const select = screen.getByLabelText('Status atual') as HTMLSelectElement
     fireEvent.change(select, { target: { value: 'ENCERRADO' } })
 
-    expect(window.confirm).toHaveBeenCalled()
+    // Inline confirmation, never a modal or window.confirm.
+    expect(screen.getByText(/Encerrar o acompanhamento de Maria Silva\?/)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText(/Encerrar o acompanhamento de Maria Silva\?/)).not.toBeInTheDocument()
     expect(select.value).toBe('EM_OBSERVACAO')
     const statusCalls = fetchMock.mock.calls.filter(([input]) => {
       const url = typeof input === 'string' ? input : String(input)
@@ -193,7 +196,7 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    const select = screen.getByLabelText('Status do acompanhamento')
+    const select = screen.getByLabelText('Status atual')
     fireEvent.change(select, { target: { value: 'ACOMPANHAMENTO_ATIVO' } })
 
     const pillSection = screen.getByText('Maria Silva').closest('section') as HTMLElement
@@ -229,7 +232,7 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    const select = screen.getByLabelText('Status do acompanhamento') as HTMLSelectElement
+    const select = screen.getByLabelText('Status atual') as HTMLSelectElement
     fireEvent.change(select, { target: { value: 'ACOMPANHAMENTO_ATIVO' } })
 
     await screen.findByText('Acompanhamento não encontrado.')
@@ -254,15 +257,14 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
       throw new Error(`Unexpected fetch call in test: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
-    vi.stubGlobal('confirm', vi.fn(() => true))
-
     renderPage()
 
     await screen.findByText('Maria Silva')
-    const select = screen.getByLabelText('Status do acompanhamento')
+    const select = screen.getByLabelText('Status atual')
     fireEvent.change(select, { target: { value: 'ENCERRADO' } })
 
-    expect(window.confirm).toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Encerrar acompanhamento' }))
+    await screen.findByText('Acompanhamento encerrado. O histórico e as evidências continuam disponíveis.')
     const pillSection = screen.getByText('Maria Silva').closest('section') as HTMLElement
     await within(pillSection).findByText('Encerrado')
 
@@ -283,13 +285,13 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    const saveButton = screen.getByRole('button', { name: 'Salvar' })
+    const saveButton = screen.getByRole('button', { name: 'Registrar ação' })
     expect(saveButton).toBeDisabled()
 
-    fireEvent.change(screen.getByLabelText('Ação'), { target: { value: '   ' } })
+    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), { target: { value: '   ' } })
     expect(saveButton).toBeDisabled()
 
-    fireEvent.change(screen.getByLabelText('Ação'), { target: { value: 'Conversei com a família.' } })
+    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), { target: { value: 'Conversei com a família.' } })
     expect(saveButton).not.toBeDisabled()
   })
 
@@ -319,8 +321,8 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    fireEvent.change(screen.getByLabelText('Ação'), { target: { value: 'Conversei com a família.' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), { target: { value: 'Conversei com a família.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar ação' }))
 
     await screen.findByText('Registro salvo.')
 
@@ -360,8 +362,8 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    fireEvent.change(screen.getByLabelText('Ação'), { target: { value: 'Conversei com a família.' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), { target: { value: 'Conversei com a família.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar ação' }))
 
     await screen.findByText('Acompanhamento não encontrado.')
   })
@@ -461,7 +463,9 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     await screen.findByText('Maria Silva')
     expect(screen.getByText('Queda de frequência')).toBeInTheDocument() // collapsible section header
     expect(screen.getByText('Queda de notas')).toBeInTheDocument()
-    expect(screen.getAllByText('Evidências')).toHaveLength(2) // each group's EvidenceCard title
+    // each group's EvidenceCard is titled with its own change description
+    expect(screen.getByText('Queda de frequência detectada.')).toBeInTheDocument()
+    expect(screen.getByText('Queda de notas detectada.')).toBeInTheDocument()
     expect(screen.getByText('Falta não justificada em 01/08/2026', { exact: false })).toBeInTheDocument()
     expect(screen.getByText('Nota abaixo da média em 01/09/2026', { exact: false })).toBeInTheDocument()
   })
