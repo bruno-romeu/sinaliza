@@ -91,6 +91,8 @@ class EvidenceItemOut(BaseModel):
 class ObservationItemOut(BaseModel):
     date: date
     text: str
+    # spec-ui-3: the timeline labels observations that registered a concern.
+    registers_concern: bool = False
 
 
 class StudentSummaryOut(BaseModel):

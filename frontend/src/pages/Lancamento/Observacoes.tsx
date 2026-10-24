@@ -13,6 +13,8 @@ import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 interface RowState {
   text: string
+  /** spec-ui-3: only an observation marked as a concern counts as a signal. */
+  concern: boolean
   saving: boolean
   message: string | null
   isError: boolean
@@ -70,7 +72,7 @@ export function Observacoes() {
           Object.fromEntries(
             fetched.map((student) => [
               student.id,
-              { text: '', saving: false, message: null, isError: false } as RowState,
+              { text: '', concern: false, saving: false, message: null, isError: false } as RowState,
             ]),
           ),
         )
@@ -106,9 +108,16 @@ export function Observacoes() {
         student_id: studentId,
         classroom_id: classroomIdAtSaveStart,
         text: textAtSaveStart,
+        registers_concern: row.concern,
       })
       if (selectedClassroomIdRef.current !== classroomIdAtSaveStart) return
-      updateRow(studentId, { text: '', saving: false, message: 'Registro salvo.', isError: false })
+      updateRow(studentId, {
+        text: '',
+        concern: false,
+        saving: false,
+        message: 'Registro salvo.',
+        isError: false,
+      })
     } catch (caught) {
       if (selectedClassroomIdRef.current !== classroomIdAtSaveStart) return
       const message =
@@ -150,6 +159,7 @@ export function Observacoes() {
                 student={student}
                 rowState={rowStates[student.id]}
                 onTextChange={(text) => updateRow(student.id, { text, message: null, isError: false })}
+                onConcernChange={(concern) => updateRow(student.id, { concern })}
                 onSave={() => handleSave(student.id)}
               />
             ))}
@@ -177,11 +187,13 @@ function ObservacaoRow({
   student,
   rowState,
   onTextChange,
+  onConcernChange,
   onSave,
 }: {
   student: Student
   rowState: RowState | undefined
   onTextChange: (text: string) => void
+  onConcernChange: (concern: boolean) => void
   onSave: () => void
 }) {
   const nameId = useId()
@@ -207,6 +219,17 @@ function ObservacaoRow({
                 hint="Fatos observáveis, sem julgamentos sobre o estudante."
                 onChange={(event) => onTextChange(event.target.value)}
               />
+              <label className="sz-check">
+                <input
+                  type="checkbox"
+                  checked={rowState.concern}
+                  onChange={(event) => onConcernChange(event.target.checked)}
+                />
+                <span>
+                  Registra uma preocupação
+                  <small>Marque quando o registro descreve algo que mudou e pede atenção. Registros de rotina ficam desmarcados.</small>
+                </span>
+              </label>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <Button variant="secondary" onClick={() => setOpen(false)}>
                   Cancelar

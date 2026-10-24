@@ -129,6 +129,34 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
       student_id: 'student-1',
       classroom_id: 'classroom-1',
       text: 'Participou ativamente da aula e ajudou colegas.',
+      registers_concern: false,
     })
+  })
+
+  it('sends registers_concern when "Registra uma preocupação" is checked (spec-ui-3)', async () => {
+    renderObservacoes()
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Turma Teste' })).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByLabelText('Turma'), { target: { value: 'classroom-1' } })
+    await screen.findByText('Estudante Teste')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Escrever observação' }))
+    fireEvent.change(screen.getByLabelText(/Observação sobre/), {
+      target: { value: 'Faltou às duas últimas avaliações.' },
+    })
+    const concern = screen.getByRole('checkbox', { name: /Registra uma preocupação/ })
+    expect(concern).not.toBeChecked()
+    fireEvent.click(concern)
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar observação' }))
+
+    await screen.findByText('Registro salvo.')
+    const observationCall = fetchMock.mock.calls.find(([input]) => {
+      const url = typeof input === 'string' ? input : String(input)
+      return url === '/api/pedagogical-observations'
+    })
+    const [, init] = observationCall as [RequestInfo | URL, RequestInit]
+    expect(JSON.parse(String(init?.body))).toMatchObject({ registers_concern: true })
   })
 })

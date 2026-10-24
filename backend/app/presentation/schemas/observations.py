@@ -20,6 +20,9 @@ class PedagogicalObservationCreateRequest(BaseModel):
     # text with FastAPI's standard 422 (spec I/O Matrix, "Whitespace-only
     # text (API bypass)") — never a bespoke `AppError`.
     text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    # spec-ui-3: optional, so existing clients keep working. Only a
+    # concern-marked observation counts as a convergence signal.
+    registers_concern: bool = False
 
 
 class PedagogicalObservationOut(BaseModel):
@@ -28,3 +31,4 @@ class PedagogicalObservationOut(BaseModel):
     author_user_id: str
     text: str
     created_at: datetime
+    registers_concern: bool = False

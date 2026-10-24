@@ -281,6 +281,9 @@ function TrajectoryDetailContent({
               date: formatDateBr(observation.date).slice(0, 5),
               text: observation.text,
               indicator: 'observacao' as const,
+              // spec-ui-3: say when the team registered a concern; only those
+              // observations count as a signal.
+              label: observation.registers_concern ? 'Observação · preocupação registrada' : undefined,
             }))}
           />
         )}

@@ -168,7 +168,11 @@ def get_student_trajectory_detail(
         ],
         concerning_factor=concerning_factor_out,
         observations=[
-            ObservationItemOut(date=observation.date, text=observation.text)
+            ObservationItemOut(
+                date=observation.date,
+                text=observation.text,
+                registers_concern=observation.registers_concern,
+            )
             for observation in result.observations
         ],
         student=(

@@ -484,6 +484,32 @@ def test_trajectory_as_of_not_covered_by_any_existing_period_has_no_current_peri
 # --- Story 3.2: convergência de sinais -----------------------------------------------
 
 
+def _add_earlier_period(db_session: Session, student_id, classroom_id, grade: str | None = None):
+    """spec-ui-3: grades and assignments compare against the student's own
+    earlier períodos, so tests that expect those signals need one. Optionally
+    writes a grade for it (the student's habitual level)."""
+    period = AcademicPeriodModel(
+        label="2º Bimestre Teste",
+        start_date=date(2026, 4, 20),
+        end_date=date(2026, 6, 26),
+        order_index=2,
+    )
+    db_session.add(period)
+    db_session.flush()
+    if grade is not None:
+        db_session.add(
+            GradeModel(
+                student_id=student_id,
+                classroom_id=classroom_id,
+                subject="Matemática",
+                period_id=period.id,
+                date=date(2026, 6, 20),
+                value=Decimal(grade),
+            )
+        )
+    return period
+
+
 def _add_low_attendance(
     db_session: Session, student_id, classroom_id, present_count: int, absent_count: int
 ) -> None:
@@ -529,6 +555,8 @@ def test_trajectory_two_confirmed_signals_creates_trajectory_change_with_sources
             author_user_id=seeded_user.id,
             text="Observação de teste.",
             created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()
@@ -546,7 +574,7 @@ def test_trajectory_two_confirmed_signals_creates_trajectory_change_with_sources
     assert change["type"] == "ATTENDANCE_DROP"
     assert change["period_id"] == str(seeded_academic_period.id)
     assert change["description"] == (
-        "Queda de frequência e registro pedagógico recente "
+        "Queda de frequência e preocupação registrada pela equipe "
         "no 3º Bimestre Teste"
     )
     detected_at = datetime.fromisoformat(change["detected_at"].replace("Z", "+00:00"))
@@ -558,8 +586,8 @@ def test_trajectory_two_confirmed_signals_creates_trajectory_change_with_sources
     assert db_rows[0].period_id == seeded_academic_period.id
 
     source_rows = db_session.execute(select(TrajectoryChangeSourceModel)).scalars().all()
-    # 3 attendance records + 1 pedagogical observation cited.
-    assert len(source_rows) == 4
+    # spec-ui-3: the 2 absences (never the day present) + 1 observation.
+    assert len(source_rows) == 3
     assert all(row.trajectory_change_id == db_rows[0].id for row in source_rows)
 
 
@@ -588,6 +616,8 @@ def test_trajectory_pedagogical_observation_after_as_of_is_excluded_from_signal(
             # After AS_OF ("2026-09-24") but still inside the período
             # vigente (ends 2026-09-25).
             created_at=datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()
@@ -630,6 +660,8 @@ def test_trajectory_recompute_same_period_replaces_description_and_sources(
     `seeded_academic_period`) to prove `ON CONFLICT ... DO UPDATE` actually
     refreshes it, not just `description`/sources (Review Findings #22)."""
     _add_low_attendance(db_session, seeded_enrolled_student.id, seeded_classroom.id, 1, 2)
+    # spec-ui-3: habitual grade 5.00 in an earlier período; 3.00 is a drop.
+    _add_earlier_period(db_session, seeded_enrolled_student.id, seeded_classroom.id, "5.00")
     db_session.add(
         GradeModel(
             student_id=seeded_enrolled_student.id,
@@ -783,6 +815,8 @@ def test_trajectory_two_requests_with_convergence_produce_identical_change_no_du
             author_user_id=seeded_user.id,
             text="Observação de teste.",
             created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()
@@ -798,4 +832,5 @@ def test_trajectory_two_requests_with_convergence_produce_identical_change_no_du
     rows = db_session.execute(select(TrajectoryChangeModel)).scalars().all()
     assert len(rows) == 1
     source_rows = db_session.execute(select(TrajectoryChangeSourceModel)).scalars().all()
-    assert len(source_rows) == 4
+    # spec-ui-3: absences and observation only, never the days present.
+    assert len(source_rows) == 3

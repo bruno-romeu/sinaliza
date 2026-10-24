@@ -501,5 +501,5 @@ def test_fingerprint_changes_when_observation_text_changes(db_session: Session) 
     assert fingerprint_1 != fingerprint_2
 
 
-def test_generator_version_bumped_for_story_2_5() -> None:
-    assert GENERATOR_VERSION == "2.5.0"
+def test_generator_version_bumped_for_spec_ui_3() -> None:
+    assert GENERATOR_VERSION == "2.6.0"

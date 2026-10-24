@@ -67,7 +67,7 @@ from app.domain.convergence import (
 from app.domain.assignment_submission import AssignmentSubmission
 from app.domain.grade import Grade
 from app.domain.trajectory import TrajectoryIndicators, compute_trajectory_indicators
-from app.domain.trajectory_change import TrajectoryChange, TrajectoryChangeSource
+from app.domain.trajectory_change import SourceType, TrajectoryChange, TrajectoryChangeSource
 
 
 @dataclass(frozen=True)
@@ -166,13 +166,17 @@ class GetStudentTrajectoryService:
         trajectory_change = None
         concerning_factor = None
         if current_period is not None:
+            earlier_periods = sorted(
+                (period for period in periods if period.order_index < current_period.order_index),
+                key=lambda period: period.order_index,
+            )
             trajectory_change, concerning_factor = self._evaluate_convergence(
                 student_id=student_id,
                 as_of_date=as_of_date,
                 current_period=current_period,
                 previous_period=previous_period,
+                earlier_periods=earlier_periods,
                 current_period_grades=current_period_grades,
-                previous_period_grades=previous_period_grades,
             )
 
         return TrajectoryResult(
@@ -188,8 +192,8 @@ class GetStudentTrajectoryService:
         as_of_date: date,
         current_period: AcademicPeriod,
         previous_period: AcademicPeriod | None,
+        earlier_periods: list[AcademicPeriod],
         current_period_grades: list[Grade],
-        previous_period_grades: list[Grade],
     ) -> tuple[TrajectoryChange | None, ConcerningFactor | None]:
         # Boundaries & Constraints: signal evaluation reads facts only within
         # [period.start_date, period.end_date] of the current/previous
@@ -215,23 +219,32 @@ class GetStudentTrajectoryService:
             else []
         )
 
+        # spec-ui-3: assignments compare against every earlier período, so the
+        # read starts at the first one (attendance still compares with the
+        # immediately previous período only).
+        assignments_range_start = (
+            earlier_periods[0].start_date if earlier_periods else current_period.start_date
+        )
         period_assignments = self._assignment_repository.list_due_in_range_for_student(
-            student_id, period_range_start, current_period.end_date
+            student_id, assignments_range_start, current_period.end_date
         )
         current_period_assignments = [
             assignment
             for assignment in period_assignments
             if current_period.start_date <= assignment.due_date <= current_period.end_date
         ]
-        previous_period_assignments = (
+        earlier_period_assignments = [
             [
                 assignment
                 for assignment in period_assignments
-                if previous_period.start_date <= assignment.due_date <= previous_period.end_date
+                if period.start_date <= assignment.due_date <= period.end_date
             ]
-            if previous_period is not None
-            else []
-        )
+            for period in earlier_periods
+        ]
+        earlier_period_grades = [
+            self._grade_repository.list_by_student_and_periods(student_id, [period.id])
+            for period in earlier_periods
+        ]
         period_assignment_ids = [assignment.id for assignment in period_assignments]
         period_submissions = (
             self._assignment_submission_repository.list_by_student_and_assignments(
@@ -252,9 +265,9 @@ class GetStudentTrajectoryService:
 
         signals = [
             evaluate_attendance_signal(current_period_attendance, previous_period_attendance),
-            evaluate_grade_signal(current_period_grades, previous_period_grades),
+            evaluate_grade_signal(current_period_grades, earlier_period_grades),
             evaluate_assignments_signal(
-                current_period_assignments, previous_period_assignments, submissions_by_assignment
+                current_period_assignments, earlier_period_assignments, submissions_by_assignment
             ),
             evaluate_pedagogical_signal(current_period_observations),
         ]
@@ -284,6 +297,24 @@ class GetStudentTrajectoryService:
                 for signal in result.confirmed_signals
                 for source_id in signal.source_ids
             ]
+            # spec-ui-3: neutral observations of the período are not a signal,
+            # but once a change exists they are still part of what the team
+            # wrote about the student then, so they are cited as evidence.
+            cited_observation_ids = {
+                source.source_id
+                for source in sources
+                if source.source_type == SourceType.PEDAGOGICAL_OBSERVATION
+            }
+            sources.extend(
+                TrajectoryChangeSource(
+                    id=uuid.uuid4(),
+                    trajectory_change_id=change_id,
+                    source_type=SourceType.PEDAGOGICAL_OBSERVATION,
+                    source_id=observation.id,
+                )
+                for observation in current_period_observations
+                if observation.id not in cited_observation_ids
+            )
             persisted_change = self._trajectory_change_repository.upsert(change, sources)
             return persisted_change, None
 
