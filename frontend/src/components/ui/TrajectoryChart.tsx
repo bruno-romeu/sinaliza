@@ -28,7 +28,7 @@ export function TrajectoryChart({
   points,
   band,
   changeIndex,
-  changeLabel = 'Saiu da faixa',
+  changeLabel,
   changeDescription,
   bandLabel,
   format,
@@ -64,6 +64,11 @@ export function TrajectoryChart({
     .filter(Boolean)
     .join(' ')
   const change = changeIndex !== undefined && changeIndex >= 0 ? points[changeIndex] : undefined
+  // "Saiu da faixa" only when the point is really outside the band; the
+  // change can also come from other indicators than the one charted.
+  const outsideBand =
+    change !== undefined && change.value !== null && band !== null && (change.value < band.low || change.value > band.high)
+  const pointLabel = changeLabel ?? (outsideBand ? 'Saiu da faixa' : 'Mudança detectada')
 
   return (
     <figure className="sz-card sz-chart" style={{ margin: 0 }}>
@@ -133,7 +138,7 @@ export function TrajectoryChart({
               <circle className="cp-ring" cx={x(changeIndex)} cy={y(change.value)} r={11} />
               <circle className="cp-dot" cx={x(changeIndex)} cy={y(change.value)} r={5} />
               <text className="cp-label" x={x(changeIndex)} y={y(change.value) - 20} textAnchor="middle">
-                {changeLabel}
+                {pointLabel}
               </text>
             </g>
           )}

@@ -95,6 +95,10 @@ SECOND_SURNAMES: tuple[str, ...] = (
 #: base, so the mixed-radix decode below never has to wrap.
 NAME_CAPACITY: int = len(GIVEN_NAMES) * len(FIRST_SURNAMES) * len(SECOND_SURNAMES)
 
+#: Stride used by `compose_name` to scatter indices (a prime that does not
+#: divide NAME_CAPACITY, so `index * stride mod capacity` is a bijection).
+_NAME_STRIDE: int = 7919
+
 #: Invented classroom labels. Deliberately not "6º Ano A": see the no-digits
 #: rule in the module docstring.
 CLASSROOM_LABELS: tuple[str, ...] = (
@@ -136,6 +140,13 @@ def compose_name(index: int) -> str:
     """
     if not 0 <= index < NAME_CAPACITY:
         raise ValueError(f"name index {index} outside 0..{NAME_CAPACITY - 1}")
+
+    # spec-ui-3: spread consecutive indices over the whole capacity before
+    # decoding. Without it a ~200-student base never reached the second
+    # surname's second digit, so every student shared the same last name.
+    # Multiplying by a stride coprime with NAME_CAPACITY is still a bijection,
+    # so uniqueness holds exactly as before.
+    index = (index * _NAME_STRIDE) % NAME_CAPACITY
 
     given_index = index % len(GIVEN_NAMES)
     rest = index // len(GIVEN_NAMES)

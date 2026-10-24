@@ -19,18 +19,24 @@ module never reimplements that arithmetic (spec Code Map).
 **Limiares de confirmação** (spec Design Notes, `[ASSUMPTION]` of PRD RF-11,
 fixed here for the MVP, calibration deferred):
 - `ATTENDANCE`: `attendance_rate < 0.75` OR `attendance_trend <= -0.10`.
-- `GRADE`: `grade_average < 5.0` OR `grade_trend <= -1.0`.
-- `ASSIGNMENTS`: `missing_assignments_count >= 2` OR
-  `missing_assignment_delta >= 2`, counting only `Assignment`s with ≥1
+  (0.75 is the legal minimum attendance, so it stays an absolute floor.)
+- `GRADE` (spec-ui-3, against the student's own history): the current
+  período's average is at least 1.0 below the *lowest* average of the
+  student's earlier períodos. A student who has always had low grades never
+  confirms; without an earlier período there is nothing to compare to.
+- `ASSIGNMENTS` (spec-ui-3, against the student's own history): the current
+  período's missing count is at least 2 above the *highest* count of the
+  student's earlier períodos, counting only `Assignment`s with ≥1
   `AssignmentSubmission` actually `NOT_DELIVERED`/`PARTIAL` recorded — never
   the ones with zero submissions registered, because every confirmed signal
   must be citable as a real `TrajectoryChangeSource` row (RNF-11), and
   `AssignmentSubmission` is never auto-created (Story 1.4). This is a
   deliberately stricter cut than 3.1's `missing_assignments_count` (which also
   counts total absence of any submission) — citability, not window math.
-- `PEDAGOGICAL_OBSERVATION`: confirms iff ≥1 `PedagogicalObservation` falls
-  inside `[period.start_date, period.end_date]` (caller already scopes the
-  query to that range, so here it is simply "non-empty").
+- `PEDAGOGICAL_OBSERVATION` (spec-ui-3): confirms iff ≥1
+  `PedagogicalObservation` inside `[period.start_date, period.end_date]` was
+  marked `registers_concern`. Neutral observations never confirm; the caller
+  still cites them as evidence when a change is detected.
 """
 
 from __future__ import annotations
@@ -43,7 +49,7 @@ from typing import Sequence
 
 from app.domain.assignment import Assignment
 from app.domain.assignment_submission import AssignmentSubmission, AssignmentSubmissionStatus
-from app.domain.attendance import AttendanceRecord
+from app.domain.attendance import AttendanceRecord, AttendanceStatus
 from app.domain.grade import Grade
 from app.domain.pedagogical_observation import PedagogicalObservation
 from app.domain.trajectory import _attendance_rate, _grade_average
@@ -51,10 +57,10 @@ from app.domain.trajectory_change import SourceType, TrajectoryChangeType
 
 _ATTENDANCE_RATE_THRESHOLD = Decimal("0.75")
 _ATTENDANCE_TREND_THRESHOLD = Decimal("-0.10")
-_GRADE_AVERAGE_THRESHOLD = Decimal("5.0")
-_GRADE_TREND_THRESHOLD = Decimal("-1.0")
-_MISSING_ASSIGNMENTS_COUNT_THRESHOLD = 2
-_MISSING_ASSIGNMENT_DELTA_THRESHOLD = 2
+# spec-ui-3: grades and assignments compare against the student's own earlier
+# períodos, never against a fixed cut shared by every student.
+_GRADE_DROP_BELOW_HABITUAL = Decimal("1.0")
+_MISSING_ABOVE_HABITUAL = 2
 _CITABLE_MISSING_STATUSES = (
     AssignmentSubmissionStatus.NOT_DELIVERED,
     AssignmentSubmissionStatus.PARTIAL,
@@ -82,7 +88,7 @@ _DESCRIPTION_PHRASE_BY_KIND: dict[SignalKind, str] = {
     SignalKind.ATTENDANCE: "queda de frequência",
     SignalKind.GRADE: "queda de notas",
     SignalKind.ASSIGNMENTS: "aumento de atividades pendentes",
-    SignalKind.PEDAGOGICAL_OBSERVATION: "registro pedagógico recente",
+    SignalKind.PEDAGOGICAL_OBSERVATION: "preocupação registrada pela equipe",
 }
 
 # Fixed, deterministic ordering for `build_description`'s phrase list —
@@ -139,23 +145,33 @@ def evaluate_attendance_signal(
     confirmed = (current_rate is not None and current_rate < _ATTENDANCE_RATE_THRESHOLD) or (
         trend is not None and trend <= _ATTENDANCE_TREND_THRESHOLD
     )
-    source_ids = tuple(record.id for record in current_records) if confirmed else ()
+    # spec-ui-3: cite only the absences. Days the student was present do not
+    # support a "queda de frequência" reading and flooded the evidence card.
+    source_ids = (
+        tuple(record.id for record in current_records if record.status != AttendanceStatus.PRESENT)
+        if confirmed
+        else ()
+    )
     return Signal(confirmed=confirmed, kind=SignalKind.ATTENDANCE, source_ids=source_ids)
 
 
 def evaluate_grade_signal(
     current_grades: Sequence[Grade],
-    previous_grades: Sequence[Grade],
+    earlier_period_grades: Sequence[Sequence[Grade]],
 ) -> Signal:
+    """`earlier_period_grades` holds one list per earlier período (any order,
+    empty lists ignored). Confirms when the current average sits at least
+    `_GRADE_DROP_BELOW_HABITUAL` below the lowest earlier average."""
     current_average = _grade_average(current_grades)
-    previous_average = _grade_average(previous_grades)
-    trend = (
-        current_average - previous_average
-        if current_average is not None and previous_average is not None
-        else None
-    )
-    confirmed = (current_average is not None and current_average < _GRADE_AVERAGE_THRESHOLD) or (
-        trend is not None and trend <= _GRADE_TREND_THRESHOLD
+    earlier_averages = [
+        average
+        for average in (_grade_average(grades) for grades in earlier_period_grades)
+        if average is not None
+    ]
+    confirmed = (
+        current_average is not None
+        and bool(earlier_averages)
+        and current_average <= min(earlier_averages) - _GRADE_DROP_BELOW_HABITUAL
     )
     source_ids = tuple(grade.id for grade in current_grades) if confirmed else ()
     return Signal(confirmed=confirmed, kind=SignalKind.GRADE, source_ids=source_ids)
@@ -182,17 +198,21 @@ def _citable_missing(
 
 def evaluate_assignments_signal(
     current_assignments: Sequence[Assignment],
-    previous_assignments: Sequence[Assignment],
+    earlier_period_assignments: Sequence[Sequence[Assignment]],
     submissions_by_assignment: dict[uuid.UUID, list[AssignmentSubmission]],
 ) -> Signal:
+    """`earlier_period_assignments` holds one list per earlier período.
+    Confirms when the current citable missing count is at least
+    `_MISSING_ABOVE_HABITUAL` above the highest earlier count."""
     current_count, current_source_ids = _citable_missing(
         current_assignments, submissions_by_assignment
     )
-    previous_count, _ = _citable_missing(previous_assignments, submissions_by_assignment)
-    delta = current_count - previous_count
-    confirmed = (
-        current_count >= _MISSING_ASSIGNMENTS_COUNT_THRESHOLD
-        or delta >= _MISSING_ASSIGNMENT_DELTA_THRESHOLD
+    earlier_counts = [
+        _citable_missing(assignments, submissions_by_assignment)[0]
+        for assignments in earlier_period_assignments
+    ]
+    confirmed = bool(earlier_counts) and (
+        current_count - max(earlier_counts) >= _MISSING_ABOVE_HABITUAL
     )
     source_ids = tuple(current_source_ids) if confirmed else ()
     return Signal(confirmed=confirmed, kind=SignalKind.ASSIGNMENTS, source_ids=source_ids)
@@ -201,8 +221,10 @@ def evaluate_assignments_signal(
 def evaluate_pedagogical_signal(
     observations: Sequence[PedagogicalObservation],
 ) -> Signal:
-    confirmed = len(observations) >= 1
-    source_ids = tuple(observation.id for observation in observations) if confirmed else ()
+    """spec-ui-3: only observations marked `registers_concern` confirm."""
+    concerns = [observation for observation in observations if observation.registers_concern]
+    confirmed = bool(concerns)
+    source_ids = tuple(observation.id for observation in concerns)
     return Signal(
         confirmed=confirmed, kind=SignalKind.PEDAGOGICAL_OBSERVATION, source_ids=source_ids
     )

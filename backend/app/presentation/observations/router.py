@@ -36,6 +36,7 @@ def register_observation(
             classroom_id=payload.classroom_id,
             text=payload.text,
             author_user_id=uuid.UUID(current_user.id),
+            registers_concern=payload.registers_concern,
         )
     except ClassroomNotFoundError as exc:
         raise AppError(
@@ -56,4 +57,5 @@ def register_observation(
         author_user_id=str(observation.author_user_id),
         text=observation.text,
         created_at=observation.created_at,
+        registers_concern=observation.registers_concern,
     )

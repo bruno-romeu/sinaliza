@@ -125,6 +125,9 @@ class GeneratedObservation:
     author_user_id: uuid.UUID
     text: str
     created_at: datetime
+    # spec-ui-3: declining profiles write observations that register a
+    # concern; `STABLE`'s routine sentences never do.
+    registers_concern: bool = False
 
 
 def _progress(index: int, total: int) -> float:
@@ -233,6 +236,7 @@ def build_observations(
                     author_user_id=author_user_id,
                     text=text,
                     created_at=datetime.combine(period.end_date, time(12, 0), tzinfo=UTC),
+                    registers_concern=profile is not SyntheticProfile.STABLE,
                 )
             )
 
