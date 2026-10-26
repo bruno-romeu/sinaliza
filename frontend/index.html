@@ -11,6 +11,22 @@
       href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..700&display=swap"
     />
     <title>Sinaliza</title>
+    <script>
+      // Applies the stored theme preference before first paint — mirrored in
+      // `src/theme/ThemeContext.tsx` (same storage key/logic) so a later
+      // in-app toggle stays consistent with this bootstrap.
+      (function () {
+        try {
+          var preference = localStorage.getItem('sinaliza.theme')
+          if (preference === 'light' || preference === 'dark') {
+            document.documentElement.setAttribute('data-theme', preference)
+          }
+        } catch (_err) {
+          // Storage unavailable (private browsing, disabled) — falls back to
+          // the OS preference via `prefers-color-scheme`, same as always.
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

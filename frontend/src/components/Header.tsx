@@ -1,8 +1,21 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { useTheme } from '../theme/useTheme'
 import { Button, ButtonLink } from './ui/Button'
 import { initials } from './ui/FollowupCard'
-import { Icon } from './ui/Icon'
+import { Icon, type IconName } from './ui/Icon'
+
+const THEME_ICON: Record<'system' | 'light' | 'dark', IconName> = {
+  system: 'monitor',
+  light: 'sol',
+  dark: 'lua',
+}
+
+const THEME_LABEL: Record<'system' | 'light' | 'dark', string> = {
+  system: 'Tema: automático (segue o sistema). Clique para usar o tema claro.',
+  light: 'Tema: claro. Clique para usar o tema escuro.',
+  dark: 'Tema: escuro. Clique para usar o tema automático.',
+}
 
 /**
  * Cabeçalho de todas as telas autenticadas (design system `AppHeader`):
@@ -11,6 +24,7 @@ import { Icon } from './ui/Icon'
  */
 export function Header() {
   const { user, logout } = useAuth()
+  const { preference, cycle } = useTheme()
   const { pathname } = useLocation()
   const onHome = pathname === '/home'
   const onLancamento = pathname.startsWith('/lancamento')
@@ -41,6 +55,9 @@ export function Header() {
               <span className="sz-header-name">{user.name}</span>
             </span>
           )}
+          <Button variant="quiet" onClick={cycle} aria-label={THEME_LABEL[preference]} title={THEME_LABEL[preference]}>
+            <Icon name={THEME_ICON[preference]} size={18} />
+          </Button>
           <Button variant="quiet" onClick={logout} aria-label="Sair">
             <Icon name="sair" size={18} />
           </Button>
