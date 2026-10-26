@@ -89,6 +89,19 @@ const PATHS = {
     </>
   ),
   sair: <path d="M15 4.5h3A1.5 1.5 0 0 1 19.5 6v12a1.5 1.5 0 0 1-1.5 1.5h-3M10 16l-4-4 4-4M6 12h10" />,
+  sol: (
+    <>
+      <circle cx={12} cy={12} r={4.5} />
+      <path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+    </>
+  ),
+  lua: <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z" />,
+  monitor: (
+    <>
+      <rect x={3} y={4.5} width={18} height={12} rx={1.5} />
+      <path d="M9 20.5h6M12 16.5v4" />
+    </>
+  ),
 } satisfies Record<string, ReactElement>
 
 export type IconName = keyof typeof PATHS
