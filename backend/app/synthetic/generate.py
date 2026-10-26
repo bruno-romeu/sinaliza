@@ -26,10 +26,15 @@ from app.infrastructure.db.models import (
     AttendanceRecordModel,
     ClassroomModel,
     EnrollmentModel,
+    FollowUpActionModel,
+    FollowUpEvidenceModel,
+    FollowUpModel,
     GradeModel,
     PedagogicalObservationModel,
     StudentModel,
     SyntheticGenerationRunModel,
+    TrajectoryChangeModel,
+    TrajectoryChangeSourceModel,
     UserModel,
 )
 from app.synthetic import facts, observations
@@ -93,7 +98,18 @@ def reset_generated_data(session: Session) -> None:
     Does not commit: the caller (`run_generation`) commits the deletes
     together with the regenerated rows, as one transaction, so a failure
     partway through population construction or insertion leaves the
-    database exactly as it was before `--reset` ran."""
+    database exactly as it was before `--reset` ran.
+
+    `follow_up_action`/`follow_up_evidence`/`follow_ups` and
+    `trajectory_change_sources`/`trajectory_changes` are also generated-base
+    content (Story 3.2/4.1, added after this function was first written) —
+    deleted first since both ultimately FK onto `students`, which only
+    `AttendanceRecord` et al. used to."""
+    session.query(FollowUpActionModel).delete()
+    session.query(FollowUpEvidenceModel).delete()
+    session.query(FollowUpModel).delete()
+    session.query(TrajectoryChangeSourceModel).delete()
+    session.query(TrajectoryChangeModel).delete()
     session.query(AssignmentSubmissionModel).delete()
     session.query(AssignmentModel).delete()
     session.query(GradeModel).delete()
