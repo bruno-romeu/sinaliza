@@ -31,6 +31,9 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sinaliza}:${POSTGRES_PASSWORD:-sinaliza}@postgres:5432/${POSTGRES_DB:-sinaliza}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+      # Rehearsal-only "today" pin (app.domain.as_of) — unset in the real
+      # deployment, see .env's SINALIZA_DEMO_AS_OF comment for the mechanism.
+      SINALIZA_DEMO_AS_OF: ${SINALIZA_DEMO_AS_OF:-}
 
   frontend:
     build:
