@@ -242,4 +242,10 @@ def test_train_split_student_invisible_across_trajectory_home_and_search(
         "/home/search?q=Estudante Treino", headers=headers
     )
     assert search_response.status_code == 200
-    assert search_response.json() == {"count": 0, "results": []}
+    assert search_response.json() == {
+        "count": 0,
+        "results": [],
+        "total": 0,
+        "page": 1,
+        "page_size": 20,
+    }

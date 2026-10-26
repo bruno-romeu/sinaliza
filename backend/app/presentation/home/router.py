@@ -4,18 +4,21 @@ other product route (spec-3-3 Boundaries & Constraints).
 `GET /home` only ever reads already-committed `TrajectoryChange` rows
 (`GetHomeService` -> `list_recent`, capped at 20) — it never recomputes
 trajectory; that stays request-scoped to `GET /students/{id}/trajectory`.
+Its `in_progress_follow_ups` list is paginated via `follow_ups_page`/
+`follow_ups_page_size` (open-case volume is operator-driven and otherwise
+grows unbounded over a real deployment's lifetime).
 
 `GET /home/search?q=` matches `q` against student name or classroom name
-(case-insensitive); an empty/no-match query is a normal 200 with an empty
-`results` array, never an error.
+(case-insensitive), paginated via `page`/`page_size`; an empty/no-match query
+is a normal 200 with an empty `results` array, never an error.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from app.application.home.get_home import GetHomeService
-from app.application.home.search_students import SearchStudentsService
+from app.application.home.get_home import DEFAULT_FOLLOW_UPS_PAGE_SIZE, GetHomeService
+from app.application.home.search_students import DEFAULT_PAGE_SIZE, SearchStudentsService
 from app.composition import get_get_home_service, get_search_students_service
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.schemas.home import (
@@ -30,8 +33,12 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @router.get("/home", response_model=HomeOut)
-def get_home(service: GetHomeService = Depends(get_get_home_service)) -> HomeOut:
-    result = service.execute()
+def get_home(
+    follow_ups_page: int = Query(default=1, ge=1),
+    follow_ups_page_size: int = Query(default=DEFAULT_FOLLOW_UPS_PAGE_SIZE, ge=1, le=100),
+    service: GetHomeService = Depends(get_get_home_service),
+) -> HomeOut:
+    result = service.execute(follow_ups_page, follow_ups_page_size)
     return HomeOut(
         recent_changes=[
             RecentChangeOut(
@@ -50,21 +57,29 @@ def get_home(service: GetHomeService = Depends(get_get_home_service)) -> HomeOut
                 student_name=active.student_name,
                 status=active.follow_up.status.value,
             )
-            for active in result.active_follow_ups
+            for active in result.active_follow_ups.items
         ],
+        in_progress_follow_ups_total=result.active_follow_ups.total,
+        in_progress_follow_ups_page=result.active_follow_ups.page,
+        in_progress_follow_ups_page_size=result.active_follow_ups.page_size,
     )
 
 
 @router.get("/home/search", response_model=StudentSearchOut)
 def search_students(
     q: str = Query(default=""),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=100),
     service: SearchStudentsService = Depends(get_search_students_service),
 ) -> StudentSearchOut:
-    results = service.execute(q)
+    page_result = service.execute(q, page, page_size)
     return StudentSearchOut(
         results=[
-            StudentSearchResultOut(id=result.id, name=result.name, classroom_name=result.classroom_name)
-            for result in results
+            StudentSearchResultOut(id=item.id, name=item.name, classroom_name=item.classroom_name)
+            for item in page_result.results
         ],
-        count=len(results),
+        count=len(page_result.results),
+        total=page_result.total,
+        page=page_result.page,
+        page_size=page_result.page_size,
     )

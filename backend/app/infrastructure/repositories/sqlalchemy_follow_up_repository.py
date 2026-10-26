@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.domain.follow_up import FollowUp, FollowUpAction, FollowUpEvidence, FollowUpStatus
@@ -107,14 +107,18 @@ class SqlAlchemyFollowUpRepository:
             created_at=model.created_at,
         )
 
-    def list_active(self) -> list[FollowUp]:
-        # spec-4-5: every `FollowUp` whose status is not `ENCERRADO` (never
-        # capped/paginated — open-case volume is operator-driven, unlike the
-        # high-volume synthetic `TrajectoryChange` rows `list_recent` caps).
+    def list_active(self, limit: int, offset: int) -> list[FollowUp]:
+        # Every `FollowUp` whose status is not `ENCERRADO`, paginated by
+        # `limit`/`offset` — open-case volume is operator-driven and grows
+        # without bound over the life of the deployment, so (unlike the
+        # synthetic-only `TrajectoryChange` rows `list_recent` caps at a
+        # fixed 20) this needs real pagination rather than a fixed cap.
         stmt = (
             select(FollowUpModel)
             .where(FollowUpModel.status != FollowUpStatus.ENCERRADO)
             .order_by(FollowUpModel.created_at.desc(), FollowUpModel.id.desc())
+            .limit(limit)
+            .offset(offset)
         )
         models = self._session.execute(stmt).scalars().all()
         return [
@@ -129,6 +133,12 @@ class SqlAlchemyFollowUpRepository:
             )
             for model in models
         ]
+
+    def count_active(self) -> int:
+        stmt = select(func.count()).select_from(FollowUpModel).where(
+            FollowUpModel.status != FollowUpStatus.ENCERRADO
+        )
+        return self._session.execute(stmt).scalar_one()
 
     def list_evidence_by_follow_up(self, follow_up_id: uuid.UUID) -> list[FollowUpEvidence]:
         # Joined to `trajectory_changes` purely to order by its `detected_at`

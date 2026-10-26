@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.domain.student import Student, StudentProfile, StudentSearchResult
@@ -78,17 +78,21 @@ class SqlAlchemyStudentRepository:
         student, classroom_name = row
         return StudentProfile(id=student.id, name=student.name, classroom_name=classroom_name)
 
-    def search(self, query: str, limit: int) -> list[StudentSearchResult]:
+    @staticmethod
+    def _match_pattern(query: str) -> str:
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        return f"%{escaped}%"
+
+    def search(self, query: str, limit: int, offset: int) -> list[StudentSearchResult]:
         """Home's student search (spec-3-3 Boundaries & Constraints):
         case-insensitive (`ILIKE`) match on either `StudentModel.name` or the
         joined `ClassroomModel.name`, scoped to `filter_eval_demo_students`
         (AD-11), same as every other student-facing read.
 
-        Capped at `limit` rows (decision: same 20-row cap as `list_recent`,
-        no "showing N of M" count indicator) so a short query can't return
-        the entire matching `EVAL_DEMO` roster unbounded."""
-        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        pattern = f"%{escaped}%"
+        Paginated by `limit`/`offset` — `count_matches` reports the true
+        total so the caller can page through every match instead of a fixed
+        cap silently hiding the rest."""
+        pattern = self._match_pattern(query)
         stmt = (
             select(StudentModel, ClassroomModel.name)
             .join(EnrollmentModel, EnrollmentModel.student_id == StudentModel.id)
@@ -99,8 +103,9 @@ class SqlAlchemyStudentRepository:
                     ClassroomModel.name.ilike(pattern, escape="\\"),
                 )
             )
-            .order_by(StudentModel.name)
+            .order_by(StudentModel.name, StudentModel.id)
             .limit(limit)
+            .offset(offset)
         )
         stmt = filter_eval_demo_students(stmt)
         rows = self._session.execute(stmt).all()
@@ -108,3 +113,20 @@ class SqlAlchemyStudentRepository:
             StudentSearchResult(id=student.id, name=student.name, classroom_name=classroom_name)
             for student, classroom_name in rows
         ]
+
+    def count_matches(self, query: str) -> int:
+        pattern = self._match_pattern(query)
+        stmt = (
+            select(func.count(func.distinct(StudentModel.id)))
+            .select_from(StudentModel)
+            .join(EnrollmentModel, EnrollmentModel.student_id == StudentModel.id)
+            .join(ClassroomModel, ClassroomModel.id == EnrollmentModel.classroom_id)
+            .where(
+                or_(
+                    StudentModel.name.ilike(pattern, escape="\\"),
+                    ClassroomModel.name.ilike(pattern, escape="\\"),
+                )
+            )
+        )
+        stmt = filter_eval_demo_students(stmt)
+        return self._session.execute(stmt).scalar_one()

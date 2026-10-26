@@ -35,6 +35,9 @@ class InProgressFollowUpOut(BaseModel):
 class HomeOut(BaseModel):
     recent_changes: list[RecentChangeOut]
     in_progress_follow_ups: list[InProgressFollowUpOut]
+    in_progress_follow_ups_total: int
+    in_progress_follow_ups_page: int
+    in_progress_follow_ups_page_size: int
 
 
 class StudentSearchResultOut(BaseModel):
@@ -46,3 +49,6 @@ class StudentSearchResultOut(BaseModel):
 class StudentSearchOut(BaseModel):
     results: list[StudentSearchResultOut]
     count: int
+    total: int
+    page: int
+    page_size: int
