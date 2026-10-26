@@ -17,24 +17,44 @@ The query is trimmed before being handed to the repository, so a trailing or
 leading space (e.g. `"Ana "`) still matches a student literally named `"Ana"`
 instead of silently failing to match.
 
-Results are capped at `SEARCH_RESULTS_LIMIT`, mirroring `GetHomeService`'s
-`RECENT_CHANGES_LIMIT` (decision: same cap, no "showing N of M" affordance —
-kept simple and consistent with the recent-changes list's existing display)."""
+Paginated by `page`/`page_size` (1-indexed, same convention as
+`GetHomeService`'s follow-up pagination) — `DEFAULT_PAGE_SIZE` matches the
+old fixed `SEARCH_RESULTS_LIMIT` cap exactly, so a caller that never passes
+either keeps seeing today's first-20-results behavior; `total` (the true
+match count, not just this page's length) is what makes paging past that
+first page possible."""
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 from app.application.home.ports import StudentSearchRepositoryPort
 from app.domain.student import StudentSearchResult
 
-SEARCH_RESULTS_LIMIT = 20
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
+
+
+@dataclass(frozen=True)
+class StudentSearchPage:
+    results: list[StudentSearchResult]
+    total: int
+    page: int
+    page_size: int
 
 
 class SearchStudentsService:
     def __init__(self, student_repository: StudentSearchRepositoryPort) -> None:
         self._student_repository = student_repository
 
-    def execute(self, query: str) -> list[StudentSearchResult]:
+    def execute(
+        self, query: str, page: int = 1, page_size: int = DEFAULT_PAGE_SIZE
+    ) -> StudentSearchPage:
         trimmed = query.strip()
         if not trimmed:
-            return []
-        return self._student_repository.search(trimmed, SEARCH_RESULTS_LIMIT)
+            return StudentSearchPage(results=[], total=0, page=page, page_size=page_size)
+
+        total = self._student_repository.count_matches(trimmed)
+        offset = (page - 1) * page_size
+        results = self._student_repository.search(trimmed, page_size, offset)
+        return StudentSearchPage(results=results, total=total, page=page, page_size=page_size)

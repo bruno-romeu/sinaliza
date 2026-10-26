@@ -119,7 +119,13 @@ def test_home_with_no_trajectory_changes_returns_empty_list(
     response = client.get("/home", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
-    assert response.json() == {"recent_changes": [], "in_progress_follow_ups": []}
+    assert response.json() == {
+        "recent_changes": [],
+        "in_progress_follow_ups": [],
+        "in_progress_follow_ups_total": 0,
+        "in_progress_follow_ups_page": 1,
+        "in_progress_follow_ups_page_size": 20,
+    }
 
 
 # --- Caps at 20 -----------------------------------------------------------------------
@@ -289,14 +295,15 @@ def test_home_breaks_follow_up_created_at_tie_by_id_desc(
     assert student_names == ["Estudante FU Alto", "Estudante FU Baixo"]
 
 
-def test_home_returns_more_than_twenty_active_follow_ups_uncapped(
+def test_home_paginates_active_follow_ups_at_twenty_per_page_by_default(
     client: TestClient,
     seeded_user,
     db_session: Session,
 ) -> None:
-    """`list_active()` is explicitly never capped (spec-4-5 Never — unlike
-    `list_recent`'s 20-row cap) — pins that 25 seeded active follow-ups all
-    come back, not truncated to 20."""
+    """Open-case volume grows without bound over a real deployment's
+    lifetime, so `list_active` is paginated (20 per page by default) rather
+    than returned whole — pins that 25 seeded active follow-ups come back as
+    a 20-item first page plus an accurate `total`."""
     base_time = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
     for i in range(25):
         student = StudentModel(name=f"Estudante FU {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
@@ -314,7 +321,75 @@ def test_home_returns_more_than_twenty_active_follow_ups_uncapped(
     response = client.get("/home", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
-    assert len(response.json()["in_progress_follow_ups"]) == 25
+    body = response.json()
+    assert len(body["in_progress_follow_ups"]) == 20
+    assert body["in_progress_follow_ups_total"] == 25
+    assert body["in_progress_follow_ups_page"] == 1
+    assert body["in_progress_follow_ups_page_size"] == 20
+
+
+def test_home_follow_ups_second_page_returns_the_remainder(
+    client: TestClient,
+    seeded_user,
+    db_session: Session,
+) -> None:
+    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    for i in range(25):
+        student = StudentModel(name=f"Estudante FU {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
+        db_session.add(student)
+        db_session.flush()
+        _add_follow_up(
+            db_session,
+            student,
+            seeded_user.id,
+            FollowUpStatus.EM_OBSERVACAO,
+            base_time - timedelta(days=i),
+        )
+    db_session.commit()
+
+    response = client.get(
+        "/home?follow_ups_page=2", headers=_auth_headers(client, seeded_user)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["in_progress_follow_ups"]) == 5
+    assert body["in_progress_follow_ups_total"] == 25
+    assert body["in_progress_follow_ups_page"] == 2
+    # The oldest 5 (days 20..24 ago) — page 1 already returned the 20 newest.
+    assert [row["student_name"] for row in body["in_progress_follow_ups"]] == [
+        f"Estudante FU {i:02d}" for i in range(20, 25)
+    ]
+
+
+def test_home_follow_ups_page_size_query_param_overrides_default(
+    client: TestClient,
+    seeded_user,
+    db_session: Session,
+) -> None:
+    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    for i in range(5):
+        student = StudentModel(name=f"Estudante FU {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
+        db_session.add(student)
+        db_session.flush()
+        _add_follow_up(
+            db_session,
+            student,
+            seeded_user.id,
+            FollowUpStatus.EM_OBSERVACAO,
+            base_time - timedelta(days=i),
+        )
+    db_session.commit()
+
+    response = client.get(
+        "/home?follow_ups_page_size=2", headers=_auth_headers(client, seeded_user)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["in_progress_follow_ups"]) == 2
+    assert body["in_progress_follow_ups_total"] == 5
+    assert body["in_progress_follow_ups_page_size"] == 2
 
 
 def test_home_excludes_encerrado_follow_ups(
@@ -411,7 +486,7 @@ def test_home_search_excludes_train_split_students(
     )
 
     assert response.status_code == 200
-    assert response.json() == {"results": [], "count": 0}
+    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 20}
 
 
 # --- Search no match -------------------------------------------------------------------
@@ -428,7 +503,7 @@ def test_home_search_no_match_returns_empty_results(
     )
 
     assert response.status_code == 200
-    assert response.json() == {"results": [], "count": 0}
+    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 20}
 
 
 # --- Blank/whitespace q short-circuit (HTTP boundary) ----------------------------------
@@ -446,7 +521,7 @@ def test_home_search_blank_q_returns_empty_results(
     response = client.get("/home/search?q=", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
-    assert response.json() == {"results": [], "count": 0}
+    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 20}
 
 
 def test_home_search_whitespace_only_q_returns_empty_results(
@@ -457,7 +532,7 @@ def test_home_search_whitespace_only_q_returns_empty_results(
     response = client.get("/home/search?q=%20%20%20", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
-    assert response.json() == {"results": [], "count": 0}
+    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 20}
 
 
 # --- %/_ escaping in the ILIKE pattern ---------------------------------------------------
@@ -515,17 +590,18 @@ def test_home_search_escapes_underscore_wildcard(
     assert body["results"][0]["name"] == "A_a"
 
 
-# --- Search results cap -----------------------------------------------------------------
+# --- Search pagination -----------------------------------------------------------------
 
 
-def test_home_search_caps_results_at_twenty(
+def test_home_search_paginates_at_twenty_per_page_by_default(
     client: TestClient,
     seeded_user,
     seeded_classroom: ClassroomModel,
     db_session: Session,
 ) -> None:
-    """`GET /home/search` caps results at 20, same as `list_recent` (decision:
-    no "showing N of M" affordance, kept simple and consistent)."""
+    """`GET /home/search` pages at 20 per page by default — `total` reports
+    every match, not just this page's length, so a caller can page through
+    the rest instead of it silently vanishing past the cap."""
     for i in range(25):
         student = StudentModel(name=f"Busca {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
         db_session.add(student)
@@ -539,6 +615,59 @@ def test_home_search_caps_results_at_twenty(
     body = response.json()
     assert body["count"] == 20
     assert len(body["results"]) == 20
+    assert body["total"] == 25
+    assert body["page"] == 1
+    assert body["page_size"] == 20
+
+
+def test_home_search_second_page_returns_the_remainder(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    db_session: Session,
+) -> None:
+    for i in range(25):
+        student = StudentModel(name=f"Busca {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
+        db_session.add(student)
+        db_session.flush()
+        db_session.add(EnrollmentModel(student_id=student.id, classroom_id=seeded_classroom.id))
+    db_session.commit()
+
+    response = client.get(
+        "/home/search?q=Busca&page=2", headers=_auth_headers(client, seeded_user)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["results"]) == 5
+    assert body["total"] == 25
+    assert body["page"] == 2
+    # Ordered by name, so page 1 took "Busca 00".."Busca 19" alphabetically.
+    assert [r["name"] for r in body["results"]] == [f"Busca {i:02d}" for i in range(20, 25)]
+
+
+def test_home_search_page_size_query_param_overrides_default(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    db_session: Session,
+) -> None:
+    for i in range(5):
+        student = StudentModel(name=f"Busca {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
+        db_session.add(student)
+        db_session.flush()
+        db_session.add(EnrollmentModel(student_id=student.id, classroom_id=seeded_classroom.id))
+    db_session.commit()
+
+    response = client.get(
+        "/home/search?q=Busca&page_size=2", headers=_auth_headers(client, seeded_user)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["results"]) == 2
+    assert body["total"] == 5
+    assert body["page_size"] == 2
 
 
 # --- Unauthenticated ---------------------------------------------------------------------

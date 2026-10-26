@@ -17,9 +17,12 @@ ever comes back empty, rather than crash the whole Home read over one bad
 row.
 
 spec-4-5 extends this service to also read every `FollowUp` whose status is
-not `ENCERRADO` via `FollowUpRepositoryPort.list_active` (never capped — see
-that port's docstring) — the same `student_name` resolution/skip-if-`None`
-pattern is reused for these rows.
+not `ENCERRADO` via `FollowUpRepositoryPort.list_active` — paginated by
+`follow_ups_page`/`follow_ups_page_size` (1-indexed; `DEFAULT_FOLLOW_UPS_PAGE_SIZE`
+matches the old fixed behavior's effective page-1 view) rather than the
+originally-"never capped" list, since open-case volume grows without bound
+over the life of a real deployment — the same `student_name`
+resolution/skip-if-`None` pattern is reused for these rows.
 """
 
 from __future__ import annotations
@@ -35,6 +38,8 @@ from app.domain.follow_up import FollowUp
 from app.domain.trajectory_change import TrajectoryChange
 
 RECENT_CHANGES_LIMIT = 20
+DEFAULT_FOLLOW_UPS_PAGE_SIZE = 20
+MAX_FOLLOW_UPS_PAGE_SIZE = 100
 
 
 @dataclass(frozen=True)
@@ -50,9 +55,17 @@ class ActiveFollowUp:
 
 
 @dataclass(frozen=True)
+class ActiveFollowUpsPage:
+    items: list[ActiveFollowUp]
+    total: int
+    page: int
+    page_size: int
+
+
+@dataclass(frozen=True)
 class HomeResult:
     recent_changes: list[RecentChange]
-    active_follow_ups: list[ActiveFollowUp]
+    active_follow_ups: ActiveFollowUpsPage
 
 
 class GetHomeService:
@@ -66,7 +79,11 @@ class GetHomeService:
         self._student_repository = student_repository
         self._follow_up_repository = follow_up_repository
 
-    def execute(self) -> HomeResult:
+    def execute(
+        self,
+        follow_ups_page: int = 1,
+        follow_ups_page_size: int = DEFAULT_FOLLOW_UPS_PAGE_SIZE,
+    ) -> HomeResult:
         changes = self._trajectory_change_repository.list_recent(RECENT_CHANGES_LIMIT)
 
         recent_changes: list[RecentChange] = []
@@ -76,7 +93,9 @@ class GetHomeService:
                 continue
             recent_changes.append(RecentChange(trajectory_change=change, student_name=student.name))
 
-        follow_ups = self._follow_up_repository.list_active()
+        total_active_follow_ups = self._follow_up_repository.count_active()
+        offset = (follow_ups_page - 1) * follow_ups_page_size
+        follow_ups = self._follow_up_repository.list_active(follow_ups_page_size, offset)
 
         active_follow_ups: list[ActiveFollowUp] = []
         for follow_up in follow_ups:
@@ -85,4 +104,12 @@ class GetHomeService:
                 continue
             active_follow_ups.append(ActiveFollowUp(follow_up=follow_up, student_name=student.name))
 
-        return HomeResult(recent_changes=recent_changes, active_follow_ups=active_follow_ups)
+        return HomeResult(
+            recent_changes=recent_changes,
+            active_follow_ups=ActiveFollowUpsPage(
+                items=active_follow_ups,
+                total=total_active_follow_ups,
+                page=follow_ups_page,
+                page_size=follow_ups_page_size,
+            ),
+        )
