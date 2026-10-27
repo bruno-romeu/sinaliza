@@ -58,12 +58,14 @@ class SqlAlchemyPedagogicalObservationRepository:
         author_user_id: uuid.UUID,
         text: str,
         created_at: datetime,
+        registers_concern: bool = False,
     ) -> PedagogicalObservation:
         model = PedagogicalObservationModel(
             student_id=student_id,
             author_user_id=author_user_id,
             text=text,
             created_at=created_at,
+            registers_concern=registers_concern,
         )
         self._session.add(model)
         self._session.commit()
@@ -74,6 +76,7 @@ class SqlAlchemyPedagogicalObservationRepository:
             author_user_id=model.author_user_id,
             text=model.text,
             created_at=model.created_at,
+            registers_concern=model.registers_concern,
         )
 
     def list_by_student_in_range(
@@ -94,6 +97,7 @@ class SqlAlchemyPedagogicalObservationRepository:
                 author_user_id=model.author_user_id,
                 text=model.text,
                 created_at=model.created_at,
+                registers_concern=model.registers_concern,
             )
             for model in models
         ]
@@ -130,6 +134,7 @@ class SqlAlchemyPedagogicalObservationRepository:
                     else model.text
                 ),
                 created_at=model.created_at,
+                registers_concern=model.registers_concern,
             )
             for model in models
         ]

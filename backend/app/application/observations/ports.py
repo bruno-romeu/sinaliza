@@ -21,4 +21,5 @@ class PedagogicalObservationRepositoryPort(Protocol):
         author_user_id: uuid.UUID,
         text: str,
         created_at: datetime,
+        registers_concern: bool = False,
     ) -> PedagogicalObservation: ...

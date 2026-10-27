@@ -99,6 +99,8 @@ def _detect_attendance_drop_change(
             author_user_id=author_user_id,
             text="Observação de teste.",
             created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()
@@ -276,6 +278,8 @@ def test_recompute_after_follow_up_evidence_exists_keeps_change_frozen(
             author_user_id=seeded_user.id,
             text="Nova observação pós-congelamento.",
             created_at=datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()

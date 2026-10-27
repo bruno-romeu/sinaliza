@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { EvidenceItem } from '../../api/client'
 import { Icon } from './Icon'
@@ -8,7 +8,11 @@ import { INDICATORS, INDICATOR_BY_SOURCE_TYPE } from './indicators'
  * Card de evidência: explica uma mudança detectada e lista os registros que
  * a sustentam. Sempre expandido. Só o cabeçalho recebe `attention-tint`.
  * A data de cada registro já vem dentro de `evidence[].description`.
+ * Com mais de `EVIDENCE_PREVIEW` registros, mostra os primeiros e um botão
+ * para ver todos, para a lista não esconder o resto da tela.
  */
+const EVIDENCE_PREVIEW = 5
+
 export function EvidenceCard({
   id,
   kicker,
@@ -27,6 +31,10 @@ export function EvidenceCard({
   linkLabel?: ReactNode
 }) {
   const titleId = id ? `${id}-title` : undefined
+  const [showAll, setShowAll] = useState(false)
+  const hidden = evidence.length - EVIDENCE_PREVIEW
+  const shown = showAll || hidden <= 0 ? evidence : evidence.slice(0, EVIDENCE_PREVIEW)
+  const listId = id ? `${id}-sources` : undefined
   return (
     <article className="sz-card sz-evidence" id={id} aria-labelledby={titleId} tabIndex={id ? -1 : undefined}>
       <div className="sz-evidence-head">
@@ -45,8 +53,8 @@ export function EvidenceCard({
         {evidence.length > 0 && (
           <>
             <p className="sz-sources-k">Registros que sustentam esta leitura</p>
-            <ul className="sz-sources">
-              {evidence.map((item, index) => {
+            <ul className="sz-sources" id={listId}>
+              {shown.map((item, index) => {
                 const info = INDICATORS[INDICATOR_BY_SOURCE_TYPE[item.source_type]]
                 return (
                   <li key={`${item.source_type}-${index}`}>
@@ -56,6 +64,18 @@ export function EvidenceCard({
                 )
               })}
             </ul>
+            {hidden > 0 && (
+              <button
+                type="button"
+                className="sz-btn sz-btn-quiet sz-sources-more"
+                aria-expanded={showAll}
+                aria-controls={listId}
+                onClick={() => setShowAll((value) => !value)}
+              >
+                <Icon name="chevron" size={18} style={{ transform: showAll ? 'rotate(180deg)' : undefined }} />
+                {showAll ? 'Mostrar menos' : `Ver todos os ${evidence.length} registros`}
+              </button>
+            )}
           </>
         )}
         {linkTo && (
