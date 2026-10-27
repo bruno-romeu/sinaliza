@@ -50,6 +50,32 @@ def _auth_headers(client: TestClient, seeded_user) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _add_earlier_period(db_session: Session, student_id, classroom_id, grade: str | None = None):
+    """spec-ui-3: grades and assignments compare against the student's own
+    earlier períodos, so tests that expect those signals need one. Optionally
+    writes a grade for it (the student's habitual level)."""
+    period = AcademicPeriodModel(
+        label="2º Bimestre Teste",
+        start_date=date(2026, 4, 20),
+        end_date=date(2026, 6, 26),
+        order_index=2,
+    )
+    db_session.add(period)
+    db_session.flush()
+    if grade is not None:
+        db_session.add(
+            GradeModel(
+                student_id=student_id,
+                classroom_id=classroom_id,
+                subject="Matemática",
+                period_id=period.id,
+                date=date(2026, 6, 20),
+                value=Decimal(grade),
+            )
+        )
+    return period
+
+
 def _add_low_attendance(
     db_session: Session, student_id, classroom_id, present_count: int, absent_count: int
 ) -> None:
@@ -91,6 +117,8 @@ def test_detail_with_detected_change_includes_resolved_evidence_and_omits_concer
             author_user_id=seeded_user.id,
             text="Observação de teste.",
             created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()
@@ -111,8 +139,12 @@ def test_detail_with_detected_change_includes_resolved_evidence_and_omits_concer
     assert body["concerning_factor"] is None
 
     # Every evidence item traces to a real source record, never free text
-    # alone (RNF-11).
-    assert len(body["evidence"]) == 4
+    # alone (RNF-11). spec-ui-3: the 2 absences + the observation; the day
+    # the student was present is never cited.
+    assert len(body["evidence"]) == 3
+    assert not any(
+        item["description"].startswith("Presença registrada") for item in body["evidence"]
+    )
     source_types = {item["source_type"] for item in body["evidence"]}
     assert source_types == {"ATTENDANCE_RECORD", "PEDAGOGICAL_OBSERVATION"}
     for item in body["evidence"]:
@@ -210,7 +242,72 @@ def test_detail_with_single_confirmed_signal_has_concerning_factor_and_no_eviden
 # --- Habitual range: >=2 history points ------------------------------------------------
 
 
-def test_detail_habitual_range_is_min_max_of_students_own_series(
+def test_detail_habitual_range_comes_from_earlier_periods_only(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    """spec-ui-3: the band is the student's own earlier períodos, never the
+    point being compared, otherwise a change could not fall outside it."""
+    first_period = AcademicPeriodModel(
+        label="1º Bimestre Teste",
+        start_date=date(2026, 2, 2),
+        end_date=date(2026, 4, 17),
+        order_index=1,
+    )
+    previous_period = AcademicPeriodModel(
+        label="2º Bimestre Teste",
+        start_date=date(2026, 5, 1),
+        end_date=date(2026, 7, 26),
+        order_index=2,
+    )
+    db_session.add_all([first_period, previous_period])
+    db_session.flush()
+
+    def _record(day: date, status: AttendanceStatus) -> AttendanceRecordModel:
+        return AttendanceRecordModel(
+            student_id=seeded_enrolled_student.id,
+            classroom_id=seeded_classroom.id,
+            date=day,
+            status=status,
+        )
+
+    db_session.add_all(
+        [
+            # 1º: rate 1.0
+            _record(date(2026, 4, 10), AttendanceStatus.PRESENT),
+            # 2º: rate 0.5
+            _record(date(2026, 7, 20), AttendanceStatus.PRESENT),
+            _record(date(2026, 7, 21), AttendanceStatus.ABSENT_UNJUSTIFIED),
+            # current: rate 0.0, outside the band
+            _record(date(2026, 9, 20), AttendanceStatus.ABSENT_UNJUSTIFIED),
+            _record(date(2026, 9, 21), AttendanceStatus.ABSENT_UNJUSTIFIED),
+        ]
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [point["period_id"] for point in body["series"]] == [
+        str(first_period.id),
+        str(previous_period.id),
+        str(seeded_academic_period.id),
+    ]
+    assert Decimal(body["series"][2]["value"]) == Decimal("0")
+    assert body["habitual_range"] is not None
+    assert Decimal(body["habitual_range"]["low"]) == Decimal("0.5")
+    assert Decimal(body["habitual_range"]["high"]) == Decimal("1.0")
+
+
+def test_detail_habitual_range_is_none_with_a_single_earlier_point(
     client: TestClient,
     seeded_user,
     seeded_classroom: ClassroomModel,
@@ -226,29 +323,18 @@ def test_detail_habitual_range_is_min_max_of_students_own_series(
     )
     db_session.add(previous_period)
     db_session.flush()
-
-    # Previous período: 1/1 present -> rate 1.0 within its own ending window.
-    db_session.add(
-        AttendanceRecordModel(
-            student_id=seeded_enrolled_student.id,
-            classroom_id=seeded_classroom.id,
-            date=date(2026, 7, 20),
-            status=AttendanceStatus.PRESENT,
-        )
-    )
-    # Current período: 1 present + 1 absent -> rate 0.5.
     db_session.add_all(
         [
             AttendanceRecordModel(
                 student_id=seeded_enrolled_student.id,
                 classroom_id=seeded_classroom.id,
-                date=date(2026, 9, 20),
+                date=date(2026, 7, 20),
                 status=AttendanceStatus.PRESENT,
             ),
             AttendanceRecordModel(
                 student_id=seeded_enrolled_student.id,
                 classroom_id=seeded_classroom.id,
-                date=date(2026, 9, 21),
+                date=date(2026, 9, 20),
                 status=AttendanceStatus.ABSENT_UNJUSTIFIED,
             ),
         ]
@@ -261,14 +347,45 @@ def test_detail_habitual_range_is_min_max_of_students_own_series(
     )
 
     assert response.status_code == 200
-    body = response.json()
-    assert len(body["series"]) == 2
-    # Ordered by start_date ascending.
-    assert body["series"][0]["period_id"] == str(previous_period.id)
-    assert body["series"][1]["period_id"] == str(seeded_academic_period.id)
-    assert body["habitual_range"] is not None
-    assert Decimal(body["habitual_range"]["low"]) == Decimal("0.5")
-    assert Decimal(body["habitual_range"]["high"]) == Decimal("1.0")
+    assert response.json()["habitual_range"] is None
+
+
+def test_detail_period_that_has_not_started_has_no_value(
+    client: TestClient,
+    seeded_user,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    """spec-ui-3: the 4º bimestre used to repeat today's value."""
+    next_period = AcademicPeriodModel(
+        label="4º Bimestre Teste",
+        start_date=date(2026, 9, 28),
+        end_date=date(2026, 12, 18),
+        order_index=4,
+    )
+    db_session.add(next_period)
+    db_session.add(
+        AttendanceRecordModel(
+            student_id=seeded_enrolled_student.id,
+            classroom_id=seeded_classroom.id,
+            date=date(2026, 9, 20),
+            status=AttendanceStatus.PRESENT,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/students/{seeded_enrolled_student.id}/trajectory/detail",
+        headers=_auth_headers(client, seeded_user),
+    )
+
+    assert response.status_code == 200
+    series = response.json()["series"]
+    assert series[-1]["period_id"] == str(next_period.id)
+    assert series[-1]["value"] is None
+    assert series[0]["value"] is not None
 
 
 # --- Unknown/TRAIN student -----------------------------------------------------------
@@ -311,6 +428,7 @@ def test_detail_chart_indicator_follows_grade_drop_change_type(
     seeded_academic_period: AcademicPeriodModel,
     db_session: Session,
 ) -> None:
+    _add_earlier_period(db_session, seeded_enrolled_student.id, seeded_classroom.id, "6.00")
     db_session.add(
         GradeModel(
             student_id=seeded_enrolled_student.id,
@@ -327,6 +445,8 @@ def test_detail_chart_indicator_follows_grade_drop_change_type(
             author_user_id=seeded_user.id,
             text="Observação de teste.",
             created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()
@@ -352,6 +472,9 @@ def test_detail_chart_indicator_follows_missing_assignments_change_type(
     seeded_academic_period: AcademicPeriodModel,
     db_session: Session,
 ) -> None:
+    # spec-ui-3: an earlier período with no missing assignments is the
+    # student's habitual level; 2 missing now is 2 above it.
+    _add_earlier_period(db_session, seeded_enrolled_student.id, seeded_classroom.id)
     for i in range(2):
         assignment = AssignmentModel(
             classroom_id=seeded_classroom.id,
@@ -375,6 +498,8 @@ def test_detail_chart_indicator_follows_missing_assignments_change_type(
             author_user_id=seeded_user.id,
             text="Observação de teste.",
             created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()
@@ -413,6 +538,7 @@ def test_detail_chart_indicator_follows_combined_deterioration_change_type(
     Boundaries mandate `attendance_rate` for this type (same as the lone-signal
     ATTENDANCE_DROP case)."""
     _add_low_attendance(db_session, seeded_enrolled_student.id, seeded_classroom.id, 1, 2)
+    _add_earlier_period(db_session, seeded_enrolled_student.id, seeded_classroom.id, "7.00")
     db_session.add(
         GradeModel(
             student_id=seeded_enrolled_student.id,
@@ -555,6 +681,8 @@ def test_detail_observations_are_capped_at_ten_desc_by_date(
                 author_user_id=seeded_user.id,
                 text=f"Observação {i}.",
                 created_at=datetime(2026, 1, 1 + i, 12, 0, tzinfo=timezone.utc),
+                # spec-ui-3: only a concern-marked observation is a signal.
+                registers_concern=True,
             )
         )
     db_session.commit()
@@ -609,6 +737,8 @@ def test_detail_evidence_redacts_observation_text_once_cited_by_a_follow_up_for_
             author_user_id=seeded_user.id,
             text="Observação de teste.",
             created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()
@@ -677,6 +807,8 @@ def test_detail_timeline_redacts_observation_text_once_cited_by_a_follow_up_for_
             author_user_id=seeded_user.id,
             text="Observação de teste.",
             created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            # spec-ui-3: only a concern-marked observation is a signal.
+            registers_concern=True,
         )
     )
     db_session.commit()

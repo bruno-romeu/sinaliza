@@ -33,9 +33,13 @@ duplicates it — and layers three new reads on top:
 
 `chart_indicator` is chosen deterministically from `trajectory_change.type`
 (spec Boundaries & Constraints table); absent a change, `attendance_rate` is
-the default. `habitual_range` is the min/max of the series' own non-null
-values — the student's own history only, never the classroom's — and is
-`None` with fewer than 2 non-null points, never a fabricated range.
+the default. `habitual_range` (spec-ui-3) is the min/max of the non-null
+values of the períodos *before* the reference período (the change's período,
+or the current one when there is no change) — the student's own history
+only, never the classroom's, and never including the point being compared,
+otherwise a change could never fall outside its own band. It is `None` with
+fewer than 2 earlier non-null points, never a fabricated range. A período
+that has not started yet (`start_date > as_of()`) has a `None` value.
 """
 
 from __future__ import annotations
@@ -102,6 +106,7 @@ class HabitualRange:
 class ObservationItem:
     date: date
     text: str
+    registers_concern: bool = False
 
 
 @dataclass(frozen=True)
@@ -154,11 +159,17 @@ class GetStudentTrajectoryDetailService:
         recent_periods = sorted(periods, key=lambda period: period.start_date)[
             -_MAX_PERIODS_IN_SERIES:
         ]
+        today = as_of()
         series = [
             self._series_point(student_id, period, window_days, chart_indicator)
+            if period.start_date <= today
+            # spec-ui-3: a período that has not started has no value yet; the
+            # chart shows "Sem registro" instead of repeating today's value.
+            else SeriesPoint(period_id=period.id, period_label=period.label, value=None)
             for period in recent_periods
         ]
-        habitual_range = self._habitual_range(series)
+        reference_index = self._reference_index(recent_periods, result.trajectory_change, today)
+        habitual_range = self._habitual_range(series[:reference_index])
 
         evidence = self._resolve_evidence(result.trajectory_change, requesting_user_id)
         observations = self._recent_observations(student_id, requesting_user_id)
@@ -256,6 +267,23 @@ class GetStudentTrajectoryDetailService:
         return Decimal(indicators.missing_assignments_count)
 
     @staticmethod
+    def _reference_index(
+        periods: list[AcademicPeriod],
+        trajectory_change: TrajectoryChange | None,
+        today: date,
+    ) -> int:
+        """Index of the período the habitual range is compared against: the
+        change's período, else the one containing `today`, else past the end
+        (every point is history)."""
+        for index, period in enumerate(periods):
+            if trajectory_change is not None and period.id == trajectory_change.period_id:
+                return index
+        for index, period in enumerate(periods):
+            if period.start_date <= today <= period.end_date:
+                return index
+        return len(periods)
+
+    @staticmethod
     def _habitual_range(series: list[SeriesPoint]) -> HabitualRange | None:
         values = [point.value for point in series if point.value is not None]
         if len(values) < 2:
@@ -303,6 +331,7 @@ class GetStudentTrajectoryDetailService:
             ObservationItem(
                 date=observation.created_at.date(),
                 text=redacted_by_id[observation.id].text,
+                registers_concern=observation.registers_concern,
             )
             for observation in most_recent
         ]

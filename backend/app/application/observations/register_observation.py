@@ -43,6 +43,7 @@ class RegisterObservationService:
         classroom_id: uuid.UUID,
         text: str,
         author_user_id: uuid.UUID,
+        registers_concern: bool = False,
     ) -> PedagogicalObservation:
         if self._classroom_repository.get_by_id(classroom_id) is None:
             raise ClassroomNotFoundError()
@@ -55,4 +56,5 @@ class RegisterObservationService:
             author_user_id=author_user_id,
             text=text,
             created_at=datetime.now(UTC),
+            registers_concern=registers_concern,
         )

@@ -70,7 +70,9 @@ def _submission(assignment_id: uuid.UUID, status: AssignmentSubmissionStatus) ->
     )
 
 
-def _observation(day: date = date(2026, 9, 1)) -> PedagogicalObservation:
+def _observation(
+    day: date = date(2026, 9, 1), registers_concern: bool = True
+) -> PedagogicalObservation:
     from datetime import datetime, timezone
 
     return PedagogicalObservation(
@@ -79,6 +81,7 @@ def _observation(day: date = date(2026, 9, 1)) -> PedagogicalObservation:
         author_user_id=AUTHOR_ID,
         text="Observação de teste.",
         created_at=datetime(day.year, day.month, day.day, 12, 0, tzinfo=timezone.utc),
+        registers_concern=registers_concern,
     )
 
 
@@ -93,7 +96,9 @@ def test_attendance_signal_confirms_when_rate_below_threshold() -> None:
 
     assert signal.confirmed is True
     assert signal.kind == SignalKind.ATTENDANCE
-    assert len(signal.source_ids) == len(current)
+    # spec-ui-3: only the absences are cited, never the days present.
+    absences = [record for record in current if record.status != AttendanceStatus.PRESENT]
+    assert signal.source_ids == tuple(record.id for record in absences)
 
 
 def test_attendance_signal_confirms_when_trend_drops_enough() -> None:
@@ -127,18 +132,31 @@ def test_attendance_signal_does_not_confirm_above_threshold_with_no_bad_trend() 
 # --- evaluate_grade_signal -------------------------------------------------------
 
 
-def test_grade_signal_confirms_when_average_below_threshold() -> None:
-    signal = evaluate_grade_signal([_grade("4.00")], [])
+def test_grade_signal_confirms_when_average_drops_below_own_habitual_low() -> None:
+    # Earlier averages 7.0 and 6.5 -> habitual low 6.5; 5.5 is 1.0 below it.
+    signal = evaluate_grade_signal([_grade("5.50")], [[_grade("7.00")], [_grade("6.50")]])
 
     assert signal.confirmed is True
     assert signal.kind == SignalKind.GRADE
     assert len(signal.source_ids) == 1
 
 
-def test_grade_signal_confirms_when_trend_drops_enough() -> None:
-    signal = evaluate_grade_signal([_grade("6.00")], [_grade("8.00")])
+def test_grade_signal_ignores_a_low_but_stable_average() -> None:
+    """spec-ui-3: a student who always had low grades is not a "queda"."""
+    signal = evaluate_grade_signal([_grade("3.50")], [[_grade("3.00")], [_grade("3.10")]])
 
-    assert signal.confirmed is True
+    assert signal.confirmed is False
+
+
+def test_grade_signal_does_not_confirm_with_a_drop_smaller_than_one_point() -> None:
+    signal = evaluate_grade_signal([_grade("6.60")], [[_grade("7.50")], [_grade("8.00")]])
+
+    assert signal.confirmed is False
+
+
+def test_grade_signal_needs_an_earlier_period_to_compare() -> None:
+    assert evaluate_grade_signal([_grade("1.00")], []).confirmed is False
+    assert evaluate_grade_signal([_grade("1.00")], [[]]).confirmed is False
 
 
 def test_grade_signal_does_not_confirm_with_no_data() -> None:
@@ -148,27 +166,46 @@ def test_grade_signal_does_not_confirm_with_no_data() -> None:
     assert signal.source_ids == ()
 
 
-def test_grade_signal_does_not_confirm_above_threshold_with_small_trend() -> None:
-    signal = evaluate_grade_signal([_grade("7.00")], [_grade("7.50")])
-
-    assert signal.confirmed is False
-
-
 # --- evaluate_assignments_signal --------------------------------------------------
 
 
-def test_assignments_signal_confirms_when_citable_missing_count_reaches_threshold() -> None:
+def test_assignments_signal_confirms_two_above_the_highest_earlier_count() -> None:
     a1, a2 = _assignment(), _assignment()
     submissions_by_assignment = {
         a1.id: [_submission(a1.id, AssignmentSubmissionStatus.NOT_DELIVERED)],
         a2.id: [_submission(a2.id, AssignmentSubmissionStatus.PARTIAL)],
     }
 
-    signal = evaluate_assignments_signal([a1, a2], [], submissions_by_assignment)
+    # Earlier períodos had 0 missing each; now 2 -> 2 above the habitual high.
+    signal = evaluate_assignments_signal([a1, a2], [[], []], submissions_by_assignment)
 
     assert signal.confirmed is True
     assert signal.kind == SignalKind.ASSIGNMENTS
     assert len(signal.source_ids) == 2
+
+
+def test_assignments_signal_ignores_a_count_the_student_always_had() -> None:
+    """spec-ui-3: 2 missing every período is the student's own pattern."""
+    current = [_assignment(), _assignment()]
+    earlier = [_assignment(date(2026, 6, 1)), _assignment(date(2026, 6, 2))]
+    submissions_by_assignment = {
+        a.id: [_submission(a.id, AssignmentSubmissionStatus.NOT_DELIVERED)] for a in current + earlier
+    }
+
+    signal = evaluate_assignments_signal(current, [earlier], submissions_by_assignment)
+
+    assert signal.confirmed is False
+
+
+def test_assignments_signal_needs_an_earlier_period_to_compare() -> None:
+    a1, a2, a3 = _assignment(), _assignment(), _assignment()
+    submissions_by_assignment = {
+        a.id: [_submission(a.id, AssignmentSubmissionStatus.NOT_DELIVERED)] for a in (a1, a2, a3)
+    }
+
+    signal = evaluate_assignments_signal([a1, a2, a3], [], submissions_by_assignment)
+
+    assert signal.confirmed is False
 
 
 def test_assignments_signal_ignores_assignments_with_zero_submissions() -> None:
@@ -178,38 +215,30 @@ def test_assignments_signal_ignores_assignments_with_zero_submissions() -> None:
     # a1 has no submission at all; a2 has a DELIVERED one (not missing).
     submissions_by_assignment = {a2.id: [_submission(a2.id, AssignmentSubmissionStatus.DELIVERED)]}
 
-    signal = evaluate_assignments_signal([a1, a2], [], submissions_by_assignment)
+    signal = evaluate_assignments_signal([a1, a2], [[]], submissions_by_assignment)
 
     assert signal.confirmed is False
     assert signal.source_ids == ()
 
 
-def test_assignments_signal_confirms_on_delta_even_below_count_threshold() -> None:
-    a1 = _assignment()
-    current = [a1]
-    previous: list[Assignment] = []
-    submissions_by_assignment = {a1.id: [_submission(a1.id, AssignmentSubmissionStatus.NOT_DELIVERED)]}
-
-    # current count=1 (< 2), previous count=0 => delta=1 (< 2) => not confirmed
-    signal = evaluate_assignments_signal(current, previous, submissions_by_assignment)
-    assert signal.confirmed is False
-
-    # Bump current count to 2 via a second missing assignment => delta=2 => confirmed
-    a2 = _assignment()
-    submissions_by_assignment[a2.id] = [_submission(a2.id, AssignmentSubmissionStatus.PARTIAL)]
-    signal = evaluate_assignments_signal([a1, a2], previous, submissions_by_assignment)
-    assert signal.confirmed is True
-
-
 # --- evaluate_pedagogical_signal --------------------------------------------------
 
 
-def test_pedagogical_signal_confirms_with_at_least_one_observation() -> None:
-    signal = evaluate_pedagogical_signal([_observation()])
+def test_pedagogical_signal_confirms_with_a_concern_marked_observation() -> None:
+    concern = _observation()
+    signal = evaluate_pedagogical_signal([_observation(registers_concern=False), concern])
 
     assert signal.confirmed is True
     assert signal.kind == SignalKind.PEDAGOGICAL_OBSERVATION
-    assert len(signal.source_ids) == 1
+    assert signal.source_ids == (concern.id,)
+
+
+def test_pedagogical_signal_ignores_neutral_observations() -> None:
+    """spec-ui-3: "Frequência dentro da faixa habitual" is not a signal."""
+    signal = evaluate_pedagogical_signal([_observation(registers_concern=False)])
+
+    assert signal.confirmed is False
+    assert signal.source_ids == ()
 
 
 def test_pedagogical_signal_does_not_confirm_with_no_observations() -> None:
@@ -272,7 +301,7 @@ def test_build_description_two_kinds_uses_fixed_order_and_e() -> None:
         frozenset({SignalKind.PEDAGOGICAL_OBSERVATION, SignalKind.ATTENDANCE}), "3º Bimestre"
     )
 
-    assert text == "Queda de frequência e registro pedagógico recente no 3º Bimestre"
+    assert text == "Queda de frequência e preocupação registrada pela equipe no 3º Bimestre"
 
 
 def test_build_description_three_kinds() -> None:

@@ -21,3 +21,6 @@ class PedagogicalObservation:
     author_user_id: uuid.UUID
     text: str
     created_at: datetime
+    # spec-ui-3: only an observation marked as registering a concern counts
+    # as a convergence signal; neutral ones are evidence and timeline only.
+    registers_concern: bool = False

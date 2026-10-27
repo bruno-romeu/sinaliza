@@ -114,7 +114,7 @@ def population_fingerprint(session: Session) -> str:
     ):
         hasher.update(
             f"pedagogical_observation|{observation.id}|{observation.student_id}|"
-            f"{observation.text}|{observation.created_at}\n".encode("utf-8")
+            f"{observation.text}|{observation.created_at}|{observation.registers_concern}\n".encode("utf-8")
         )
 
     return hasher.hexdigest()
