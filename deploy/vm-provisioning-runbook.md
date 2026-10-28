@@ -170,7 +170,9 @@ nano .env   # or vim/vi — edit as needed
 ```
 
 At minimum, set a real `JWT_SECRET` (long random value — `docker-compose.yml`
-requires it to be set, there is no default). Review `POSTGRES_USER`,
+requires it to be set, there is no default), and `DEV_SEED_EMAIL` /
+`DEV_SEED_PASSWORD` for the login the evaluators will use (step 9b creates
+it; never keep the example `change-me` password on a public URL). Review `POSTGRES_USER`,
 `POSTGRES_PASSWORD`, and `POSTGRES_DB` as well; the defaults in
 `docker-compose.yml` (`sinaliza`/`sinaliza`/`sinaliza`) are fine for a demo
 but should be changed for anything beyond that.
@@ -244,6 +246,38 @@ Check status:
 ```bash
 docker compose ps
 ```
+
+---
+
+## 9b. Populate the demonstration base (spec-ui-4)
+
+The containers start with an empty database (only the schema, from
+`alembic upgrade head`). Populate it once, by hand, from the repo root:
+
+```bash
+docker compose exec backend python -m app.infrastructure.db.seed_dev_user
+docker compose exec backend python -m app.infrastructure.db.seed_dev_fixtures
+docker compose exec backend python -m app.synthetic.generate --seed 42 --reset
+docker compose exec backend python -m app.synthetic.prepare_demo
+```
+
+- `seed_dev_user` creates the login from `DEV_SEED_*` in `.env`.
+- `seed_dev_fixtures` creates the 4 academic periods of 2026 (it also adds
+  a few fixture students, which `generate --reset` replaces).
+- `generate` builds the synthetic base (200 students, 60 in the demo cut).
+- `prepare_demo` computes every demo trajectory once, so the Home lists
+  the detected changes. Changes are computed when a trajectory is read and
+  the Home only lists computed ones, so **run it again on the morning of the
+  evaluation**: the base is truncated at the real date, and each new day
+  brings the records dated that day into view.
+
+Leave `SINALIZA_DEMO_AS_OF` unset: the generator spreads grades, deliveries
+and observations across each bimestre, so the real date works, and records
+entered live during the presentation show up immediately. Set it only to
+rehearse a specific day, and run `prepare_demo` with the same value.
+
+The ML commands (`app.ml.train`, `app.ml.evaluate`, `app.ml.predict`) are not
+needed by any screen and can stay local.
 
 ---
 

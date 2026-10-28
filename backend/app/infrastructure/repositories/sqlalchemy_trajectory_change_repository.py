@@ -34,7 +34,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import Date as SA_Date
-from sqlalchemy import cast, delete, exists, select
+from sqlalchemy import cast, delete, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -145,10 +145,19 @@ class SqlAlchemyTrajectoryChangeRepository:
             description=model.description,
         )
 
-    def list_recent(self, limit: int) -> list[TrajectoryChange]:
+    def count_recent(self) -> int:
+        """Total behind `list_recent`, under the same `filter_as_of`."""
+        detected_at_date = cast(TrajectoryChangeModel.detected_at, SA_Date)
+        stmt = filter_as_of(
+            select(func.count()).select_from(TrajectoryChangeModel), detected_at_date
+        )
+        return self._session.execute(stmt).scalar_one()
+
+    def list_recent(self, limit: int, offset: int = 0) -> list[TrajectoryChange]:
         """Home's only read of `TrajectoryChange` (spec-3-3 Boundaries &
-        Constraints): the `limit` most recent rows by `detected_at` desc,
-        never a second page, never filtered/sorted any other way.
+        Constraints): rows by `detected_at` desc (then `id` desc, so pages
+        never overlap or skip rows that share a `detected_at`), paginated by
+        `limit`/`offset` since spec-ui-4 — `count_recent` gives the total.
 
         Also applies `filter_as_of` on `detected_at` (spec-5-4): `detected_at`
         is always written as `as_of()`'s own pinned date at insert time
@@ -168,7 +177,7 @@ class SqlAlchemyTrajectoryChangeRepository:
         stmt = filter_as_of(select(TrajectoryChangeModel), detected_at_date).order_by(
             TrajectoryChangeModel.detected_at.desc(), TrajectoryChangeModel.id.desc()
         )
-        stmt = stmt.limit(limit)
+        stmt = stmt.limit(limit).offset(offset)
         models = self._session.execute(stmt).scalars().all()
         return [
             TrajectoryChange(

@@ -9,9 +9,15 @@ function isThemePreference(value: unknown): value is ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark'
 }
 
+// Storage can be unavailable (private browsing, blocked site data) and then
+// throws; the theme still works for the session, it just is not remembered.
 function readStoredPreference(): ThemePreference {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  return isThemePreference(raw) ? raw : 'system'
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return isThemePreference(raw) ? raw : 'system'
+  } catch {
+    return 'system'
+  }
 }
 
 // Mirrors the inline script in `index.html` (same storage key, same logic),
@@ -24,7 +30,11 @@ function applyPreference(preference: ThemePreference) {
   } else {
     root.setAttribute('data-theme', preference)
   }
-  localStorage.setItem(STORAGE_KEY, preference)
+  try {
+    localStorage.setItem(STORAGE_KEY, preference)
+  } catch {
+    // Not remembered across visits; the current page still switches theme.
+  }
 }
 
 /**

@@ -52,6 +52,10 @@ from app.synthetic.rng import derived_key
 #: Dividing by this span turns the integer into a fraction in `[0, 1)`.
 _KEY_SPACE = 2**128
 
+#: Half-width of the per-período quantile variation around a student's
+#: habitual level for a subject (spec-ui-4).
+_GRADE_PERIOD_VARIATION = 0.06
+
 #: Profiles whose grade-quantile shift (Assumption 2) applies.
 _GRADE_DECLINING_PROFILES = (SyntheticProfile.FALLING_GRADES, SyntheticProfile.COMBINED_DETERIORATION)
 
@@ -133,12 +137,21 @@ def grade_value(
     """The grade `student_id` receives in `subject` for the period at
     `period_index` (0-based, out of `total_periods`).
 
-    Draws a per-(student, subject, period) quantile — "the same quantile
-    `STABLE` uses against `GRADE_DISTRIBUTION`" (spec) — then, for
+    Draws a per-(student, subject) habitual quantile plus a small
+    per-período variation (spec-ui-4) — "the same quantile `STABLE` uses
+    against `GRADE_DISTRIBUTION`" (spec) — then, for
     declining profiles, shifts it linearly toward 0 by the period's
     progress fraction (Assumption 2) before mapping it into
     `GRADE_DISTRIBUTION`'s bands."""
-    quantile = _fraction(seed, "grade_quantile", str(student_id), subject, period_id_label)
+    # spec-ui-4: each student has a habitual level per subject, with a small
+    # variation between períodos. Drawing a fresh quantile every período made
+    # a STABLE student's average jump by several points between bimestres,
+    # which read as a "queda de notas" for a student who had not changed.
+    base = _fraction(seed, "grade_level", str(student_id), subject)
+    noise = (_fraction(seed, "grade_quantile", str(student_id), subject, period_id_label) - 0.5) * (
+        2 * _GRADE_PERIOD_VARIATION
+    )
+    quantile = min(max(base + noise, 0.0), 0.999999)
     if profile in _GRADE_DECLINING_PROFILES:
         progress = _progress(period_index, total_periods)
         quantile = quantile * (1 - progress)

@@ -137,7 +137,14 @@ export function TrajectoryChart({
               <circle className="cp-halo" cx={x(changeIndex)} cy={y(change.value)} r={12} />
               <circle className="cp-ring" cx={x(changeIndex)} cy={y(change.value)} r={11} />
               <circle className="cp-dot" cx={x(changeIndex)} cy={y(change.value)} r={5} />
-              <text className="cp-label" x={x(changeIndex)} y={y(change.value) - 20} textAnchor="middle">
+              <text
+                className="cp-label"
+                x={x(changeIndex)}
+                y={y(change.value) - 20}
+                // First/last point: anchor the label inward so it never
+                // overflows the card (the last bimestre is the usual case).
+                textAnchor={changeIndex === points.length - 1 && points.length > 1 ? 'end' : changeIndex === 0 ? 'start' : 'middle'}
+              >
                 {pointLabel}
               </text>
             </g>

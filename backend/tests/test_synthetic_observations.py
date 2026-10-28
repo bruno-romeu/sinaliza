@@ -28,7 +28,7 @@ from app.infrastructure.db.models import (
 )
 from app.infrastructure.security.bcrypt_hasher import BcryptPasswordHasher
 from app.synthetic import observations
-from app.synthetic.facts import PeriodWindow
+from app.synthetic.facts import PeriodWindow, spread_day
 from app.synthetic.fingerprint import population_fingerprint
 from app.synthetic.generate import (
     GENERATOR_VERSION,
@@ -117,7 +117,10 @@ def test_build_observations_one_per_student_period() -> None:
 
 
 def test_build_observations_different_seed_changes_text() -> None:
-    population = _population(SyntheticProfile.FALLING_ATTENDANCE)
+    # 8 students, not 1: with 2 templates per stage, a single student over 4
+    # períodos picks the same texts under both seeds about 1 time in 16, which
+    # made this test fail at random. Across 8 students that is ~1 in 10^9.
+    population = _population(*([SyntheticProfile.FALLING_ATTENDANCE] * 8))
     periods = _periods(4)
     author_id = uuid.uuid4()
 
@@ -129,7 +132,9 @@ def test_build_observations_different_seed_changes_text() -> None:
     assert texts_a != texts_b
 
 
-def test_build_observations_created_at_is_noon_utc_on_period_end_date() -> None:
+def test_build_observations_created_at_is_noon_utc_mid_period() -> None:
+    """spec-ui-4: written in the middle of the período (not on its last day),
+    so a bimestre in progress already has its observation."""
     population = _population(SyntheticProfile.STABLE)
     periods = _periods(2)
     author_id = uuid.uuid4()
@@ -139,7 +144,10 @@ def test_build_observations_created_at_is_noon_utc_on_period_end_date() -> None:
     for observation, period in zip(
         sorted(result, key=lambda o: o.created_at), sorted(periods, key=lambda p: p.end_date)
     ):
-        assert observation.created_at == datetime.combine(period.end_date, time(12, 0), tzinfo=UTC)
+        day = observation.created_at.date()
+        assert observation.created_at == datetime.combine(day, time(12, 0), tzinfo=UTC)
+        assert period.start_date < day < period.end_date
+        assert day == spread_day(period, 0.5)
 
 
 def test_build_observations_author_user_id_is_carried_through() -> None:
@@ -502,4 +510,4 @@ def test_fingerprint_changes_when_observation_text_changes(db_session: Session) 
 
 
 def test_generator_version_bumped_for_spec_ui_3() -> None:
-    assert GENERATOR_VERSION == "2.6.0"
+    assert GENERATOR_VERSION == "2.7.0"
