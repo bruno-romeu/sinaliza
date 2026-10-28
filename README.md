@@ -300,10 +300,10 @@ Com o backend configurado (`backend/.env`), na pasta `backend`:
 uv run python -m app.infrastructure.db.seed_dev_user
 uv run python -m app.infrastructure.db.seed_dev_fixtures
 uv run python -m app.synthetic.generate --seed 42 --reset
-SINALIZA_DEMO_AS_OF=2026-09-25 uv run python -m app.synthetic.prepare_demo
+uv run python -m app.synthetic.prepare_demo
 ```
 
-Inicie o backend com o mesmo `SINALIZA_DEMO_AS_OF=2026-09-25`. Essa data é o fim do 3º bimestre, quando as notas e observações do bimestre já existem. O `prepare_demo` calcula uma vez a trajetória de cada estudante da demo, porque a página inicial só lista mudanças já calculadas. É uma ação manual, nunca agendada.
+O gerador distribui notas, entregas e observações ao longo de cada bimestre, então a demonstração funciona na data real, sem `SINALIZA_DEMO_AS_OF`, e o que for lançado ao vivo aparece na hora. O `prepare_demo` calcula uma vez a trajetória de cada estudante da demo, porque a página inicial só lista mudanças já calculadas: rode de novo no dia da apresentação. É uma ação manual, nunca agendada. Para ensaiar um dia específico, defina `SINALIZA_DEMO_AS_OF` (no backend e no `prepare_demo`). No ambiente hospedado, veja o passo 9b de `deploy/vm-provisioning-runbook.md`.
 
 ---
 

@@ -6,8 +6,9 @@ Pure module: zero I/O, zero SQLAlchemy imports (AD-2's spirit, `profiles.py`/
 derived from `(seed, student_id, period)` via `app.synthetic.rng` — never
 ambient randomness or wall-clock time — so the same seed reproduces a
 byte-identical base (RNF-13). `created_at` is derived from the period alone
-(`period.end_date` at noon UTC): every observation in the same period shares
-one timestamp, regardless of seed or student.
+(the middle school day of the period, at noon UTC, spec-ui-4): every
+observation in the same period shares one timestamp, regardless of seed or
+student.
 
 Every template below is a plain literal string, never an f-string that
 embeds a fabricated statistic: no invented absence counts, no percentages,
@@ -34,11 +35,14 @@ from datetime import UTC, datetime, time
 from typing import Literal
 
 from app.domain.student import SyntheticProfile
-from app.synthetic.facts import PeriodWindow
+from app.synthetic.facts import PeriodWindow, spread_day
 from app.synthetic.population import GeneratedPopulation
 from app.synthetic.rng import derived_key, stable_uuid
 
 Stage = Literal["early", "mid", "late"]
+
+#: Where in the período the observation is written (spec-ui-4).
+_OBSERVATION_POSITION = 0.5
 
 #: Routine/no-trend templates — `STABLE`'s only source (spec Boundaries &
 #: Constraints). Plain fixed sentences, no fabricated numbers.
@@ -235,7 +239,11 @@ def build_observations(
                     student_id=student.id,
                     author_user_id=author_user_id,
                     text=text,
-                    created_at=datetime.combine(period.end_date, time(12, 0), tzinfo=UTC),
+                    # spec-ui-4: mid-período, so a bimestre in progress already
+                    # has what the team wrote about it.
+                    created_at=datetime.combine(
+                        spread_day(period, _OBSERVATION_POSITION), time(12, 0), tzinfo=UTC
+                    ),
                     registers_concern=profile is not SyntheticProfile.STABLE,
                 )
             )

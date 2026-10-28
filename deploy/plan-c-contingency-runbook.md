@@ -99,6 +99,11 @@ the container, Neon included.
    - `JWT_SECRET` = a long random value (generate one; never reuse a dev
      value in anything demo-facing).
    - `JWT_EXPIRE_MINUTES` = `60` (or your preferred value).
+   - Populate the base once from your machine, with `DATABASE_URL` pointing
+     at Neon and `DEV_SEED_*` set: the same four commands as
+     `vm-provisioning-runbook.md` step 9b, run as
+     `uv run python -m ...` inside `backend/` instead of
+     `docker compose exec backend python -m ...`.
 5. Leave the service on Render's free plan. **This is exactly what causes
    the cold-start exposure documented in the RNF-01 waiver above** — free
    Render services spin down after a period of no traffic and take a

@@ -1,0 +1,12 @@
+# Keep LF in the repository and in every checkout, so a Windows clone with
+# core.autocrlf=true can still build the Docker images (a CRLF
+# docker-entrypoint.sh fails with "no such file or directory") and patches
+# from other machines apply cleanly.
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.joblib binary
+*.docx binary
+*.pdf binary

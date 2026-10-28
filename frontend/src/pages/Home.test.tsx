@@ -108,6 +108,9 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
         return jsonResponse({
           results: [{ id: 'student-3', name: 'Ana Pereira', classroom_name: '7º Ano A' }],
           count: 1,
+          total: 1,
+          page: 1,
+          page_size: 5,
         })
       }
       throw new Error(`Unexpected fetch call in test: ${url}`)
@@ -188,7 +191,7 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     })
 
     await screen.findByText('Ana Pereira')
-    const loadMore = screen.getByRole('button', { name: 'Ver mais (1 restantes)' })
+    const loadMore = screen.getByRole('button', { name: 'Ver mais (1 restante)' })
 
     fireEvent.click(loadMore)
 
@@ -299,7 +302,7 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
 
     renderHome()
     await screen.findByText('Maria Silva')
-    const loadMore = screen.getByRole('button', { name: 'Ver mais (1 restantes)' })
+    const loadMore = screen.getByRole('button', { name: 'Ver mais (1 restante)' })
 
     fireEvent.click(loadMore)
 
@@ -335,5 +338,107 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
 
     await screen.findByText('Nenhum estudante encontrado com esse nome/turma.')
     expect(screen.getByText('Maria Silva')).toBeInTheDocument()
+  })
+
+  // spec-ui-4: the recent-changes list pages like the other two.
+  const HOME_PAGE = (page: number, items: Array<{ id: string; name: string }>, total: number) => ({
+    recent_changes: items.map((item) => ({
+      student_id: item.id,
+      student_name: item.name,
+      type: 'ATTENDANCE_DROP',
+      description: `Queda de frequência no 3º Bimestre (${item.name})`,
+      detected_at: '2026-09-25T00:00:00Z',
+    })),
+    recent_changes_total: total,
+    recent_changes_page: page,
+    recent_changes_page_size: 2,
+    in_progress_follow_ups: [],
+    in_progress_follow_ups_total: 0,
+    in_progress_follow_ups_page: 1,
+    in_progress_follow_ups_page_size: 5,
+  })
+
+  it('shows the totals in the summary and pages through every recent change', async () => {
+    fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('changes_page=2')) {
+        return jsonResponse(HOME_PAGE(2, [{ id: 's3', name: 'Carla Dias' }], 3))
+      }
+      return jsonResponse(
+        HOME_PAGE(1, [
+          { id: 's1', name: 'Ana Lima' },
+          { id: 's2', name: 'Bruno Reis' },
+        ], 3),
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHome()
+    await screen.findByText('Ana Lima')
+    // The total, not the 2 rows loaded so far.
+    expect(screen.getByText('3 mudanças')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mais (1 restante)' }))
+
+    await screen.findByText('Carla Dias')
+    expect(screen.getByText('Ana Lima')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ver mais/ })).not.toBeInTheDocument()
+    // Asking for page 2 of changes keeps the follow-ups on their first page.
+    const secondCall = String(fetchMock.mock.calls[1][0])
+    expect(secondCall).toContain('changes_page=2')
+    expect(secondCall).toContain('follow_ups_page=1')
+  })
+
+  it('does not repeat a change that comes back on the next page', async () => {
+    fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('changes_page=2')) {
+        // The list shifted: page 2 now starts with a row already shown.
+        return jsonResponse(
+          HOME_PAGE(2, [
+            { id: 's2', name: 'Bruno Reis' },
+            { id: 's3', name: 'Carla Dias' },
+          ], 3),
+        )
+      }
+      return jsonResponse(
+        HOME_PAGE(1, [
+          { id: 's1', name: 'Ana Lima' },
+          { id: 's2', name: 'Bruno Reis' },
+        ], 3),
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHome()
+    await screen.findByText('Ana Lima')
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mais (1 restante)' }))
+    await screen.findByText('Carla Dias')
+
+    expect(screen.getAllByText('Bruno Reis')).toHaveLength(1)
+  })
+
+  it('keeps the loaded rows and offers a retry when loading more fails', async () => {
+    fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('changes_page=2')) {
+        return jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500)
+      }
+      return jsonResponse(
+        HOME_PAGE(1, [
+          { id: 's1', name: 'Ana Lima' },
+          { id: 's2', name: 'Bruno Reis' },
+        ], 3),
+      )
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHome()
+    await screen.findByText('Ana Lima')
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mais (1 restante)' }))
+
+    await screen.findByText('Não foi possível carregar mais agora. Tente de novo.')
+    expect(screen.getByText('Bruno Reis')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver mais (1 restante)' })).toBeEnabled()
   })
 })
