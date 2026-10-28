@@ -124,14 +124,14 @@ def test_home_with_no_trajectory_changes_returns_empty_list(
         "in_progress_follow_ups": [],
         "in_progress_follow_ups_total": 0,
         "in_progress_follow_ups_page": 1,
-        "in_progress_follow_ups_page_size": 20,
+        "in_progress_follow_ups_page_size": 5,
     }
 
 
-# --- Caps at 20 -----------------------------------------------------------------------
+# --- Caps at 5 -----------------------------------------------------------------------
 
 
-def test_home_caps_recent_changes_at_twenty(
+def test_home_caps_recent_changes_at_five(
     client: TestClient,
     seeded_user,
     seeded_academic_period: AcademicPeriodModel,
@@ -154,11 +154,11 @@ def test_home_caps_recent_changes_at_twenty(
 
     assert response.status_code == 200
     recent_changes = response.json()["recent_changes"]
-    assert len(recent_changes) == 20
-    # The 20 most recent — i.e. the smallest `i` values (0..19) — not the
-    # first 20 inserted.
+    assert len(recent_changes) == 5
+    # The 5 most recent — i.e. the smallest `i` values (0..4) — not the
+    # first 5 inserted.
     assert recent_changes[0]["student_name"] == "Estudante 00"
-    assert recent_changes[-1]["student_name"] == "Estudante 19"
+    assert recent_changes[-1]["student_name"] == "Estudante 04"
 
 
 # --- id.desc() tiebreaker ------------------------------------------------------------
@@ -295,15 +295,15 @@ def test_home_breaks_follow_up_created_at_tie_by_id_desc(
     assert student_names == ["Estudante FU Alto", "Estudante FU Baixo"]
 
 
-def test_home_paginates_active_follow_ups_at_twenty_per_page_by_default(
+def test_home_paginates_active_follow_ups_at_five_per_page_by_default(
     client: TestClient,
     seeded_user,
     db_session: Session,
 ) -> None:
     """Open-case volume grows without bound over a real deployment's
-    lifetime, so `list_active` is paginated (20 per page by default) rather
+    lifetime, so `list_active` is paginated (5 per page by default) rather
     than returned whole — pins that 25 seeded active follow-ups come back as
-    a 20-item first page plus an accurate `total`."""
+    a 5-item first page plus an accurate `total`."""
     base_time = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
     for i in range(25):
         student = StudentModel(name=f"Estudante FU {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
@@ -322,10 +322,10 @@ def test_home_paginates_active_follow_ups_at_twenty_per_page_by_default(
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body["in_progress_follow_ups"]) == 20
+    assert len(body["in_progress_follow_ups"]) == 5
     assert body["in_progress_follow_ups_total"] == 25
     assert body["in_progress_follow_ups_page"] == 1
-    assert body["in_progress_follow_ups_page_size"] == 20
+    assert body["in_progress_follow_ups_page_size"] == 5
 
 
 def test_home_follow_ups_second_page_returns_the_remainder(
@@ -356,9 +356,10 @@ def test_home_follow_ups_second_page_returns_the_remainder(
     assert len(body["in_progress_follow_ups"]) == 5
     assert body["in_progress_follow_ups_total"] == 25
     assert body["in_progress_follow_ups_page"] == 2
-    # The oldest 5 (days 20..24 ago) — page 1 already returned the 20 newest.
+    # Page 1 already returned the 5 newest (days 0..4 ago); page 2 is the
+    # next 5 (days 5..9 ago).
     assert [row["student_name"] for row in body["in_progress_follow_ups"]] == [
-        f"Estudante FU {i:02d}" for i in range(20, 25)
+        f"Estudante FU {i:02d}" for i in range(5, 10)
     ]
 
 
@@ -486,7 +487,7 @@ def test_home_search_excludes_train_split_students(
     )
 
     assert response.status_code == 200
-    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 20}
+    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 5}
 
 
 # --- Search no match -------------------------------------------------------------------
@@ -503,7 +504,7 @@ def test_home_search_no_match_returns_empty_results(
     )
 
     assert response.status_code == 200
-    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 20}
+    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 5}
 
 
 # --- Blank/whitespace q short-circuit (HTTP boundary) ----------------------------------
@@ -521,7 +522,7 @@ def test_home_search_blank_q_returns_empty_results(
     response = client.get("/home/search?q=", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
-    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 20}
+    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 5}
 
 
 def test_home_search_whitespace_only_q_returns_empty_results(
@@ -532,7 +533,7 @@ def test_home_search_whitespace_only_q_returns_empty_results(
     response = client.get("/home/search?q=%20%20%20", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
-    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 20}
+    assert response.json() == {"results": [], "count": 0, "total": 0, "page": 1, "page_size": 5}
 
 
 # --- %/_ escaping in the ILIKE pattern ---------------------------------------------------
@@ -593,13 +594,13 @@ def test_home_search_escapes_underscore_wildcard(
 # --- Search pagination -----------------------------------------------------------------
 
 
-def test_home_search_paginates_at_twenty_per_page_by_default(
+def test_home_search_paginates_at_five_per_page_by_default(
     client: TestClient,
     seeded_user,
     seeded_classroom: ClassroomModel,
     db_session: Session,
 ) -> None:
-    """`GET /home/search` pages at 20 per page by default — `total` reports
+    """`GET /home/search` pages at 5 per page by default — `total` reports
     every match, not just this page's length, so a caller can page through
     the rest instead of it silently vanishing past the cap."""
     for i in range(25):
@@ -613,11 +614,11 @@ def test_home_search_paginates_at_twenty_per_page_by_default(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["count"] == 20
-    assert len(body["results"]) == 20
+    assert body["count"] == 5
+    assert len(body["results"]) == 5
     assert body["total"] == 25
     assert body["page"] == 1
-    assert body["page_size"] == 20
+    assert body["page_size"] == 5
 
 
 def test_home_search_second_page_returns_the_remainder(
@@ -642,8 +643,8 @@ def test_home_search_second_page_returns_the_remainder(
     assert len(body["results"]) == 5
     assert body["total"] == 25
     assert body["page"] == 2
-    # Ordered by name, so page 1 took "Busca 00".."Busca 19" alphabetically.
-    assert [r["name"] for r in body["results"]] == [f"Busca {i:02d}" for i in range(20, 25)]
+    # Ordered by name, so page 1 took "Busca 00".."Busca 04" alphabetically.
+    assert [r["name"] for r in body["results"]] == [f"Busca {i:02d}" for i in range(5, 10)]
 
 
 def test_home_search_page_size_query_param_overrides_default(

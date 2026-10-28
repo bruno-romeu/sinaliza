@@ -247,5 +247,5 @@ def test_train_split_student_invisible_across_trajectory_home_and_search(
         "results": [],
         "total": 0,
         "page": 1,
-        "page_size": 20,
+        "page_size": 5,
     }

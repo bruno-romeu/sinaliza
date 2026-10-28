@@ -65,11 +65,17 @@ export function Home() {
 
   const [recentChanges, setRecentChanges] = useState<RecentChange[] | null>(null)
   const [inProgressFollowUps, setInProgressFollowUps] = useState<InProgressFollowUp[] | null>(null)
+  const [followUpsPage, setFollowUpsPage] = useState(1)
+  const [followUpsTotal, setFollowUpsTotal] = useState(0)
+  const [loadingMoreFollowUps, setLoadingMoreFollowUps] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<StudentSearchResult[] | null>(null)
+  const [searchPage, setSearchPage] = useState(1)
+  const [searchTotal, setSearchTotal] = useState(0)
+  const [loadingMoreResults, setLoadingMoreResults] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
 
@@ -83,6 +89,8 @@ export function Home() {
         if (ignore) return
         setRecentChanges(home.recent_changes)
         setInProgressFollowUps(home.in_progress_follow_ups)
+        setFollowUpsPage(home.in_progress_follow_ups_page)
+        setFollowUpsTotal(home.in_progress_follow_ups_total)
       })
       .catch(() => {
         if (ignore) return
@@ -92,6 +100,19 @@ export function Home() {
       ignore = true
     }
   }, [token, loadAttempt])
+
+  function handleLoadMoreFollowUps() {
+    if (!token || loadingMoreFollowUps) return
+    setLoadingMoreFollowUps(true)
+    const nextPage = followUpsPage + 1
+    getHome(token, nextPage)
+      .then((home) => {
+        setInProgressFollowUps((prev) => [...(prev ?? []), ...home.in_progress_follow_ups])
+        setFollowUpsPage(home.in_progress_follow_ups_page)
+        setFollowUpsTotal(home.in_progress_follow_ups_total)
+      })
+      .finally(() => setLoadingMoreFollowUps(false))
+  }
 
   // Stores the trimmed query so the staleness check below compares
   // trimmed-to-trimmed (see `queryAtStart` below); a leading/trailing space
@@ -104,6 +125,8 @@ export function Home() {
       setResults(null)
       setSearchError(null)
       setSearching(false)
+      setSearchPage(1)
+      setSearchTotal(0)
       return
     }
     let ignore = false
@@ -117,6 +140,8 @@ export function Home() {
         .then((response) => {
           if (ignore || queryRef.current !== queryAtStart) return
           setResults(response.results)
+          setSearchPage(response.page)
+          setSearchTotal(response.total)
         })
         .catch((caught) => {
           if (ignore || queryRef.current !== queryAtStart) return
@@ -134,6 +159,21 @@ export function Home() {
       window.clearTimeout(timeoutId)
     }
   }, [token, query])
+
+  function handleLoadMoreResults() {
+    const trimmed = query.trim()
+    if (!token || !trimmed || loadingMoreResults) return
+    setLoadingMoreResults(true)
+    const nextPage = searchPage + 1
+    searchStudents(token, trimmed, nextPage)
+      .then((response) => {
+        if (queryRef.current !== trimmed) return
+        setResults((prev) => [...(prev ?? []), ...response.results])
+        setSearchPage(response.page)
+        setSearchTotal(response.total)
+      })
+      .finally(() => setLoadingMoreResults(false))
+  }
 
   const showingSearch = query.trim().length > 0
 
@@ -183,18 +223,25 @@ export function Home() {
           )}
 
           {results !== null && results.length > 0 && (
-            <ul className="sz-results">
-              {results.map((result) => (
-                <li key={result.id}>
-                  <Link to={`/estudantes/${result.id}`}>
-                    <Icon name="pessoa" size={20} style={{ color: 'var(--ink-muted)' }} />
-                    <span className="sz-results-name">{result.name}</span>
-                    <Tag>{result.classroom_name}</Tag>
-                    <Icon name="chevron-dir" size={20} className="sz-results-chev" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="sz-results">
+                {results.map((result) => (
+                  <li key={result.id}>
+                    <Link to={`/estudantes/${result.id}`}>
+                      <Icon name="pessoa" size={20} style={{ color: 'var(--ink-muted)' }} />
+                      <span className="sz-results-name">{result.name}</span>
+                      <Tag>{result.classroom_name}</Tag>
+                      <Icon name="chevron-dir" size={20} className="sz-results-chev" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {results.length < searchTotal && (
+                <Button variant="quiet" onClick={handleLoadMoreResults} disabled={loadingMoreResults}>
+                  {loadingMoreResults ? 'Carregando…' : `Ver mais (${searchTotal - results.length} restantes)`}
+                </Button>
+              )}
+            </>
           )}
         </Section>
       )}
@@ -251,13 +298,22 @@ export function Home() {
         )}
 
         {inProgressFollowUps !== null && inProgressFollowUps.length > 0 && (
-          <ul className="sz-list">
-            {inProgressFollowUps.map((item) => (
-              <li key={item.id}>
-                <FollowupCard to={`/acompanhamentos/${item.id}`} name={item.student_name} status={item.status} />
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="sz-list">
+              {inProgressFollowUps.map((item) => (
+                <li key={item.id}>
+                  <FollowupCard to={`/acompanhamentos/${item.id}`} name={item.student_name} status={item.status} />
+                </li>
+              ))}
+            </ul>
+            {inProgressFollowUps.length < followUpsTotal && (
+              <Button variant="quiet" onClick={handleLoadMoreFollowUps} disabled={loadingMoreFollowUps}>
+                {loadingMoreFollowUps
+                  ? 'Carregando…'
+                  : `Ver mais (${followUpsTotal - inProgressFollowUps.length} restantes)`}
+              </Button>
+            )}
+          </>
         )}
       </Section>
     </Page>
