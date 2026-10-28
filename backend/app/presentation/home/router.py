@@ -2,7 +2,7 @@
 other product route (spec-3-3 Boundaries & Constraints).
 
 `GET /home` only ever reads already-committed `TrajectoryChange` rows
-(`GetHomeService` -> `list_recent`, capped at 20) — it never recomputes
+(`GetHomeService` -> `list_recent`, capped at `RECENT_CHANGES_LIMIT`) — it never recomputes
 trajectory; that stays request-scoped to `GET /students/{id}/trajectory`.
 Its `in_progress_follow_ups` list is paginated via `follow_ups_page`/
 `follow_ups_page_size` (open-case volume is operator-driven and otherwise

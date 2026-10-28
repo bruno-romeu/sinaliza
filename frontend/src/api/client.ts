@@ -258,19 +258,23 @@ export async function registerAssignmentSubmission(
   })
 }
 
-export async function getHome(token: string): Promise<Home> {
+export async function getHome(token: string, followUpsPage = 1): Promise<Home> {
   return request<Home>({
     method: 'GET',
-    path: '/home',
+    path: `/home?follow_ups_page=${followUpsPage}`,
     token,
     fallbackMessage: 'Não foi possível carregar os dados agora.',
   })
 }
 
-export async function searchStudents(token: string, query: string): Promise<StudentSearchResults> {
+export async function searchStudents(
+  token: string,
+  query: string,
+  page = 1,
+): Promise<StudentSearchResults> {
   return request<StudentSearchResults>({
     method: 'GET',
-    path: `/home/search?q=${encodeURIComponent(query)}`,
+    path: `/home/search?q=${encodeURIComponent(query)}&page=${page}`,
     token,
     fallbackMessage: 'Não foi possível buscar estudantes agora.',
   })

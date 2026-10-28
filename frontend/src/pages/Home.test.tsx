@@ -44,7 +44,7 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
   it('shows one row per recent change, ordered as returned by the API', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/home') {
+      if (url.startsWith('/api/home') && !url.startsWith('/api/home/search')) {
         return jsonResponse({
           recent_changes: [
             {
@@ -101,7 +101,7 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
   it('searches by name/turma and announces the result count via aria-live', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/home') {
+      if (url.startsWith('/api/home') && !url.startsWith('/api/home/search')) {
         return jsonResponse({ recent_changes: [], in_progress_follow_ups: [] })
       }
       if (url.startsWith('/api/home/search')) {
@@ -132,7 +132,7 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
   it('shows a factual error message when the search request fails', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/home') {
+      if (url.startsWith('/api/home') && !url.startsWith('/api/home/search')) {
         return jsonResponse({ recent_changes: [], in_progress_follow_ups: [] })
       }
       if (url.startsWith('/api/home/search')) {
@@ -152,10 +152,55 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     await screen.findByText('boom')
   })
 
+  it('loads and appends the next page of search results on "Ver mais"', async () => {
+    fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.startsWith('/api/home') && !url.startsWith('/api/home/search')) {
+        return jsonResponse({ recent_changes: [], in_progress_follow_ups: [] })
+      }
+      if (url.startsWith('/api/home/search')) {
+        if (url.includes('page=2')) {
+          return jsonResponse({
+            results: [{ id: 'student-4', name: 'Bruna Lima', classroom_name: '7º Ano B' }],
+            count: 1,
+            total: 2,
+            page: 2,
+            page_size: 1,
+          })
+        }
+        return jsonResponse({
+          results: [{ id: 'student-3', name: 'Ana Pereira', classroom_name: '7º Ano A' }],
+          count: 1,
+          total: 2,
+          page: 1,
+          page_size: 1,
+        })
+      }
+      throw new Error(`Unexpected fetch call in test: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHome()
+    await screen.findByText('Nenhuma mudança a revisar hoje.')
+
+    fireEvent.change(screen.getByLabelText('Buscar estudante por nome ou turma'), {
+      target: { value: 'a' },
+    })
+
+    await screen.findByText('Ana Pereira')
+    const loadMore = screen.getByRole('button', { name: 'Ver mais (1 restantes)' })
+
+    fireEvent.click(loadMore)
+
+    await screen.findByText('Bruna Lima')
+    expect(screen.getByText('Ana Pereira')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ver mais/ })).not.toBeInTheDocument()
+  })
+
   it('shows the no-match message, with no suggestions, when search returns nothing', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/home') {
+      if (url.startsWith('/api/home') && !url.startsWith('/api/home/search')) {
         return jsonResponse({ recent_changes: [], in_progress_follow_ups: [] })
       }
       if (url.startsWith('/api/home/search')) {
@@ -226,10 +271,47 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
     await screen.findByText('Nenhum acompanhamento em andamento no momento')
   })
 
+  it('loads and appends the next page of in-progress follow-ups on "Ver mais"', async () => {
+    fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.includes('follow_ups_page=2')) {
+        return jsonResponse({
+          recent_changes: [],
+          in_progress_follow_ups: [
+            { id: 'fu-2', student_id: 'student-2', student_name: 'João Souza', status: 'ACOMPANHAMENTO_ATIVO' },
+          ],
+          in_progress_follow_ups_total: 2,
+          in_progress_follow_ups_page: 2,
+          in_progress_follow_ups_page_size: 1,
+        })
+      }
+      return jsonResponse({
+        recent_changes: [],
+        in_progress_follow_ups: [
+          { id: 'fu-1', student_id: 'student-1', student_name: 'Maria Silva', status: 'EM_OBSERVACAO' },
+        ],
+        in_progress_follow_ups_total: 2,
+        in_progress_follow_ups_page: 1,
+        in_progress_follow_ups_page_size: 1,
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHome()
+    await screen.findByText('Maria Silva')
+    const loadMore = screen.getByRole('button', { name: 'Ver mais (1 restantes)' })
+
+    fireEvent.click(loadMore)
+
+    await screen.findByText('João Souza')
+    expect(screen.getByText('Maria Silva')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ver mais/ })).not.toBeInTheDocument()
+  })
+
   it('keeps the active-follow-ups section visible while search results are showing', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/home') {
+      if (url.startsWith('/api/home') && !url.startsWith('/api/home/search')) {
         return jsonResponse({
           recent_changes: [],
           in_progress_follow_ups: [

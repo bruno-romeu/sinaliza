@@ -37,8 +37,8 @@ from app.application.home.ports import (
 from app.domain.follow_up import FollowUp
 from app.domain.trajectory_change import TrajectoryChange
 
-RECENT_CHANGES_LIMIT = 20
-DEFAULT_FOLLOW_UPS_PAGE_SIZE = 20
+RECENT_CHANGES_LIMIT = 5
+DEFAULT_FOLLOW_UPS_PAGE_SIZE = 5
 MAX_FOLLOW_UPS_PAGE_SIZE = 100
 
 

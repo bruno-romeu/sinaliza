@@ -18,11 +18,9 @@ leading space (e.g. `"Ana "`) still matches a student literally named `"Ana"`
 instead of silently failing to match.
 
 Paginated by `page`/`page_size` (1-indexed, same convention as
-`GetHomeService`'s follow-up pagination) — `DEFAULT_PAGE_SIZE` matches the
-old fixed `SEARCH_RESULTS_LIMIT` cap exactly, so a caller that never passes
-either keeps seeing today's first-20-results behavior; `total` (the true
-match count, not just this page's length) is what makes paging past that
-first page possible."""
+`GetHomeService`'s follow-up pagination) — `total` (the true match count,
+not just this page's length) is what makes paging past the first page
+possible."""
 
 from __future__ import annotations
 
@@ -31,7 +29,7 @@ from dataclasses import dataclass
 from app.application.home.ports import StudentSearchRepositoryPort
 from app.domain.student import StudentSearchResult
 
-DEFAULT_PAGE_SIZE = 20
+DEFAULT_PAGE_SIZE = 5
 MAX_PAGE_SIZE = 100
 
 
