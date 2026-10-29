@@ -18,7 +18,8 @@ from app.domain.trajectory_change import TrajectoryChange
 
 
 class TrajectoryChangeRepositoryPort(Protocol):
-    def list_recent(self, limit: int) -> list[TrajectoryChange]: ...
+    def list_recent(self, limit: int, offset: int = 0) -> list[TrajectoryChange]: ...
+    def count_recent(self) -> int: ...
 
 
 class FollowUpRepositoryPort(Protocol):

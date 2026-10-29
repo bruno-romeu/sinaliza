@@ -2,9 +2,10 @@
 (spec-3-3 Boundaries & Constraints).
 
 Reads the already-committed `TrajectoryChange` rows via
-`TrajectoryChangeRepositoryPort.list_recent` (capped at
-`RECENT_CHANGES_LIMIT`, ordered by `detected_at` desc by the repository
-itself) — this service never iterates students or triggers
+`TrajectoryChangeRepositoryPort.list_recent` (ordered by `detected_at` desc
+by the repository itself; paginated by `changes_page`/`changes_page_size`
+since spec-ui-4 — a fixed cap of 5 had left every other change unreachable
+from the Home) — this service never iterates students or triggers
 `GetStudentTrajectoryService` recomputation; that stays request-scoped to the
 per-student trajectory endpoint.
 
@@ -37,7 +38,8 @@ from app.application.home.ports import (
 from app.domain.follow_up import FollowUp
 from app.domain.trajectory_change import TrajectoryChange
 
-RECENT_CHANGES_LIMIT = 5
+DEFAULT_CHANGES_PAGE_SIZE = 5
+MAX_CHANGES_PAGE_SIZE = 100
 DEFAULT_FOLLOW_UPS_PAGE_SIZE = 5
 MAX_FOLLOW_UPS_PAGE_SIZE = 100
 
@@ -63,8 +65,16 @@ class ActiveFollowUpsPage:
 
 
 @dataclass(frozen=True)
+class RecentChangesPage:
+    items: list[RecentChange]
+    total: int
+    page: int
+    page_size: int
+
+
+@dataclass(frozen=True)
 class HomeResult:
-    recent_changes: list[RecentChange]
+    recent_changes: RecentChangesPage
     active_follow_ups: ActiveFollowUpsPage
 
 
@@ -83,8 +93,13 @@ class GetHomeService:
         self,
         follow_ups_page: int = 1,
         follow_ups_page_size: int = DEFAULT_FOLLOW_UPS_PAGE_SIZE,
+        changes_page: int = 1,
+        changes_page_size: int = DEFAULT_CHANGES_PAGE_SIZE,
     ) -> HomeResult:
-        changes = self._trajectory_change_repository.list_recent(RECENT_CHANGES_LIMIT)
+        total_changes = self._trajectory_change_repository.count_recent()
+        changes = self._trajectory_change_repository.list_recent(
+            changes_page_size, (changes_page - 1) * changes_page_size
+        )
 
         recent_changes: list[RecentChange] = []
         for change in changes:
@@ -105,7 +120,12 @@ class GetHomeService:
             active_follow_ups.append(ActiveFollowUp(follow_up=follow_up, student_name=student.name))
 
         return HomeResult(
-            recent_changes=recent_changes,
+            recent_changes=RecentChangesPage(
+                items=recent_changes,
+                total=total_changes,
+                page=changes_page,
+                page_size=changes_page_size,
+            ),
             active_follow_ups=ActiveFollowUpsPage(
                 items=active_follow_ups,
                 total=total_active_follow_ups,

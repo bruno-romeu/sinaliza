@@ -34,6 +34,10 @@ class InProgressFollowUpOut(BaseModel):
 
 class HomeOut(BaseModel):
     recent_changes: list[RecentChangeOut]
+    # spec-ui-4: the recent-changes list is paginated like the follow-ups.
+    recent_changes_total: int
+    recent_changes_page: int
+    recent_changes_page_size: int
     in_progress_follow_ups: list[InProgressFollowUpOut]
     in_progress_follow_ups_total: int
     in_progress_follow_ups_page: int
