@@ -258,10 +258,17 @@ export async function registerAssignmentSubmission(
   })
 }
 
-export async function getHome(token: string, followUpsPage = 1): Promise<Home> {
+export async function getHome(
+  token: string,
+  pages: { changesPage?: number; followUpsPage?: number } = {},
+): Promise<Home> {
+  const params = new URLSearchParams({
+    changes_page: String(pages.changesPage ?? 1),
+    follow_ups_page: String(pages.followUpsPage ?? 1),
+  })
   return request<Home>({
     method: 'GET',
-    path: `/home?follow_ups_page=${followUpsPage}`,
+    path: `/home?${params.toString()}`,
     token,
     fallbackMessage: 'Não foi possível carregar os dados agora.',
   })

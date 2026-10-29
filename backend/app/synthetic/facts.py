@@ -47,6 +47,33 @@ class PeriodWindow:
     order_index: int
 
 
+def spread_day(period: PeriodWindow, position: float) -> date:
+    """The school day at `position` (0..1) of `period`'s span (spec-ui-3/4).
+
+    Grades, assignments and observations used to be dated on `end_date`, so
+    a período had none of them until its last day and, on any real date
+    inside a bimestre, nothing could converge into a change. Spreading them
+    across the período keeps a partial bimestre realistic. Weekends move
+    forward to Monday, never past `end_date`."""
+    span = (period.end_date - period.start_date).days
+    day = period.start_date + timedelta(days=round(span * position))
+    while day.weekday() >= 5 and day < period.end_date:
+        day += timedelta(days=1)
+    while day.weekday() >= 5 and day > period.start_date:
+        day -= timedelta(days=1)
+    return day
+
+
+def _grade_position(subject_index: int) -> float:
+    """Evaluations at 20%, 40%, 60% and 80% of the período."""
+    return (subject_index + 1) / (len(SUBJECTS) + 1)
+
+
+def _assignment_position(subject_index: int) -> float:
+    """Due dates at 12.5%, 37.5%, 62.5% and 87.5% of the período."""
+    return (subject_index + 0.5) / len(SUBJECTS)
+
+
 def school_days(periods: tuple[PeriodWindow, ...]) -> tuple[date, ...]:
     """One school day per weekday inside each period's `[start_date,
     end_date]`, excluding gaps between periods — built strictly per period,
@@ -169,7 +196,7 @@ def _build_grades(
     for student in population.students:
         classroom_id = classroom_by_student[student.id]
         for period_index, period in enumerate(periods):
-            for subject in SUBJECTS:
+            for subject_index, subject in enumerate(SUBJECTS):
                 value = profiles.grade_value(
                     seed,
                     student.id,
@@ -186,7 +213,7 @@ def _build_grades(
                         classroom_id=classroom_id,
                         subject=subject,
                         period_order_index=period.order_index,
-                        date=period.end_date,
+                        date=spread_day(period, _grade_position(subject_index)),
                         value=value,
                     )
                 )
@@ -203,7 +230,7 @@ def _build_assignments(
 
     for classroom in population.classrooms:
         for period in periods:
-            for subject in SUBJECTS:
+            for subject_index, subject in enumerate(SUBJECTS):
                 assignments.append(
                     GeneratedAssignment(
                         id=stable_uuid(
@@ -212,7 +239,7 @@ def _build_assignments(
                         classroom_id=classroom.id,
                         subject=subject,
                         period_order_index=period.order_index,
-                        due_date=period.end_date,
+                        due_date=spread_day(period, _assignment_position(subject_index)),
                     )
                 )
 

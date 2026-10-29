@@ -2,7 +2,8 @@
 other product route (spec-3-3 Boundaries & Constraints).
 
 `GET /home` only ever reads already-committed `TrajectoryChange` rows
-(`GetHomeService` -> `list_recent`, capped at `RECENT_CHANGES_LIMIT`) — it never recomputes
+(`GetHomeService` -> `list_recent`, paginated by `changes_page`/
+`changes_page_size`) — it never recomputes
 trajectory; that stays request-scoped to `GET /students/{id}/trajectory`.
 Its `in_progress_follow_ups` list is paginated via `follow_ups_page`/
 `follow_ups_page_size` (open-case volume is operator-driven and otherwise
@@ -17,7 +18,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from app.application.home.get_home import DEFAULT_FOLLOW_UPS_PAGE_SIZE, GetHomeService
+from app.application.home.get_home import (
+    DEFAULT_CHANGES_PAGE_SIZE,
+    DEFAULT_FOLLOW_UPS_PAGE_SIZE,
+    GetHomeService,
+)
 from app.application.home.search_students import DEFAULT_PAGE_SIZE, SearchStudentsService
 from app.composition import get_get_home_service, get_search_students_service
 from app.presentation.auth.dependencies import get_current_user
@@ -36,9 +41,13 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 def get_home(
     follow_ups_page: int = Query(default=1, ge=1),
     follow_ups_page_size: int = Query(default=DEFAULT_FOLLOW_UPS_PAGE_SIZE, ge=1, le=100),
+    changes_page: int = Query(default=1, ge=1),
+    changes_page_size: int = Query(default=DEFAULT_CHANGES_PAGE_SIZE, ge=1, le=100),
     service: GetHomeService = Depends(get_get_home_service),
 ) -> HomeOut:
-    result = service.execute(follow_ups_page, follow_ups_page_size)
+    result = service.execute(
+        follow_ups_page, follow_ups_page_size, changes_page, changes_page_size
+    )
     return HomeOut(
         recent_changes=[
             RecentChangeOut(
@@ -48,8 +57,11 @@ def get_home(
                 description=recent.trajectory_change.description,
                 detected_at=recent.trajectory_change.detected_at,
             )
-            for recent in result.recent_changes
+            for recent in result.recent_changes.items
         ],
+        recent_changes_total=result.recent_changes.total,
+        recent_changes_page=result.recent_changes.page,
+        recent_changes_page_size=result.recent_changes.page_size,
         in_progress_follow_ups=[
             InProgressFollowUpOut(
                 id=active.follow_up.id,

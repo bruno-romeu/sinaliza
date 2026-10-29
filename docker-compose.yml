@@ -34,6 +34,13 @@ services:
       # Rehearsal-only "today" pin (app.domain.as_of) — unset in the real
       # deployment, see .env's SINALIZA_DEMO_AS_OF comment for the mechanism.
       SINALIZA_DEMO_AS_OF: ${SINALIZA_DEMO_AS_OF:-}
+      # spec-ui-4: read only by the one-off population commands run with
+      # `docker compose exec backend ...` (seed_dev_user, synthetic.generate),
+      # never by the API itself. Without them the hosted base could not get
+      # its login user. See deploy/vm-provisioning-runbook.md, step 9b.
+      DEV_SEED_NAME: ${DEV_SEED_NAME:-}
+      DEV_SEED_EMAIL: ${DEV_SEED_EMAIL:-}
+      DEV_SEED_PASSWORD: ${DEV_SEED_PASSWORD:-}
 
   frontend:
     build:

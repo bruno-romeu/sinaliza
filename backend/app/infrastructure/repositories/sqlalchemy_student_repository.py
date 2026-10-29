@@ -103,7 +103,7 @@ class SqlAlchemyStudentRepository:
                     ClassroomModel.name.ilike(pattern, escape="\\"),
                 )
             )
-            .order_by(StudentModel.name, StudentModel.id)
+            .order_by(StudentModel.name, StudentModel.id, ClassroomModel.id)
             .limit(limit)
             .offset(offset)
         )

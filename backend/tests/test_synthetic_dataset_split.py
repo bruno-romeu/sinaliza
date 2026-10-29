@@ -43,6 +43,7 @@ from app.synthetic import calibration
 from app.synthetic.facts import SUBJECTS, PeriodWindow, build_facts, school_days
 from app.synthetic.generate import _build_arg_parser, run_generation
 from app.synthetic.population import GenerationConfig, build_population
+from tests.test_synthetic_facts_generation import _seed_coordination_user
 
 # A full synthetic school year (4 bimesters), mirroring
 # `test_synthetic_facts_generation.py`'s shape, so "complete trajectory
@@ -122,6 +123,7 @@ def test_cli_default_train_ratio_is_the_named_constant_not_a_duplicate_literal()
 
 def test_exactly_two_dataset_split_values_exist_on_a_generated_base(db_session: Session) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     observed_splits = {s.dataset_split for s in db_session.query(StudentModel).all()}
@@ -210,6 +212,7 @@ def test_generated_train_students_never_appear_in_list_enrolled_for_any_classroo
     db_session: Session,
 ) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     repository = SqlAlchemyStudentRepository(db_session)
@@ -226,6 +229,7 @@ def test_generated_train_students_fail_exists_enrollment_for_their_real_classroo
     db_session: Session,
 ) -> None:
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     repository = SqlAlchemyStudentRepository(db_session)
@@ -249,6 +253,7 @@ def test_generated_train_facts_exist_in_the_database_but_never_via_the_student_r
     resolve a student — confirming AD-4/AD-11 is a read-side filter, not an
     accidental absence of TRAIN data altogether."""
     _seed_periods(db_session)
+    _seed_coordination_user(db_session)
     run_generation(db_session, _CONFIG, reset=False)
 
     train_student = (

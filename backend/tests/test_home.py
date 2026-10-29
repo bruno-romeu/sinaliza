@@ -121,6 +121,9 @@ def test_home_with_no_trajectory_changes_returns_empty_list(
     assert response.status_code == 200
     assert response.json() == {
         "recent_changes": [],
+        "recent_changes_total": 0,
+        "recent_changes_page": 1,
+        "recent_changes_page_size": 5,
         "in_progress_follow_ups": [],
         "in_progress_follow_ups_total": 0,
         "in_progress_follow_ups_page": 1,
@@ -128,10 +131,10 @@ def test_home_with_no_trajectory_changes_returns_empty_list(
     }
 
 
-# --- Caps at 5 -----------------------------------------------------------------------
+# --- Pagination of recent changes (spec-ui-4) ----------------------------------------
 
 
-def test_home_caps_recent_changes_at_five(
+def test_home_first_page_of_recent_changes_has_five_and_the_total(
     client: TestClient,
     seeded_user,
     seeded_academic_period: AcademicPeriodModel,
@@ -159,6 +162,61 @@ def test_home_caps_recent_changes_at_five(
     # first 5 inserted.
     assert recent_changes[0]["student_name"] == "Estudante 00"
     assert recent_changes[-1]["student_name"] == "Estudante 04"
+    # spec-ui-4: the other 20 are reachable, not hidden behind a fixed cap.
+    assert response.json()["recent_changes_total"] == 25
+
+
+def test_home_pages_through_every_recent_change_without_gaps_or_repeats(
+    client: TestClient,
+    seeded_user,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    """All changes share one `detected_at` (the usual shape: `prepare_demo`
+    computes everything on the same "today"), so only the `id` tiebreaker
+    keeps pages from overlapping."""
+    detected_at = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    for i in range(12):
+        student = StudentModel(name=f"Estudante {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
+        db_session.add(student)
+        db_session.flush()
+        _add_change(db_session, student, seeded_academic_period, detected_at)
+    db_session.commit()
+    headers = _auth_headers(client, seeded_user)
+
+    seen: list[str] = []
+    for page in (1, 2, 3):
+        body = client.get(f"/home?changes_page={page}", headers=headers).json()
+        assert body["recent_changes_total"] == 12
+        assert body["recent_changes_page"] == page
+        seen.extend(item["student_id"] for item in body["recent_changes"])
+
+    assert len(seen) == 12
+    assert len(set(seen)) == 12
+    past_the_end = client.get("/home?changes_page=4", headers=headers).json()
+    assert past_the_end["recent_changes"] == []
+
+
+def test_home_changes_page_does_not_move_the_follow_ups_page(
+    client: TestClient,
+    seeded_user,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+) -> None:
+    body = client.get(
+        "/home?changes_page=2&changes_page_size=3", headers=_auth_headers(client, seeded_user)
+    ).json()
+
+    assert body["recent_changes_page"] == 2
+    assert body["recent_changes_page_size"] == 3
+    assert body["in_progress_follow_ups_page"] == 1
+
+
+def test_home_rejects_invalid_changes_page(client: TestClient, seeded_user) -> None:
+    headers = _auth_headers(client, seeded_user)
+
+    assert client.get("/home?changes_page=0", headers=headers).status_code == 422
+    assert client.get("/home?changes_page_size=101", headers=headers).status_code == 422
 
 
 # --- id.desc() tiebreaker ------------------------------------------------------------

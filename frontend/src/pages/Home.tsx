@@ -54,6 +54,47 @@ function plural(count: number, singular: string, pluralForm: string) {
   return `${count} ${count === 1 ? singular : pluralForm}`
 }
 
+// spec-ui-4: the three Home lists page with "Ver mais". Pages are offset
+// based, so a row can come back twice if the list changed in between (a
+// follow-up opened, a change recomputed); appending through this keeps each
+// row once.
+function appendUnique<T>(prev: T[] | null, next: T[], key: (item: T) => string): T[] {
+  const seen = new Set((prev ?? []).map(key))
+  return [...(prev ?? []), ...next.filter((item) => !seen.has(key(item)))]
+}
+
+const changeKey = (change: RecentChange) => `${change.student_id}|${change.type}|${change.description}`
+const followUpKey = (followUp: InProgressFollowUp) => followUp.id
+const resultKey = (result: StudentSearchResult) => `${result.id}|${result.classroom_name}`
+
+const LOAD_MORE_ERROR = 'Não foi possível carregar mais agora. Tente de novo.'
+
+function LoadMore({
+  shown,
+  total,
+  loading,
+  error,
+  onClick,
+}: {
+  shown: number
+  total: number
+  loading: boolean
+  error: boolean
+  onClick: () => void
+}) {
+  if (shown >= total && !error) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+      {error && <Notice tone="attention">{LOAD_MORE_ERROR}</Notice>}
+      {shown < total && (
+        <Button variant="quiet" onClick={onClick} disabled={loading}>
+          {loading ? 'Carregando…' : `Ver mais (${plural(total - shown, 'restante', 'restantes')})`}
+        </Button>
+      )}
+    </div>
+  )
+}
+
 /**
  * Home: recent trajectory changes (read-only, never recomputed here) plus a
  * student search box — both link to `/estudantes/:studentId`. No
@@ -64,10 +105,15 @@ export function Home() {
   const { token } = useAuth()
 
   const [recentChanges, setRecentChanges] = useState<RecentChange[] | null>(null)
+  const [changesPage, setChangesPage] = useState(1)
+  const [changesTotal, setChangesTotal] = useState(0)
+  const [loadingMoreChanges, setLoadingMoreChanges] = useState(false)
+  const [moreChangesError, setMoreChangesError] = useState(false)
   const [inProgressFollowUps, setInProgressFollowUps] = useState<InProgressFollowUp[] | null>(null)
   const [followUpsPage, setFollowUpsPage] = useState(1)
   const [followUpsTotal, setFollowUpsTotal] = useState(0)
   const [loadingMoreFollowUps, setLoadingMoreFollowUps] = useState(false)
+  const [moreFollowUpsError, setMoreFollowUpsError] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
 
@@ -76,6 +122,7 @@ export function Home() {
   const [searchPage, setSearchPage] = useState(1)
   const [searchTotal, setSearchTotal] = useState(0)
   const [loadingMoreResults, setLoadingMoreResults] = useState(false)
+  const [moreResultsError, setMoreResultsError] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
 
@@ -88,6 +135,8 @@ export function Home() {
       .then((home) => {
         if (ignore) return
         setRecentChanges(home.recent_changes)
+        setChangesPage(home.recent_changes_page)
+        setChangesTotal(home.recent_changes_total)
         setInProgressFollowUps(home.in_progress_follow_ups)
         setFollowUpsPage(home.in_progress_follow_ups_page)
         setFollowUpsTotal(home.in_progress_follow_ups_total)
@@ -101,16 +150,33 @@ export function Home() {
     }
   }, [token, loadAttempt])
 
+  // Each "Ver mais" asks only for the next page of its own list; the other
+  // list keeps its page untouched.
+  function handleLoadMoreChanges() {
+    if (!token || loadingMoreChanges) return
+    setLoadingMoreChanges(true)
+    setMoreChangesError(false)
+    getHome(token, { changesPage: changesPage + 1 })
+      .then((home) => {
+        setRecentChanges((prev) => appendUnique(prev, home.recent_changes, changeKey))
+        setChangesPage(home.recent_changes_page)
+        setChangesTotal(home.recent_changes_total)
+      })
+      .catch(() => setMoreChangesError(true))
+      .finally(() => setLoadingMoreChanges(false))
+  }
+
   function handleLoadMoreFollowUps() {
     if (!token || loadingMoreFollowUps) return
     setLoadingMoreFollowUps(true)
-    const nextPage = followUpsPage + 1
-    getHome(token, nextPage)
+    setMoreFollowUpsError(false)
+    getHome(token, { followUpsPage: followUpsPage + 1 })
       .then((home) => {
-        setInProgressFollowUps((prev) => [...(prev ?? []), ...home.in_progress_follow_ups])
+        setInProgressFollowUps((prev) => appendUnique(prev, home.in_progress_follow_ups, followUpKey))
         setFollowUpsPage(home.in_progress_follow_ups_page)
         setFollowUpsTotal(home.in_progress_follow_ups_total)
       })
+      .catch(() => setMoreFollowUpsError(true))
       .finally(() => setLoadingMoreFollowUps(false))
   }
 
@@ -127,6 +193,7 @@ export function Home() {
       setSearching(false)
       setSearchPage(1)
       setSearchTotal(0)
+      setMoreResultsError(false)
       return
     }
     let ignore = false
@@ -142,6 +209,7 @@ export function Home() {
           setResults(response.results)
           setSearchPage(response.page)
           setSearchTotal(response.total)
+          setMoreResultsError(false)
         })
         .catch((caught) => {
           if (ignore || queryRef.current !== queryAtStart) return
@@ -164,13 +232,18 @@ export function Home() {
     const trimmed = query.trim()
     if (!token || !trimmed || loadingMoreResults) return
     setLoadingMoreResults(true)
+    setMoreResultsError(false)
     const nextPage = searchPage + 1
     searchStudents(token, trimmed, nextPage)
       .then((response) => {
         if (queryRef.current !== trimmed) return
-        setResults((prev) => [...(prev ?? []), ...response.results])
+        setResults((prev) => appendUnique(prev, response.results, resultKey))
         setSearchPage(response.page)
         setSearchTotal(response.total)
+      })
+      .catch(() => {
+        if (queryRef.current !== trimmed) return
+        setMoreResultsError(true)
       })
       .finally(() => setLoadingMoreResults(false))
   }
@@ -182,15 +255,15 @@ export function Home() {
       <ScreenHead kicker="Coordenação pedagógica" title="Home">
         {recentChanges !== null && inProgressFollowUps !== null && !loadError && (
           <p className="sz-summary">
-            {recentChanges.length > 0 ? (
+            {changesTotal > 0 ? (
               <>
-                <b>{plural(recentChanges.length, 'mudança', 'mudanças')}</b> para revisar
+                <b>{plural(changesTotal, 'mudança', 'mudanças')}</b> para revisar
               </>
             ) : (
               'Nada novo para revisar'
             )}
             {' · '}
-            <b>{plural(inProgressFollowUps.length, 'acompanhamento', 'acompanhamentos')}</b> em andamento
+            <b>{plural(followUpsTotal, 'acompanhamento', 'acompanhamentos')}</b> em andamento
           </p>
         )}
       </ScreenHead>
@@ -212,7 +285,7 @@ export function Home() {
             {searching
               ? 'Buscando…'
               : results !== null
-                ? `${results.length} ${results.length === 1 ? 'estudante encontrado' : 'estudantes encontrados'}`
+                ? `${searchTotal} ${searchTotal === 1 ? 'estudante encontrado' : 'estudantes encontrados'}`
                 : ''}
           </p>
 
@@ -226,7 +299,7 @@ export function Home() {
             <>
               <ul className="sz-results">
                 {results.map((result) => (
-                  <li key={result.id}>
+                  <li key={resultKey(result)}>
                     <Link to={`/estudantes/${result.id}`}>
                       <Icon name="pessoa" size={20} style={{ color: 'var(--ink-muted)' }} />
                       <span className="sz-results-name">{result.name}</span>
@@ -236,11 +309,13 @@ export function Home() {
                   </li>
                 ))}
               </ul>
-              {results.length < searchTotal && (
-                <Button variant="quiet" onClick={handleLoadMoreResults} disabled={loadingMoreResults}>
-                  {loadingMoreResults ? 'Carregando…' : `Ver mais (${searchTotal - results.length} restantes)`}
-                </Button>
-              )}
+              <LoadMore
+                shown={results.length}
+                total={searchTotal}
+                loading={loadingMoreResults}
+                error={moreResultsError}
+                onClick={handleLoadMoreResults}
+              />
             </>
           )}
         </Section>
@@ -271,8 +346,8 @@ export function Home() {
 
           {recentChanges !== null && !loadError && recentChanges.length > 0 && (
             <ul className="sz-list">
-              {recentChanges.map((change, index) => (
-                <li key={`${change.student_id}-${index}`}>
+              {recentChanges.map((change) => (
+                <li key={changeKey(change)}>
                   <ChangeRow
                     to={`/estudantes/${change.student_id}`}
                     name={change.student_name}
@@ -283,6 +358,15 @@ export function Home() {
                 </li>
               ))}
             </ul>
+          )}
+          {recentChanges !== null && !loadError && recentChanges.length > 0 && (
+            <LoadMore
+              shown={recentChanges.length}
+              total={changesTotal}
+              loading={loadingMoreChanges}
+              error={moreChangesError}
+              onClick={handleLoadMoreChanges}
+            />
           )}
         </Section>
       )}
@@ -306,13 +390,13 @@ export function Home() {
                 </li>
               ))}
             </ul>
-            {inProgressFollowUps.length < followUpsTotal && (
-              <Button variant="quiet" onClick={handleLoadMoreFollowUps} disabled={loadingMoreFollowUps}>
-                {loadingMoreFollowUps
-                  ? 'Carregando…'
-                  : `Ver mais (${followUpsTotal - inProgressFollowUps.length} restantes)`}
-              </Button>
-            )}
+            <LoadMore
+              shown={inProgressFollowUps.length}
+              total={followUpsTotal}
+              loading={loadingMoreFollowUps}
+              error={moreFollowUpsError}
+              onClick={handleLoadMoreFollowUps}
+            />
           </>
         )}
       </Section>

@@ -47,7 +47,7 @@ from app.synthetic.population import GenerationConfig, build_population
 #: Hand-maintained — bumped by any story that changes what the generator
 #: emits, so an old `synthetic_generation_runs` row stays interpretable after
 #: the generator evolves (RNF-13, Assumption 4).
-GENERATOR_VERSION = "2.6.0"
+GENERATOR_VERSION = "2.7.0"
 
 
 class DatabasePopulatedError(RuntimeError):
@@ -101,18 +101,14 @@ def reset_generated_data(session: Session) -> None:
     partway through population construction or insertion leaves the
     database exactly as it was before `--reset` ran.
 
-    `follow_up_action`/`follow_up_evidence`/`follow_ups` and
-    `trajectory_change_sources`/`trajectory_changes` are also generated-base
-    content (Story 3.2/4.1, added after this function was first written) —
-    deleted first since both ultimately FK onto `students`, which only
-    `AttendanceRecord` et al. used to.
-
-    spec-ui-3: also deletes what was *derived* from the base and points at its
-    students: detected trajectory changes (and their sources), follow-ups
-    opened on them (with evidence and actions) and ML predictions. Without
-    this, `--reset` failed with a foreign-key error after any demo run, since
-    `prepare_demo` (or opening a trajectory) persists changes.
-    `ml_model_version` stays: it describes a trained model, not the base."""
+    Also deletes what was *derived* from the base and points at its students
+    (Story 3.2/4.1 tables added after this function was first written, plus
+    ML predictions): follow-up actions, evidence and follow-ups, trajectory
+    change sources and changes, `ml_prediction`. They go first, since all of
+    them FK onto `students`; without this, `--reset` failed with a foreign-key
+    error after any demo run, because `prepare_demo` (or opening a
+    trajectory) persists changes. `ml_model_version` stays: it describes a
+    trained model, not the base."""
     session.query(FollowUpActionModel).delete()
     session.query(FollowUpEvidenceModel).delete()
     session.query(FollowUpModel).delete()
