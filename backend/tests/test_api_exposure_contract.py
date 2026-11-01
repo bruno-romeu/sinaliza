@@ -134,6 +134,8 @@ def test_a_signed_token_whose_sub_is_not_a_uuid_is_rejected_as_401_not_500(
     """`CurrentUser.id` é convertido com `uuid.UUID(...)` em todo router que
     precisa da identidade do chamador; antes, um token válido com `sub`
     não-UUID estourava `ValueError` dentro do router (500)."""
+    from datetime import UTC, datetime, timedelta
+
     import jwt
 
     token = jwt.encode(
@@ -141,6 +143,10 @@ def test_a_signed_token_whose_sub_is_not_a_uuid_is_rejected_as_401_not_500(
             "sub": "nao-e-um-uuid",
             "name": "Coordenação",
             "role": UserRole.COORDENACAO_PEDAGOGICA.value,
+            # `exp` é exigido na decodificação (`jwt_issuer.decode`): sem ele
+            # o token seria recusado antes de chegar à checagem do `sub`, e
+            # este teste passaria pelo motivo errado.
+            "exp": datetime.now(UTC) + timedelta(hours=1),
         },
         test_settings.jwt_secret,
         algorithm=JwtTokenIssuer.algorithm,
