@@ -51,27 +51,25 @@ def population_fingerprint(session: Session) -> str:
 
     for classroom in session.query(ClassroomModel).order_by(ClassroomModel.id).all():
         hasher.update(
-            f"classroom|{classroom.id}|{classroom.name}|{classroom.academic_year}\n".encode("utf-8")
+            f"classroom|{classroom.id}|{classroom.name}|{classroom.academic_year}\n".encode()
         )
 
     for student in session.query(StudentModel).order_by(StudentModel.id).all():
         profile_label = student.synthetic_profile.value if student.synthetic_profile else "NULL"
         hasher.update(
             f"student|{student.id}|{student.name}|{student.dataset_split.value}|"
-            f"{profile_label}\n".encode("utf-8")
+            f"{profile_label}\n".encode()
         )
 
     for enrollment in session.query(EnrollmentModel).order_by(EnrollmentModel.id).all():
         hasher.update(
-            f"enrollment|{enrollment.id}|{enrollment.student_id}|{enrollment.classroom_id}\n".encode(
-                "utf-8"
-            )
+            f"enrollment|{enrollment.id}|{enrollment.student_id}|{enrollment.classroom_id}\n".encode()
         )
 
     for record in session.query(AttendanceRecordModel).order_by(AttendanceRecordModel.id).all():
         hasher.update(
             f"attendance|{record.id}|{record.student_id}|{record.classroom_id}|"
-            f"{record.date}|{record.status.value}\n".encode("utf-8")
+            f"{record.date}|{record.status.value}\n".encode()
         )
 
     grade_rows = (
@@ -83,7 +81,7 @@ def population_fingerprint(session: Session) -> str:
     for grade, order_index in grade_rows:
         hasher.update(
             f"grade|{grade.id}|{grade.student_id}|{grade.classroom_id}|{grade.subject}|"
-            f"{order_index}|{grade.date}|{grade.value}\n".encode("utf-8")
+            f"{order_index}|{grade.date}|{grade.value}\n".encode()
         )
 
     assignment_rows = (
@@ -95,7 +93,7 @@ def population_fingerprint(session: Session) -> str:
     for assignment, order_index in assignment_rows:
         hasher.update(
             f"assignment|{assignment.id}|{assignment.classroom_id}|{assignment.subject}|"
-            f"{order_index}|{assignment.due_date}\n".encode("utf-8")
+            f"{order_index}|{assignment.due_date}\n".encode()
         )
 
     for submission in (
@@ -104,17 +102,15 @@ def population_fingerprint(session: Session) -> str:
         hasher.update(
             f"assignment_submission|{submission.id}|{submission.assignment_id}|"
             f"{submission.student_id}|{submission.status.value}|"
-            f"{submission.date}\n".encode("utf-8")
+            f"{submission.date}\n".encode()
         )
 
     for observation in (
-        session.query(PedagogicalObservationModel)
-        .order_by(PedagogicalObservationModel.id)
-        .all()
+        session.query(PedagogicalObservationModel).order_by(PedagogicalObservationModel.id).all()
     ):
         hasher.update(
             f"pedagogical_observation|{observation.id}|{observation.student_id}|"
-            f"{observation.text}|{observation.created_at}|{observation.registers_concern}\n".encode("utf-8")
+            f"{observation.text}|{observation.created_at}|{observation.registers_concern}\n".encode()
         )
 
     return hasher.hexdigest()

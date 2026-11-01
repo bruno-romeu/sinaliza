@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
@@ -76,7 +76,7 @@ def run_training(session: Session, artifact_dir: Path | str) -> MLModelVersion:
     resolved_artifact_dir = Path(artifact_dir)
     resolved_artifact_dir.mkdir(parents=True, exist_ok=True)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     version = _version_string(now)
     # Versioned filename (never a fixed name) so a second run can never
     # overwrite a prior artifact file (spec Never).

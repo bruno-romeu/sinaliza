@@ -225,9 +225,7 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
                 )
             ).scalars()
         )
-    assert trajectory_change_type_labels == {
-        member.value for member in TrajectoryChangeType
-    }
+    assert trajectory_change_type_labels == {member.value for member in TrajectoryChangeType}
     assert trajectory_change_source_type_labels == {member.value for member in SourceType}
 
     # Same label-drift regression as above, for Story 4.1's `follow_up_status`.

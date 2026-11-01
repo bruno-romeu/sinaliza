@@ -40,7 +40,9 @@ def list_classrooms(
 ) -> list[ClassroomOut]:
     classrooms = service.execute()
     return [
-        ClassroomOut(id=str(classroom.id), name=classroom.name, academic_year=classroom.academic_year)
+        ClassroomOut(
+            id=str(classroom.id), name=classroom.name, academic_year=classroom.academic_year
+        )
         for classroom in classrooms
     ]
 

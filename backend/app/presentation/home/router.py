@@ -45,9 +45,7 @@ def get_home(
     changes_page_size: int = Query(default=DEFAULT_CHANGES_PAGE_SIZE, ge=1, le=100),
     service: GetHomeService = Depends(get_get_home_service),
 ) -> HomeOut:
-    result = service.execute(
-        follow_ups_page, follow_ups_page_size, changes_page, changes_page_size
-    )
+    result = service.execute(follow_ups_page, follow_ups_page_size, changes_page, changes_page_size)
     return HomeOut(
         recent_changes=[
             RecentChangeOut(

@@ -5,7 +5,8 @@ Revises: 0007
 Create Date: 2026-10-13
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -13,9 +14,9 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0008"
-down_revision: Union[str, None] = "0007"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0007"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Same explicit checkfirst=True / create_type=False enum lifecycle as
 # 0007_create_trajectory_change_tables.py.
@@ -64,9 +65,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_index("ix_follow_ups_student_id", "follow_ups", ["student_id"])
-    op.create_index(
-        "ix_follow_ups_responsible_user_id", "follow_ups", ["responsible_user_id"]
-    )
+    op.create_index("ix_follow_ups_responsible_user_id", "follow_ups", ["responsible_user_id"])
 
     op.create_table(
         "follow_up_evidence",
@@ -84,9 +83,7 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    op.create_index(
-        "ix_follow_up_evidence_follow_up_id", "follow_up_evidence", ["follow_up_id"]
-    )
+    op.create_index("ix_follow_up_evidence_follow_up_id", "follow_up_evidence", ["follow_up_id"])
     op.create_index(
         "ix_follow_up_evidence_trajectory_change_id",
         "follow_up_evidence",
@@ -95,12 +92,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_follow_up_evidence_trajectory_change_id", table_name="follow_up_evidence"
-    )
-    op.drop_index(
-        "ix_follow_up_evidence_follow_up_id", table_name="follow_up_evidence"
-    )
+    op.drop_index("ix_follow_up_evidence_trajectory_change_id", table_name="follow_up_evidence")
+    op.drop_index("ix_follow_up_evidence_follow_up_id", table_name="follow_up_evidence")
     op.drop_table("follow_up_evidence")
 
     op.drop_index("ix_follow_ups_responsible_user_id", table_name="follow_ups")

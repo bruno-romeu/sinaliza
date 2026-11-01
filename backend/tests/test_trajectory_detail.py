@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -83,7 +83,10 @@ def _add_low_attendance(
     for _ in range(present_count):
         db_session.add(
             AttendanceRecordModel(
-                student_id=student_id, classroom_id=classroom_id, date=day, status=AttendanceStatus.PRESENT
+                student_id=student_id,
+                classroom_id=classroom_id,
+                date=day,
+                status=AttendanceStatus.PRESENT,
             )
         )
         day += timedelta(days=1)
@@ -116,7 +119,7 @@ def test_detail_with_detected_change_includes_resolved_evidence_and_omits_concer
             student_id=seeded_enrolled_student.id,
             author_user_id=seeded_user.id,
             text="Observação de teste.",
-            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )
@@ -154,7 +157,10 @@ def test_detail_with_detected_change_includes_resolved_evidence_and_omits_concer
     observation_items = [
         item for item in body["evidence"] if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
     ]
-    assert observation_items[0]["description"] == "Registro pedagógico em 01/09/2026: Observação de teste."
+    assert (
+        observation_items[0]["description"]
+        == "Registro pedagógico em 01/09/2026: Observação de teste."
+    )
 
     # Series covers the (single) seeded período.
     assert len(body["series"]) == 1
@@ -444,7 +450,7 @@ def test_detail_chart_indicator_follows_grade_drop_change_type(
             student_id=seeded_enrolled_student.id,
             author_user_id=seeded_user.id,
             text="Observação de teste.",
-            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )
@@ -497,7 +503,7 @@ def test_detail_chart_indicator_follows_missing_assignments_change_type(
             student_id=seeded_enrolled_student.id,
             author_user_id=seeded_user.id,
             text="Observação de teste.",
-            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )
@@ -601,9 +607,7 @@ def test_detail_window_days_query_param_overrides_default(
     # perturb the independent, period-bounded convergence/concerning-factor
     # read (code review finding, Story 3.4).
     assert default_window.json()["trajectory_change"] == widened_window.json()["trajectory_change"]
-    assert (
-        default_window.json()["concerning_factor"] == widened_window.json()["concerning_factor"]
-    )
+    assert default_window.json()["concerning_factor"] == widened_window.json()["concerning_factor"]
 
 
 # --- Current-period series point anchors on the real clock, not a future end_date ------
@@ -680,7 +684,7 @@ def test_detail_observations_are_capped_at_ten_desc_by_date(
                 student_id=seeded_enrolled_student.id,
                 author_user_id=seeded_user.id,
                 text=f"Observação {i}.",
-                created_at=datetime(2026, 1, 1 + i, 12, 0, tzinfo=timezone.utc),
+                created_at=datetime(2026, 1, 1 + i, 12, 0, tzinfo=UTC),
                 # spec-ui-3: only a concern-marked observation is a signal.
                 registers_concern=True,
             )
@@ -736,7 +740,7 @@ def test_detail_evidence_redacts_observation_text_once_cited_by_a_follow_up_for_
             student_id=seeded_enrolled_student.id,
             author_user_id=seeded_user.id,
             text="Observação de teste.",
-            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )
@@ -771,9 +775,7 @@ def test_detail_evidence_redacts_observation_text_once_cited_by_a_follow_up_for_
         f"/students/{seeded_enrolled_student.id}/trajectory/detail", headers=headers
     ).json()
     own_observation = next(
-        item
-        for item in own_detail["evidence"]
-        if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
+        item for item in own_detail["evidence"] if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
     )
     assert "Observação de teste." in own_observation["description"]
 
@@ -806,7 +808,7 @@ def test_detail_timeline_redacts_observation_text_once_cited_by_a_follow_up_for_
             student_id=seeded_enrolled_student.id,
             author_user_id=seeded_user.id,
             text="Observação de teste.",
-            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )

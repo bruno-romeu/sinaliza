@@ -48,10 +48,10 @@ idêntico" under concurrent, independent recomputation): `attendance_rate`/
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Sequence
 
 from app.domain.assignment import Assignment
 from app.domain.assignment_submission import AssignmentSubmission, AssignmentSubmissionStatus
@@ -159,7 +159,9 @@ def compute_trajectory_indicators(
         submissions_by_assignment.setdefault(submission.assignment_id, []).append(submission)
 
     missing_assignments_count = _missing_count(current_assignments, submissions_by_assignment)
-    previous_missing_assignments_count = _missing_count(previous_assignments, submissions_by_assignment)
+    previous_missing_assignments_count = _missing_count(
+        previous_assignments, submissions_by_assignment
+    )
     missing_assignment_delta = missing_assignments_count - previous_missing_assignments_count
 
     return TrajectoryIndicators(

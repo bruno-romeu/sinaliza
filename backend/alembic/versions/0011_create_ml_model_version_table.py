@@ -9,7 +9,8 @@ RF-17). No enum columns here, unlike most prior migrations in this chain —
 plain table creation, shaped like `0006_create_synthetic_generation_runs_table.py`
 minus the enum lifecycle.
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -17,9 +18,9 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0011"
-down_revision: Union[str, None] = "0010"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0010"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

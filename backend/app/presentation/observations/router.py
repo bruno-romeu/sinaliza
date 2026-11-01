@@ -22,9 +22,7 @@ from app.presentation.schemas.observations import (
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
-@router.post(
-    "/pedagogical-observations", response_model=PedagogicalObservationOut, status_code=201
-)
+@router.post("/pedagogical-observations", response_model=PedagogicalObservationOut, status_code=201)
 def register_observation(
     payload: PedagogicalObservationCreateRequest,
     current_user: CurrentUser = Depends(get_current_user),
