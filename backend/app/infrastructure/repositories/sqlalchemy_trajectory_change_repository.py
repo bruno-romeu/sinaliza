@@ -27,14 +27,20 @@ Postgres silently skips the update for a frozen row instead of touching it.
 used instead of `scalar_one()`; when it comes back `None` (frozen), the
 existing row's current (frozen) values are fetched by a separate `SELECT` on
 the `(student_id, type, period_id)` key, and `TrajectoryChangeSource` rows are
-left completely untouched (no delete+reinsert) — the whole point of freezing."""
+left completely untouched (no delete+reinsert) — the whole point of freezing.
+
+Every read here — `get_by_id` included, since epic-5-retro-item-2 — goes
+through `filter_as_of_timestamp` on `detected_at` (AD-5, AD-11); see
+`get_by_id`'s own docstring for why that method was the remaining hole.
+`upsert` is a write and is deliberately *not* truncated: detection persists
+the change `as_of()` itself derived, and a write is never a "read of the
+future"."""
 
 from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Date as SA_Date
-from sqlalchemy import cast, delete, exists, func, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -44,7 +50,8 @@ from app.infrastructure.db.models import (
     TrajectoryChangeModel,
     TrajectoryChangeSourceModel,
 )
-from app.infrastructure.repositories.base import filter_as_of
+from app.infrastructure.repositories.base import filter_as_of_timestamp
+from app.infrastructure.repositories.errors import translating_integrity_errors
 
 
 class SqlAlchemyTrajectoryChangeRepository:
@@ -78,7 +85,11 @@ class SqlAlchemyTrajectoryChangeRepository:
             },
             where=not_frozen,
         ).returning(TrajectoryChangeModel.id)
-        change_id = self._session.execute(upsert_stmt).scalar_one_or_none()
+        # An FK violation here (an already-deleted student/período) is
+        # translated into `ForeignKeyViolationError` with the session rolled
+        # back, instead of escaping raw and leaving the session unusable.
+        with translating_integrity_errors(self._session):
+            change_id = self._session.execute(upsert_stmt).scalar_one_or_none()
 
         if change_id is None:
             # Frozen: the WHERE blocked the update, so nothing was returned.
@@ -104,22 +115,23 @@ class SqlAlchemyTrajectoryChangeRepository:
                 description=existing.description,
             )
 
-        self._session.execute(
-            delete(TrajectoryChangeSourceModel).where(
-                TrajectoryChangeSourceModel.trajectory_change_id == change_id
-            )
-        )
-        for source in sources:
-            self._session.add(
-                TrajectoryChangeSourceModel(
-                    id=source.id,
-                    trajectory_change_id=change_id,
-                    source_type=source.source_type,
-                    source_id=source.source_id,
+        with translating_integrity_errors(self._session):
+            self._session.execute(
+                delete(TrajectoryChangeSourceModel).where(
+                    TrajectoryChangeSourceModel.trajectory_change_id == change_id
                 )
             )
+            for source in sources:
+                self._session.add(
+                    TrajectoryChangeSourceModel(
+                        id=source.id,
+                        trajectory_change_id=change_id,
+                        source_type=source.source_type,
+                        source_id=source.source_id,
+                    )
+                )
 
-        self._session.commit()
+            self._session.commit()
 
         return TrajectoryChange(
             id=change_id,
@@ -132,8 +144,25 @@ class SqlAlchemyTrajectoryChangeRepository:
 
     def get_by_id(self, change_id: uuid.UUID) -> TrajectoryChange | None:
         """Story 4.1 — loads one `TrajectoryChange` by id for
-        `OpenFollowUpService`."""
-        model = self._session.get(TrajectoryChangeModel, change_id)
+        `OpenFollowUpService` and `GetFollowUpService`.
+
+        epic-5-retro-item-2: this used to be a plain
+        `session.get(TrajectoryChangeModel, change_id)` with no date filter
+        at all, while `list_recent` (Story 5.4) truncated at `as_of()` — the
+        same "demo rewind leaks a later-dated row" bug class, one method
+        away. A rehearsal that persisted a change under a later
+        `SINALIZA_DEMO_AS_OF` and then rewound to an earlier date could
+        still open a follow-up on it (`POST /follow-ups`) or read it back
+        (`GET /follow-ups/{id}`) by id, even though Home and Trajectory had
+        correctly stopped showing it. Now it answers `None` for a change
+        dated after the current `as_of()`, exactly like every other
+        trajectory-facing read.
+        """
+        stmt = filter_as_of_timestamp(
+            select(TrajectoryChangeModel).where(TrajectoryChangeModel.id == change_id),
+            TrajectoryChangeModel.detected_at,
+        )
+        model = self._session.execute(stmt).scalar_one_or_none()
         if model is None:
             return None
         return TrajectoryChange(
@@ -147,9 +176,9 @@ class SqlAlchemyTrajectoryChangeRepository:
 
     def count_recent(self) -> int:
         """Total behind `list_recent`, under the same `filter_as_of`."""
-        detected_at_date = cast(TrajectoryChangeModel.detected_at, SA_Date)
-        stmt = filter_as_of(
-            select(func.count()).select_from(TrajectoryChangeModel), detected_at_date
+        stmt = filter_as_of_timestamp(
+            select(func.count()).select_from(TrajectoryChangeModel),
+            TrajectoryChangeModel.detected_at,
         )
         return self._session.execute(stmt).scalar_one()
 
@@ -167,16 +196,15 @@ class SqlAlchemyTrajectoryChangeRepository:
         persisted a later-dated change would otherwise still surface that
         change in Home, a "future" leak relative to the rewound date.
 
-        `detected_at` is cast to `Date` first, mirroring
-        `sqlalchemy_pedagogical_observation_repository.py`'s precedent for
-        timestamp columns — comparing the raw `timestamptz` to `as_of()`'s
-        plain `date` would let Postgres resolve the date literal at the
-        session timezone's midnight rather than UTC midnight, silently
-        shifting the truncation boundary on a non-UTC session."""
-        detected_at_date = cast(TrajectoryChangeModel.detected_at, SA_Date)
-        stmt = filter_as_of(select(TrajectoryChangeModel), detected_at_date).order_by(
-            TrajectoryChangeModel.detected_at.desc(), TrajectoryChangeModel.id.desc()
-        )
+        `detected_at` is bucketed to its **UTC** calendar date first, via
+        `base.utc_date_of` — comparing the raw `timestamptz` to `as_of()`'s
+        plain `date`, or casting it with a plain `::date`, would let Postgres
+        resolve the day boundary at the session `timezone` GUC rather than at
+        UTC, silently shifting the truncation boundary on a non-UTC
+        session."""
+        stmt = filter_as_of_timestamp(
+            select(TrajectoryChangeModel), TrajectoryChangeModel.detected_at
+        ).order_by(TrajectoryChangeModel.detected_at.desc(), TrajectoryChangeModel.id.desc())
         stmt = stmt.limit(limit).offset(offset)
         models = self._session.execute(stmt).scalars().all()
         return [

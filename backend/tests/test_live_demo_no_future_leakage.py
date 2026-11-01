@@ -192,6 +192,98 @@ def test_rewinding_as_of_hides_a_previously_detected_change(
     assert second_response.json()["recent_changes"] == []
 
 
+# --- Follow-ups: the same truncation, reached by id (epic-5-retro-item-2) ------
+#
+# Story 5.4 fixed `list_recent` (Home/Trajectory) but left
+# `SqlAlchemyTrajectoryChangeRepository.get_by_id` — the only read behind
+# `POST /follow-ups` and `GET /follow-ups/{id}` — with no `as_of()` filter at
+# all: a plain `session.get(...)`. So a rehearsal that persisted a change
+# under a later `SINALIZA_DEMO_AS_OF` and then rewound could still reach that
+# same "future" change by id, both to open a follow-up on it and to read it
+# back inside one, while Home had correctly stopped showing it. Both tests
+# below fail against that version of `get_by_id` and pass with the filter.
+
+
+def test_rewinding_as_of_hides_a_later_change_from_get_follow_up_detail(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SINALIZA_DEMO_AS_OF", "2026-09-24")
+    change = _add_change(
+        db_session,
+        seeded_enrolled_student,
+        seeded_academic_period,
+        datetime(2026, 9, 24, 0, 0, tzinfo=UTC),
+    )
+    headers = _auth_headers(client, seeded_user)
+
+    opened = client.post(
+        "/follow-ups",
+        headers=headers,
+        json={
+            "student_id": str(seeded_enrolled_student.id),
+            "trajectory_change_id": str(change.id),
+        },
+    )
+    assert opened.status_code == 201
+    follow_up_id = opened.json()["id"]
+
+    before = client.get(f"/follow-ups/{follow_up_id}", headers=headers)
+    assert before.status_code == 200
+    assert [group["trajectory_change"]["id"] for group in before.json()["trajectory_changes"]] == [
+        str(change.id)
+    ]
+
+    # Rewind to before the change was detected: the follow-up itself is a
+    # human process and stays readable, but the change it cites is now dated
+    # in the future and must not be rendered as current evidence.
+    monkeypatch.setenv("SINALIZA_DEMO_AS_OF", "2026-09-10")
+
+    after = client.get(f"/follow-ups/{follow_up_id}", headers=headers)
+    assert after.status_code == 200
+    assert after.json()["trajectory_changes"] == []
+
+
+def test_rewinding_as_of_makes_opening_a_follow_up_on_a_later_change_404(
+    client: TestClient,
+    seeded_user,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SINALIZA_DEMO_AS_OF", "2026-09-24")
+    change = _add_change(
+        db_session,
+        seeded_enrolled_student,
+        seeded_academic_period,
+        datetime(2026, 9, 24, 0, 0, tzinfo=UTC),
+    )
+    headers = _auth_headers(client, seeded_user)
+
+    monkeypatch.setenv("SINALIZA_DEMO_AS_OF", "2026-09-10")
+
+    response = client.post(
+        "/follow-ups",
+        headers=headers,
+        json={
+            "student_id": str(seeded_enrolled_student.id),
+            "trajectory_change_id": str(change.id),
+        },
+    )
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {
+            "code": "trajectory_change_not_found",
+            "message": "Mudança de trajetória não encontrada.",
+        }
+    }
+
+
 # --- TRAIN-split student: invisible across every live demo surface -----------
 
 
