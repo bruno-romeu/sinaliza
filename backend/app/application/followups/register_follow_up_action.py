@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 
 from app.application.followups.errors import FollowUpAccessDeniedError, FollowUpNotFoundError
 from app.application.followups.ports import FollowUpRepositoryPort
+from app.application.integrity import translating_repository_integrity_errors
 from app.domain.follow_up import FollowUpAction
 
 
@@ -48,4 +49,5 @@ class RegisterFollowUpActionService:
             author_user_id=author_user_id,
             created_at=datetime.now(UTC),
         )
-        return self._follow_up_repository.add_action(action)
+        with translating_repository_integrity_errors():
+            return self._follow_up_repository.add_action(action)
