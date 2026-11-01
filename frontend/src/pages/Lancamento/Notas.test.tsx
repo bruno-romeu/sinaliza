@@ -32,14 +32,21 @@ describe('Notas — client-side out-of-range validation (spec I/O Matrix "Out-of
       STORAGE_KEY,
       JSON.stringify({
         token: 'fake-token',
-        user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'COORDENACAO_PEDAGOGICA' },
+        user: {
+          id: 'u1',
+          name: 'Test User',
+          email: 'test@example.com',
+          role: 'COORDENACAO_PEDAGOGICA',
+        },
       }),
     )
 
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url === '/api/classrooms') {
-        return jsonResponse([{ id: 'classroom-1', name: 'Turma Teste', academic_year: 2026 }])
+        return jsonResponse([
+          { id: 'classroom-1', name: 'Turma Teste', academic_year: 2026 },
+        ])
       }
       if (url === '/api/academic-periods') {
         return jsonResponse([
@@ -86,23 +93,33 @@ describe('Notas — client-side out-of-range validation (spec I/O Matrix "Out-of
     // GETs, then fill turma/disciplina/período so the row's Save button is
     // enabled (`canSave`).
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Turma Teste' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Turma Teste' }),
+      ).toBeInTheDocument()
     })
-    fireEvent.change(screen.getByLabelText('Turma'), { target: { value: 'classroom-1' } })
+    fireEvent.change(screen.getByLabelText('Turma'), {
+      target: { value: 'classroom-1' },
+    })
 
     await screen.findByText('Estudante Teste')
 
-    fireEvent.change(screen.getByLabelText('Disciplina'), { target: { value: 'Matemática' } })
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: '3º Bimestre' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Disciplina'), {
+      target: { value: 'Matemática' },
     })
-    fireEvent.change(screen.getByLabelText('Período letivo'), { target: { value: 'period-1' } })
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: '3º Bimestre' }),
+      ).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByLabelText('Período letivo'), {
+      target: { value: 'period-1' },
+    })
 
     const valorInput = screen.getByLabelText(/Nota de/)
     fireEvent.change(valorInput, { target: { value: '15' } })
 
     const saveButton = screen.getByRole('button', { name: 'Salvar' })
-    expect(saveButton).not.toBeDisabled()
+    expect(saveButton).toBeEnabled()
     fireEvent.click(saveButton)
 
     const expectedMessage = 'O valor deve estar entre 0 e 10.'
@@ -127,18 +144,30 @@ describe('Notas — client-side out-of-range validation (spec I/O Matrix "Out-of
     renderNotas()
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Turma Teste' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Turma Teste' }),
+      ).toBeInTheDocument()
     })
-    fireEvent.change(screen.getByLabelText('Turma'), { target: { value: 'classroom-1' } })
+    fireEvent.change(screen.getByLabelText('Turma'), {
+      target: { value: 'classroom-1' },
+    })
 
     await screen.findByText('Estudante Teste')
 
-    fireEvent.change(screen.getByLabelText('Disciplina'), { target: { value: 'Matemática' } })
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: '3º Bimestre' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Disciplina'), {
+      target: { value: 'Matemática' },
     })
-    fireEvent.change(screen.getByLabelText('Período letivo'), { target: { value: 'period-1' } })
-    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-09-24' } })
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: '3º Bimestre' }),
+      ).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByLabelText('Período letivo'), {
+      target: { value: 'period-1' },
+    })
+    fireEvent.change(screen.getByLabelText('Data'), {
+      target: { value: '2026-09-24' },
+    })
 
     const valorInput = screen.getByLabelText(/Nota de/)
     fireEvent.change(valorInput, { target: { value: '8.5' } })

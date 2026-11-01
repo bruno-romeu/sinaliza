@@ -43,7 +43,11 @@ export function Header() {
             </ButtonLink>
           )}
           {!onLancamento && (
-            <ButtonLink to="/lancamento/presenca" variant="secondary" icon="mais">
+            <ButtonLink
+              to="/lancamento/presenca"
+              variant="secondary"
+              icon="mais"
+            >
               Lançar registro
             </ButtonLink>
           )}
@@ -55,7 +59,12 @@ export function Header() {
               <span className="sz-header-name">{user.name}</span>
             </span>
           )}
-          <Button variant="quiet" onClick={cycle} aria-label={THEME_LABEL[preference]} title={THEME_LABEL[preference]}>
+          <Button
+            variant="quiet"
+            onClick={cycle}
+            aria-label={THEME_LABEL[preference]}
+            title={THEME_LABEL[preference]}
+          >
             <Icon name={THEME_ICON[preference]} size={18} />
           </Button>
           <Button variant="quiet" onClick={logout} aria-label="Sair">

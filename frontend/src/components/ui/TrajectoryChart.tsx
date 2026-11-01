@@ -47,7 +47,9 @@ export function TrajectoryChart({
   onChangePoint?: () => void
 }) {
   const [showTable, setShowTable] = useState(false)
-  const known = points.map((point) => point.value).filter((value): value is number => value !== null)
+  const known = points
+    .map((point) => point.value)
+    .filter((value): value is number => value !== null)
   const all = [...known, ...(band ? [band.low, band.high] : [])]
   let lo = all.length ? Math.min(...all) : 0
   let hi = all.length ? Math.max(...all) : 1
@@ -56,24 +58,42 @@ export function TrajectoryChart({
   hi += span * 0.15
   const n = Math.max(points.length, 2)
   const x = (index: number) =>
-    points.length <= 1 ? (PAD.left + W - PAD.right) / 2 : PAD.left + (index * (W - PAD.left - PAD.right)) / (n - 1)
-  const y = (value: number) => PAD.top + ((hi - value) * (H - PAD.top - PAD.bottom)) / (hi - lo)
-  const ticks = [0, 0.5, 1].map((f) => lo + span * 0.15 + f * (hi - lo - span * 0.3))
+    points.length <= 1
+      ? (PAD.left + W - PAD.right) / 2
+      : PAD.left + (index * (W - PAD.left - PAD.right)) / (n - 1)
+  const y = (value: number) =>
+    PAD.top + ((hi - value) * (H - PAD.top - PAD.bottom)) / (hi - lo)
+  const ticks = [0, 0.5, 1].map(
+    (f) => lo + span * 0.15 + f * (hi - lo - span * 0.3),
+  )
   const line = points
-    .map((point, index) => (point.value === null ? null : `${x(index)},${y(point.value)}`))
+    .map((point, index) =>
+      point.value === null ? null : `${x(index)},${y(point.value)}`,
+    )
     .filter(Boolean)
     .join(' ')
-  const change = changeIndex !== undefined && changeIndex >= 0 ? points[changeIndex] : undefined
+  const change =
+    changeIndex !== undefined && changeIndex >= 0
+      ? points[changeIndex]
+      : undefined
   // "Saiu da faixa" only when the point is really outside the band; the
   // change can also come from other indicators than the one charted.
   const outsideBand =
-    change !== undefined && change.value !== null && band !== null && (change.value < band.low || change.value > band.high)
-  const pointLabel = changeLabel ?? (outsideBand ? 'Saiu da faixa' : 'Mudança detectada')
+    change !== undefined &&
+    change.value !== null &&
+    band !== null &&
+    (change.value < band.low || change.value > band.high)
+  const pointLabel =
+    changeLabel ?? (outsideBand ? 'Saiu da faixa' : 'Mudança detectada')
 
   return (
     <figure className="sz-card sz-chart" style={{ margin: 0 }}>
       <div className="sz-chart-head">
-        <div>{indicator && <IndicatorTag indicator={indicator}>{indicatorLabel}</IndicatorTag>}</div>
+        <div>
+          {indicator && (
+            <IndicatorTag indicator={indicator}>{indicatorLabel}</IndicatorTag>
+          )}
+        </div>
         <Button
           variant="quiet"
           icon={showTable ? 'grafico' : 'tabela'}
@@ -87,8 +107,19 @@ export function TrajectoryChart({
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary}>
           {ticks.map((tick, index) => (
             <g key={`t${index}`}>
-              <line className="grid" x1={PAD.left} x2={W - PAD.right} y1={y(tick)} y2={y(tick)} />
-              <text className="axis" x={PAD.left - 10} y={y(tick) + 4} textAnchor="end">
+              <line
+                className="grid"
+                x1={PAD.left}
+                x2={W - PAD.right}
+                y1={y(tick)}
+                y2={y(tick)}
+              />
+              <text
+                className="axis"
+                x={PAD.left - 10}
+                y={y(tick) + 4}
+                textAnchor="end"
+              >
                 {format(tick)}
               </text>
             </g>
@@ -105,16 +136,30 @@ export function TrajectoryChart({
           {line && <polyline className="line" points={line} />}
           {points.map((point, index) =>
             point.value === null || index === changeIndex ? null : (
-              <circle key={point.key} className="dot" cx={x(index)} cy={y(point.value)} r={4.5} />
+              <circle
+                key={point.key}
+                className="dot"
+                cx={x(index)}
+                cy={y(point.value)}
+                r={4.5}
+              />
             ),
           )}
           {points.map((point, index) => (
             <text
               key={`x${point.key}`}
-              className={['axis', index === changeIndex ? 'axis-hot' : null].filter(Boolean).join(' ')}
+              className={['axis', index === changeIndex ? 'axis-hot' : null]
+                .filter(Boolean)
+                .join(' ')}
               x={x(index)}
               y={H - 10}
-              textAnchor={points.length > 1 && index === 0 ? 'start' : points.length > 1 && index === points.length - 1 ? 'end' : 'middle'}
+              textAnchor={
+                points.length > 1 && index === 0
+                  ? 'start'
+                  : points.length > 1 && index === points.length - 1
+                    ? 'end'
+                    : 'middle'
+              }
             >
               {point.label}
             </text>
@@ -133,17 +178,43 @@ export function TrajectoryChart({
                 }
               }}
             >
-              <circle className="cp-hit" cx={x(changeIndex)} cy={y(change.value)} r={22} />
-              <circle className="cp-halo" cx={x(changeIndex)} cy={y(change.value)} r={12} />
-              <circle className="cp-ring" cx={x(changeIndex)} cy={y(change.value)} r={11} />
-              <circle className="cp-dot" cx={x(changeIndex)} cy={y(change.value)} r={5} />
+              <circle
+                className="cp-hit"
+                cx={x(changeIndex)}
+                cy={y(change.value)}
+                r={22}
+              />
+              <circle
+                className="cp-halo"
+                cx={x(changeIndex)}
+                cy={y(change.value)}
+                r={12}
+              />
+              <circle
+                className="cp-ring"
+                cx={x(changeIndex)}
+                cy={y(change.value)}
+                r={11}
+              />
+              <circle
+                className="cp-dot"
+                cx={x(changeIndex)}
+                cy={y(change.value)}
+                r={5}
+              />
               <text
                 className="cp-label"
                 x={x(changeIndex)}
                 y={y(change.value) - 20}
                 // First/last point: anchor the label inward so it never
                 // overflows the card (the last bimestre is the usual case).
-                textAnchor={changeIndex === points.length - 1 && points.length > 1 ? 'end' : changeIndex === 0 ? 'start' : 'middle'}
+                textAnchor={
+                  changeIndex === points.length - 1 && points.length > 1
+                    ? 'end'
+                    : changeIndex === 0
+                      ? 'start'
+                      : 'middle'
+                }
               >
                 {pointLabel}
               </text>
@@ -165,7 +236,11 @@ export function TrajectoryChart({
             <tr key={point.key}>
               <td>{point.label}</td>
               <td>{format(point.value)}</td>
-              <td>{band ? `${format(band.low)} a ${format(band.high)}` : 'Sem registro'}</td>
+              <td>
+                {band
+                  ? `${format(band.low)} a ${format(band.high)}`
+                  : 'Sem registro'}
+              </td>
             </tr>
           ))}
         </tbody>

@@ -10,7 +10,13 @@ import {
   type Classroom,
   type Student,
 } from '../../api/client'
-import { Notice, RosterRow, Section, SelectField, TextField } from '../../components/ui'
+import {
+  Notice,
+  RosterRow,
+  Section,
+  SelectField,
+  TextField,
+} from '../../components/ui'
 import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 function todayIsoDate(): string {
@@ -93,10 +99,14 @@ export function Notas() {
     if (!token) return
     listClassrooms(token)
       .then(setClassrooms)
-      .catch(() => setClassroomsError('Não foi possível carregar as turmas agora.'))
+      .catch(() =>
+        setClassroomsError('Não foi possível carregar as turmas agora.'),
+      )
     listAcademicPeriods(token)
       .then(setPeriods)
-      .catch(() => setPeriodsError('Não foi possível carregar os períodos letivos agora.'))
+      .catch(() =>
+        setPeriodsError('Não foi possível carregar os períodos letivos agora.'),
+      )
   }, [token])
 
   useEffect(() => {
@@ -116,7 +126,12 @@ export function Notas() {
           Object.fromEntries(
             fetched.map((student) => [
               student.id,
-              { value: '', saving: false, message: null, isError: false } as RowState,
+              {
+                value: '',
+                saving: false,
+                message: null,
+                isError: false,
+              } as RowState,
             ]),
           ),
         )
@@ -138,20 +153,37 @@ export function Notas() {
     setRowStates((prev) => {
       const next: Record<string, RowState> = {}
       for (const studentId of Object.keys(prev)) {
-        next[studentId] = { value: '', saving: false, message: null, isError: false }
+        next[studentId] = {
+          value: '',
+          saving: false,
+          message: null,
+          isError: false,
+        }
       }
       return next
     })
   }, [selectedPeriodId, subject, date])
 
   function updateRow(studentId: string, patch: Partial<RowState>) {
-    setRowStates((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }))
+    setRowStates((prev) => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], ...patch },
+    }))
   }
 
-  const canSave = Boolean(selectedClassroomId && selectedPeriodId && subject.trim() && date)
+  const canSave = Boolean(
+    selectedClassroomId && selectedPeriodId && subject.trim() && date,
+  )
 
   async function handleSave(studentId: string) {
-    if (!token || !selectedClassroomId || !selectedPeriodId || !subject.trim() || !date) return
+    if (
+      !token ||
+      !selectedClassroomId ||
+      !selectedPeriodId ||
+      !subject.trim() ||
+      !date
+    )
+      return
     const row = rowStates[studentId]
     if (!row) return
 
@@ -182,11 +214,17 @@ export function Notas() {
         value: row.value.trim(),
       })
       if (sharedContextChanged()) return
-      updateRow(studentId, { saving: false, message: 'Registro salvo.', isError: false })
+      updateRow(studentId, {
+        saving: false,
+        message: 'Registro salvo.',
+        isError: false,
+      })
     } catch (caught) {
       if (sharedContextChanged()) return
       const message =
-        caught instanceof ApiError ? caught.message : 'Não foi possível salvar a nota agora.'
+        caught instanceof ApiError
+          ? caught.message
+          : 'Não foi possível salvar a nota agora.'
       updateRow(studentId, { saving: false, message, isError: true })
     }
   }
@@ -229,19 +267,30 @@ export function Notas() {
               </option>
             ))}
           </SelectField>
-          <TextField label="Data" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+          <TextField
+            label="Data"
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
         </>
       }
     >
       <Section id="lancamento-alunos" title="Estudantes">
-        <p className="sz-muted">Valores de 0 a 10, com até duas casas decimais.</p>
+        <p className="sz-muted">
+          Valores de 0 a 10, com até duas casas decimais.
+        </p>
         <RosterStates
           selected={Boolean(selectedClassroomId)}
           loading={studentsLoading}
           error={studentsError}
           empty={!studentsLoading && !studentsError && students.length === 0}
         />
-        {students.length > 0 && !canSave && <Notice tone="info">Selecione disciplina, período letivo e data para lançar notas.</Notice>}
+        {students.length > 0 && !canSave && (
+          <Notice tone="info">
+            Selecione disciplina, período letivo e data para lançar notas.
+          </Notice>
+        )}
         {students.length > 0 && (
           <ul className="sz-roster">
             {students.map((student) => (
@@ -250,7 +299,13 @@ export function Notas() {
                 student={student}
                 rowState={rowStates[student.id]}
                 canSave={canSave}
-                onValueChange={(value) => updateRow(student.id, { value, message: null, isError: false })}
+                onValueChange={(value) =>
+                  updateRow(student.id, {
+                    value,
+                    message: null,
+                    isError: false,
+                  })
+                }
                 onSave={() => handleSave(student.id)}
               />
             ))}
