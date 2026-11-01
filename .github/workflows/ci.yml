@@ -174,8 +174,20 @@ jobs:
       - name: Subir a stack
         run: docker compose up -d --build
 
-      - name: Esperar o Nginx responder
-        run: timeout 180 bash -c 'until curl -sf http://localhost/ > /dev/null; do sleep 2; done'
+      # Esperar o Nginx responder NAO basta: ele serve os estaticos assim que
+      # sobe, enquanto o backend ainda roda `alembic upgrade head`. A primeira
+      # versao disto semeava o usuario cedo demais e morria com
+      # `relation "users" does not exist`.
+      #
+      # Sondar o backend resolve, porque docker-entrypoint.sh faz
+      # `set -e; alembic upgrade head; exec uvicorn` — se ele responde HTTP, a
+      # migration ja terminou com sucesso. A requisicao passa pelo Nginx, entao
+      # tambem prova o proxy /api.
+      #
+      # Usa /openapi.json de proposito, NAO /auth/login: o login e limitado por
+      # taxa, e um loop de sondagem queimaria a cota antes do smoke test rodar.
+      - name: Esperar o backend responder
+        run: timeout 180 bash -c 'until curl -sf http://localhost/api/openapi.json > /dev/null; do sleep 2; done'
 
       # Banco recem-criado nao tem usuario. Sem isto o smoke test de login
       # falha por ausencia de dado, nao por defeito da aplicacao.
