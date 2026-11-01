@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // Dev-time proxy for `/api` -> the FastAPI backend, mirroring the Nginx
@@ -19,5 +19,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     pool: 'threads',
+    // Os testes unitários vivem em `src/`; `e2e/` é do Playwright. Sem esta
+    // exclusão o padrão de descoberta do Vitest pegaria `e2e/**/*.spec.ts` e
+    // quebraria `npm test` (os globais do Playwright não existem no Vitest).
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })

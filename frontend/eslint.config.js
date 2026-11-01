@@ -13,7 +13,15 @@ export default tseslint.config(
     // `src/api/schema.d.ts` é gerado por `npm run generate:api-types` a partir
     // de `backend/openapi.json` e está no .gitignore: nunca deve ser lintado
     // nem formatado, sob pena de a próxima regeneração desfazer tudo.
-    ignores: ['dist/**', 'node_modules/**', 'src/api/schema.d.ts'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'src/api/schema.d.ts',
+      // Artefatos de execução do Playwright (relatório, traces, screenshots).
+      'test-results/**',
+      'playwright-report/**',
+      '.playwright/**',
+    ],
   },
 
   // Regras base para todo o código de aplicação.
@@ -52,7 +60,12 @@ export default tseslint.config(
 
   // Arquivos de configuração executados em Node.
   {
-    files: ['*.config.{ts,js}', 'vite.config.ts', 'eslint.config.js'],
+    files: [
+      '*.config.{ts,js}',
+      'vite.config.ts',
+      'eslint.config.js',
+      'playwright.config.ts',
+    ],
     languageOptions: {
       globals: globals.node,
     },
@@ -79,6 +92,19 @@ export default tseslint.config(
       'testing-library/no-container': 'warn',
       'testing-library/no-manual-cleanup': 'warn',
       'vitest/expect-expect': 'warn',
+    },
+  },
+
+  // Testes end-to-end (Playwright). Deliberadamente SEM os plugins de
+  // Vitest/Testing Library/jest-dom: aqui não existe `describe` global do
+  // Vitest nem render em jsdom, e as regras `testing-library/*` só gerariam
+  // ruído sobre uma API (`page.getByRole`) que não é a delas. O processo roda
+  // em Node, e o que vai dentro de `page.evaluate` roda no navegador, por isso
+  // os dois conjuntos de globais.
+  {
+    files: ['e2e/**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
     },
   },
 

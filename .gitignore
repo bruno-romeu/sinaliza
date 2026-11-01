@@ -22,3 +22,10 @@ backend/ml_artifacts/
 frontend/node_modules/
 frontend/dist/
 frontend/src/api/schema.d.ts
+
+# Frontend (Playwright): artefatos de execução dos testes end-to-end
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/.playwright/
+frontend/playwright/.cache/
