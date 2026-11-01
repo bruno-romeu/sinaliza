@@ -6,10 +6,16 @@ backend route besides `/auth/login`" is explicitly out of scope here).
 
 Reads `sub`/`name`/`role` straight out of the validated JWT claims — no DB
 round-trip (spec Design Notes, mirrors the stateless-bearer design of AD-8).
+The claims are validated for *shape* here, though: every route that needs the
+caller's identity does `uuid.UUID(current_user.id)`, so a correctly signed
+token carrying a non-UUID (or missing) `sub` would raise `ValueError`/
+`KeyError` inside the router and surface as an unhandled 500. It is answered
+as the 401 any other unusable token gets.
 """
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 
 from fastapi import Depends
@@ -34,19 +40,37 @@ def get_current_user(
     token_issuer: JwtTokenIssuer = Depends(get_token_issuer),
 ) -> CurrentUser:
     if credentials is None or not credentials.credentials:
-        raise AppError(
-            status_code=401,
-            code="invalid_token",
-            message="Sessão expirada ou inválida.",
-        )
+        raise _invalid_token()
 
     try:
         claims = token_issuer.decode(credentials.credentials)
     except InvalidTokenError as exc:
-        raise AppError(
-            status_code=401,
-            code="invalid_token",
-            message="Sessão expirada ou inválida.",
-        ) from exc
+        raise _invalid_token() from exc
 
-    return CurrentUser(id=claims["sub"], name=claims["name"], role=claims["role"])
+    return CurrentUser(
+        id=str(_require_uuid_claim(claims, "sub")),
+        name=_require_str_claim(claims, "name"),
+        role=_require_str_claim(claims, "role"),
+    )
+
+
+def _invalid_token() -> AppError:
+    return AppError(
+        status_code=401,
+        code="invalid_token",
+        message="Sessão expirada ou inválida.",
+    )
+
+
+def _require_str_claim(claims: dict[str, object], name: str) -> str:
+    value = claims.get(name)
+    if not isinstance(value, str) or not value:
+        raise _invalid_token()
+    return value
+
+
+def _require_uuid_claim(claims: dict[str, object], name: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(_require_str_claim(claims, name))
+    except ValueError as exc:
+        raise _invalid_token() from exc

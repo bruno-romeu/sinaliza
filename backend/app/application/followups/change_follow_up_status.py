@@ -18,6 +18,7 @@ import uuid
 
 from app.application.followups.errors import FollowUpAccessDeniedError, FollowUpNotFoundError
 from app.application.followups.ports import FollowUpRepositoryPort
+from app.application.integrity import translating_repository_integrity_errors
 from app.domain.follow_up import FollowUp, FollowUpStatus
 
 
@@ -34,7 +35,8 @@ class ChangeFollowUpStatusService:
         if follow_up.responsible_user_id != requesting_user_id:
             raise FollowUpAccessDeniedError()
 
-        updated = self._follow_up_repository.update_status(follow_up_id, status)
+        with translating_repository_integrity_errors():
+            updated = self._follow_up_repository.update_status(follow_up_id, status)
         if updated is None:
             raise FollowUpNotFoundError()
         return updated

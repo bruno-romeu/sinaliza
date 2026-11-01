@@ -34,6 +34,7 @@ from app.application.followups.errors import (
     TrajectoryChangeNotFoundError,
 )
 from app.application.followups.ports import FollowUpRepositoryPort, TrajectoryChangeRepositoryPort
+from app.application.integrity import translating_repository_integrity_errors
 from app.domain.follow_up import FollowUp, FollowUpEvidence, FollowUpStatus
 
 
@@ -71,13 +72,14 @@ class OpenFollowUpService:
                 for item in self._follow_up_repository.list_evidence_by_follow_up(existing.id)
             }
             if trajectory_change_id not in linked:
-                self._follow_up_repository.add_evidence(
-                    FollowUpEvidence(
-                        id=uuid.uuid4(),
-                        follow_up_id=existing.id,
-                        trajectory_change_id=trajectory_change_id,
+                with translating_repository_integrity_errors():
+                    self._follow_up_repository.add_evidence(
+                        FollowUpEvidence(
+                            id=uuid.uuid4(),
+                            follow_up_id=existing.id,
+                            trajectory_change_id=trajectory_change_id,
+                        )
                     )
-                )
             return OpenFollowUpResult(follow_up=existing, created=False)
 
         follow_up = FollowUp(
@@ -96,5 +98,6 @@ class OpenFollowUpService:
                 trajectory_change_id=trajectory_change_id,
             )
         ]
-        saved = self._follow_up_repository.save_with_evidence(follow_up, evidence)
+        with translating_repository_integrity_errors():
+            saved = self._follow_up_repository.save_with_evidence(follow_up, evidence)
         return OpenFollowUpResult(follow_up=saved, created=True)
