@@ -1,7 +1,18 @@
 """Implements `FollowUpRepositoryPort` on top of SQLAlchemy. Plain inserts
 only (no upsert needed, spec Code Map). A new `FollowUp` is always a fresh row;
 never updated by this repository (status transitions are Story 4.2+ scope,
-spec Never: "the router never mutates `FollowUp` state directly")."""
+spec Never: "the router never mutates `FollowUp` state directly").
+
+Every write here (`save_with_evidence`, `add_evidence`, `add_action`,
+`update_status`) runs under `translating_integrity_errors`: an FK violation
+— a `trajectory_change_id`/`follow_up_id`/`author_user_id` that no longer
+exists — rolls the session back and raises a typed
+`ForeignKeyViolationError` instead of escaping as a raw `IntegrityError`
+over a session no later statement can use (`repositories/errors.py`).
+`save_with_evidence` wraps the whole flush-insert-commit sequence, so a
+failure on the evidence rows rolls back the `FollowUp` insert with it — a
+`FollowUp` is never persisted without the evidence that justifies it
+(AGENTS.md "Evidência")."""
 
 from __future__ import annotations
 
@@ -17,6 +28,7 @@ from app.infrastructure.db.models import (
     FollowUpModel,
     TrajectoryChangeModel,
 )
+from app.infrastructure.repositories.errors import translating_integrity_errors
 
 
 class SqlAlchemyFollowUpRepository:
@@ -24,34 +36,36 @@ class SqlAlchemyFollowUpRepository:
         self._session = session
 
     def save_with_evidence(self, follow_up: FollowUp, evidence: list[FollowUpEvidence]) -> FollowUp:
-        self._session.add(
-            FollowUpModel(
-                id=follow_up.id,
-                student_id=follow_up.student_id,
-                status=follow_up.status,
-                reason=follow_up.reason,
-                responsible_user_id=follow_up.responsible_user_id,
-                next_review_date=follow_up.next_review_date,
-                created_at=follow_up.created_at,
-            )
-        )
-        # Flushed before the evidence rows below: `FollowUpModel`/
-        # `FollowUpEvidenceModel` have no `relationship()` between them (plain
-        # FK columns only, same as `TrajectoryChangeModel`/
-        # `TrajectoryChangeSourceModel`), so the unit of work has no
-        # dependency edge to order these two inserts by — an explicit flush
-        # here guarantees `follow_ups` is written first, inside the same
-        # transaction as the evidence insert and the final commit below.
-        self._session.flush()
-        for item in evidence:
+        with translating_integrity_errors(self._session):
             self._session.add(
-                FollowUpEvidenceModel(
-                    id=item.id,
-                    follow_up_id=item.follow_up_id,
-                    trajectory_change_id=item.trajectory_change_id,
+                FollowUpModel(
+                    id=follow_up.id,
+                    student_id=follow_up.student_id,
+                    status=follow_up.status,
+                    reason=follow_up.reason,
+                    responsible_user_id=follow_up.responsible_user_id,
+                    next_review_date=follow_up.next_review_date,
+                    created_at=follow_up.created_at,
                 )
             )
-        self._session.commit()
+            # Flushed before the evidence rows below: `FollowUpModel`/
+            # `FollowUpEvidenceModel` have no `relationship()` between them
+            # (plain FK columns only, same as `TrajectoryChangeModel`/
+            # `TrajectoryChangeSourceModel`), so the unit of work has no
+            # dependency edge to order these two inserts by — an explicit
+            # flush here guarantees `follow_ups` is written first, inside the
+            # same transaction as the evidence insert and the final commit
+            # below.
+            self._session.flush()
+            for item in evidence:
+                self._session.add(
+                    FollowUpEvidenceModel(
+                        id=item.id,
+                        follow_up_id=item.follow_up_id,
+                        trajectory_change_id=item.trajectory_change_id,
+                    )
+                )
+            self._session.commit()
         return follow_up
 
     def find_open_for_student(
@@ -88,7 +102,8 @@ class SqlAlchemyFollowUpRepository:
                 trajectory_change_id=evidence.trajectory_change_id,
             )
         )
-        self._session.commit()
+        with translating_integrity_errors(self._session):
+            self._session.commit()
         return evidence
 
     def get_by_id(self, follow_up_id: uuid.UUID) -> FollowUp | None:
@@ -191,7 +206,8 @@ class SqlAlchemyFollowUpRepository:
                 created_at=action.created_at,
             )
         )
-        self._session.commit()
+        with translating_integrity_errors(self._session):
+            self._session.commit()
         return action
 
     def update_status(self, follow_up_id: uuid.UUID, status: FollowUpStatus) -> FollowUp | None:
@@ -202,7 +218,8 @@ class SqlAlchemyFollowUpRepository:
         # codebase (spec Code Map, AD-6) — reached only via
         # `ChangeFollowUpStatusService`, never the router.
         model.status = status
-        self._session.commit()
+        with translating_integrity_errors(self._session):
+            self._session.commit()
         return FollowUp(
             id=model.id,
             student_id=model.student_id,

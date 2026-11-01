@@ -1,8 +1,11 @@
 """Implements `AssignmentRepositoryPort` on top of SQLAlchemy.
 
-`save` never needs to translate an `IntegrityError` into a domain error —
 `assignments` carries no UNIQUE constraint beyond FK integrity (spec
-Boundaries & Constraints), mirrors `SqlAlchemyGradeRepository`'s precedent.
+Boundaries & Constraints); `save` translates a violation of those FKs
+(`classroom_id`, `period_id`) through `translating_integrity_errors`,
+rolling the session back and raising a typed `ForeignKeyViolationError`
+rather than letting a raw `IntegrityError` escape over an unusable session —
+mirrors `SqlAlchemyGradeRepository`'s precedent (`repositories/errors.py`).
 
 `list_due_in_range_for_student` (Story 3.1) joins through `EnrollmentModel`
 — `Assignment` is classroom-scoped, not student-scoped, so "this student's
@@ -22,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.domain.assignment import Assignment
 from app.infrastructure.db.models import AssignmentModel, EnrollmentModel
 from app.infrastructure.repositories.base import filter_as_of
+from app.infrastructure.repositories.errors import translating_integrity_errors
 
 
 def _to_domain(model: AssignmentModel) -> Assignment:
@@ -52,7 +56,8 @@ class SqlAlchemyAssignmentRepository:
             due_date=due_date,
         )
         self._session.add(model)
-        self._session.commit()
+        with translating_integrity_errors(self._session):
+            self._session.commit()
         self._session.refresh(model)
         return _to_domain(model)
 
