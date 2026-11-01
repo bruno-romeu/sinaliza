@@ -105,7 +105,9 @@ def test_train_eval_split_ratio_is_a_named_documented_calibration_parameter() ->
     assert parameter in calibration.GENERATOR_PARAMETERS
 
 
-def test_generation_config_default_train_ratio_is_the_named_constant_not_a_duplicate_literal() -> None:
+def test_generation_config_default_train_ratio_is_the_named_constant_not_a_duplicate_literal() -> (
+    None
+):
     default_config = GenerationConfig(seed=0)
     assert default_config.train_ratio == calibration.TRAIN_EVAL_SPLIT_RATIO.value
 
@@ -146,9 +148,7 @@ def test_eval_demo_students_have_complete_trajectory_across_the_full_school_year
     facts = build_facts(population, periods, _CONFIG)
 
     total_days = len(school_days(periods))
-    eval_demo_ids = {
-        s.id for s in population.students if s.dataset_split == DatasetSplit.EVAL_DEMO
-    }
+    eval_demo_ids = {s.id for s in population.students if s.dataset_split == DatasetSplit.EVAL_DEMO}
     train_ids = {s.id for s in population.students if s.dataset_split == DatasetSplit.TRAIN}
     assert eval_demo_ids and train_ids, "both splits must be present in this config"
 
@@ -183,9 +183,7 @@ def test_eval_demo_students_have_complete_trajectory_across_the_full_school_year
         assert len(attendance_by_student[student_id]) == total_days
         assert len(grades_by_student[student_id]) == len(periods) * len(SUBJECTS)
 
-    classroom_by_student = {
-        e.student_id: e.classroom_id for e in population.enrollments
-    }
+    classroom_by_student = {e.student_id: e.classroom_id for e in population.enrollments}
     submissions_per_classroom: dict = {}
     for student_id, submissions in submissions_by_student.items():
         submissions_per_classroom.setdefault(classroom_by_student[student_id], set()).add(
@@ -257,7 +255,9 @@ def test_generated_train_facts_exist_in_the_database_but_never_via_the_student_r
     run_generation(db_session, _CONFIG, reset=False)
 
     train_student = (
-        db_session.query(StudentModel).filter(StudentModel.dataset_split == DatasetSplit.TRAIN).first()
+        db_session.query(StudentModel)
+        .filter(StudentModel.dataset_split == DatasetSplit.TRAIN)
+        .first()
     )
     assert train_student is not None
 

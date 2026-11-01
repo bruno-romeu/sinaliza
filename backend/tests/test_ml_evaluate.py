@@ -8,7 +8,7 @@ rows directly and driving the real `Session`-taking function.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -111,7 +111,7 @@ def _seed_train_student(
                     student_id=student.id,
                     author_user_id=author_user_id,
                     text="Observação de teste.",
-                    created_at=datetime(2026, 3, 6, tzinfo=timezone.utc),
+                    created_at=datetime(2026, 3, 6, tzinfo=UTC),
                 )
             )
     db_session.commit()
@@ -175,7 +175,7 @@ def _seed_eval_demo_student(
                     student_id=student.id,
                     author_user_id=author_user_id,
                     text="Observação de teste.",
-                    created_at=datetime(2026, 3, 6, tzinfo=timezone.utc),
+                    created_at=datetime(2026, 3, 6, tzinfo=UTC),
                 )
             )
     db_session.commit()
@@ -265,7 +265,12 @@ def test_happy_path_prints_metrics_confusion_matrix_and_disclaimer(
     tmp_path: Path,
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     for profile in (
         SyntheticProfile.STABLE,
@@ -335,7 +340,12 @@ def test_no_labeled_eval_demo_rows_raises(
     tmp_path: Path,
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     # An EVAL_DEMO student with no label is excluded, same as a TRAIN row
     # with no label — the usable set is empty.
@@ -360,7 +370,12 @@ def test_zero_eval_demo_rows_raises(
     tmp_path: Path,
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
 
     with pytest.raises(NoEvaluationDataError):
@@ -381,7 +396,12 @@ def test_single_class_eval_set_reports_metrics_and_not_computable_auc(
     tmp_path: Path,
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     for _ in range(2):
         _seed_eval_demo_student(
@@ -417,7 +437,7 @@ def test_model_trained_on_label_subset_still_computes_valid_auc_metrics(
     tmp_path: Path,
 ) -> None:
     _seed_model_version_trained_on_subset_of_labels(
-        db_session, tmp_path, "subset", datetime(2026, 1, 1, tzinfo=timezone.utc)
+        db_session, tmp_path, "subset", datetime(2026, 1, 1, tzinfo=UTC)
     )
     # EVAL_DEMO labels span >=2 classes, including FALLING_GRADES — a label
     # absent from the trained pipeline's `classes_` — so `_ALL_LABELS`'
@@ -456,7 +476,12 @@ def test_eval_demo_row_missing_facts_is_scored_not_skipped(
     tmp_path: Path,
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     _seed_eval_demo_student(
         db_session,
@@ -522,7 +547,12 @@ def test_main_exits_nonzero_and_prints_to_stderr_on_no_evaluation_data(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     monkeypatch.setattr(evaluate_module, "SessionLocal", lambda: _SessionContext(db_session))
     monkeypatch.setattr(evaluate_module, "get_settings", lambda: SimpleNamespace())
@@ -546,7 +576,12 @@ def test_main_exits_zero_and_prints_report_on_success(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     for profile in (SyntheticProfile.STABLE, SyntheticProfile.FALLING_GRADES):
         _seed_eval_demo_student(

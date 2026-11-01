@@ -24,8 +24,8 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import cast, select
 from sqlalchemy import Date as SA_Date
+from sqlalchemy import cast, select
 from sqlalchemy.orm import Session
 
 from app.domain.pedagogical_observation import PedagogicalObservation

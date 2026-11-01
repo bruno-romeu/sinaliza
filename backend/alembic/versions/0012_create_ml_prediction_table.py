@@ -9,7 +9,8 @@ Persists one row per `EVAL_DEMO` student scored by a
 `0011_create_ml_model_version_table.py`'s shape — no enum columns, two FKs
 (`students.id`, `ml_model_version.id`) instead of zero.
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -17,9 +18,9 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0012"
-down_revision: Union[str, None] = "0011"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0011"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -191,7 +191,9 @@ def seeded_academic_period(db_session: Session) -> AcademicPeriodModel:
 
 @pytest.fixture()
 def seeded_assignment(
-    db_session: Session, seeded_classroom: ClassroomModel, seeded_academic_period: AcademicPeriodModel
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period: AcademicPeriodModel,
 ) -> AssignmentModel:
     """Shaped like `seeded_academic_period` (spec Code Map). Built on
     `seeded_classroom` + `seeded_academic_period` so submission tests have an

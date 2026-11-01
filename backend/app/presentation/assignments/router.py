@@ -95,9 +95,7 @@ def list_assignments_by_classroom(
     ]
 
 
-@router.post(
-    "/assignment-submissions", response_model=AssignmentSubmissionOut, status_code=201
-)
+@router.post("/assignment-submissions", response_model=AssignmentSubmissionOut, status_code=201)
 def register_assignment_submission(
     payload: AssignmentSubmissionCreateRequest,
     service: RegisterSubmissionService = Depends(get_register_submission_service),

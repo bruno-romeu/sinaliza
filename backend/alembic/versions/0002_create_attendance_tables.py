@@ -5,7 +5,8 @@ Revises: 0001
 Create Date: 2026-09-23
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -13,9 +14,9 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0002"
-down_revision: Union[str, None] = "0001"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0001"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Same explicit checkfirst=True / create_type=False lifecycle as
 # 0001_create_users_table.py — `op.drop_table` does not reliably reverse the
@@ -66,9 +67,7 @@ def upgrade() -> None:
             sa.ForeignKey("classrooms.id"),
             nullable=False,
         ),
-        sa.UniqueConstraint(
-            "student_id", "classroom_id", name="uq_enrollment_student_classroom"
-        ),
+        sa.UniqueConstraint("student_id", "classroom_id", name="uq_enrollment_student_classroom"),
     )
     op.create_index("ix_enrollments_student_id", "enrollments", ["student_id"])
     op.create_index("ix_enrollments_classroom_id", "enrollments", ["classroom_id"])

@@ -5,7 +5,7 @@ network, mirrors the "no DB" half of the spec's Code Map."""
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import UTC, date
 from decimal import Decimal
 
 import pytest
@@ -45,11 +45,17 @@ def _grade(value: str, period_id: uuid.UUID = PERIOD_ID, day: date = AS_OF_DATE)
 
 def _assignment(due_date: date) -> Assignment:
     return Assignment(
-        id=uuid.uuid4(), classroom_id=CLASSROOM_ID, subject="Matemática", period_id=PERIOD_ID, due_date=due_date
+        id=uuid.uuid4(),
+        classroom_id=CLASSROOM_ID,
+        subject="Matemática",
+        period_id=PERIOD_ID,
+        due_date=due_date,
     )
 
 
-def _submission(assignment_id: uuid.UUID, status: AssignmentSubmissionStatus, day: date) -> AssignmentSubmission:
+def _submission(
+    assignment_id: uuid.UUID, status: AssignmentSubmissionStatus, day: date
+) -> AssignmentSubmission:
     return AssignmentSubmission(
         id=uuid.uuid4(), assignment_id=assignment_id, student_id=STUDENT_ID, status=status, date=day
     )
@@ -60,9 +66,9 @@ def _submission(assignment_id: uuid.UUID, status: AssignmentSubmissionStatus, da
 
 def test_as_of_defaults_to_real_utc_today_without_override(monkeypatch) -> None:
     monkeypatch.delenv("SINALIZA_DEMO_AS_OF", raising=False)
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    assert as_of() == datetime.now(timezone.utc).date()
+    assert as_of() == datetime.now(UTC).date()
 
 
 def test_as_of_uses_env_override_when_set(monkeypatch) -> None:
@@ -123,7 +129,9 @@ def test_compute_trajectory_indicators_happy_path() -> None:
     assignment_current = _assignment(due_date=date(2026, 9, 22))
     assignments = [assignment_current]
     assignment_submissions = [
-        _submission(assignment_current.id, AssignmentSubmissionStatus.NOT_DELIVERED, date(2026, 9, 22))
+        _submission(
+            assignment_current.id, AssignmentSubmissionStatus.NOT_DELIVERED, date(2026, 9, 22)
+        )
     ]
 
     indicators = compute_trajectory_indicators(

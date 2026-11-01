@@ -19,7 +19,9 @@ OUTPUT_PATH = Path(__file__).resolve().parent.parent / "openapi.json"
 
 def export_openapi() -> None:
     schema = app.openapi()
-    OUTPUT_PATH.write_text(json.dumps(schema, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    OUTPUT_PATH.write_text(
+        json.dumps(schema, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     print(f"Wrote {OUTPUT_PATH}")
 
 

@@ -200,7 +200,7 @@ def _format_report(report: EvaluationReport) -> str:
     header = "    ".join(_ALL_LABELS)
     matrix_lines = "\n".join(
         f"  {label:<24} " + "  ".join(str(value) for value in row)
-        for label, row in zip(_ALL_LABELS, report.confusion_matrix)
+        for label, row in zip(_ALL_LABELS, report.confusion_matrix, strict=False)
     )
 
     return (

@@ -54,7 +54,9 @@ from app.infrastructure.repositories.sqlalchemy_grade_repository import SqlAlche
 from app.infrastructure.repositories.sqlalchemy_pedagogical_observation_repository import (
     SqlAlchemyPedagogicalObservationRepository,
 )
-from app.infrastructure.repositories.sqlalchemy_student_repository import SqlAlchemyStudentRepository
+from app.infrastructure.repositories.sqlalchemy_student_repository import (
+    SqlAlchemyStudentRepository,
+)
 from app.infrastructure.repositories.sqlalchemy_trajectory_change_repository import (
     SqlAlchemyTrajectoryChangeRepository,
 )

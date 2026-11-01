@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import joblib
 from sqlalchemy import select
@@ -88,9 +88,9 @@ def run_prediction(session: Session, artifact_dir: object = None) -> list[MLPred
     ]
     probabilities = pipeline.predict_proba(feature_matrix)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     predictions: list[MLPrediction] = []
-    for row, probability_row in zip(scoring_rows, probabilities):
+    for row, probability_row in zip(scoring_rows, probabilities, strict=False):
         score = 1 - float(probability_row[stable_index])
         prediction = MLPrediction(
             id=uuid.uuid4(),

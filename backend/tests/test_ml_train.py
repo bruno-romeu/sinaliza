@@ -8,7 +8,7 @@ synthetic generator.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -108,7 +108,7 @@ def _seed_train_student(
                     student_id=student.id,
                     author_user_id=author_user_id,
                     text="Observação de teste.",
-                    created_at=datetime(2026, 3, 6, tzinfo=timezone.utc),
+                    created_at=datetime(2026, 3, 6, tzinfo=UTC),
                 )
             )
     db_session.commit()
@@ -184,9 +184,7 @@ def test_train_row_missing_label_is_excluded_and_fatal_only_if_set_empties(
     db_session: Session, tmp_path: Path
 ) -> None:
     db_session.add(
-        StudentModel(
-            name="Sem rótulo", dataset_split=DatasetSplit.TRAIN, synthetic_profile=None
-        )
+        StudentModel(name="Sem rótulo", dataset_split=DatasetSplit.TRAIN, synthetic_profile=None)
     )
     db_session.commit()
 
@@ -206,9 +204,7 @@ def test_train_row_missing_label_does_not_block_other_usable_rows(
     tmp_path: Path,
 ) -> None:
     db_session.add(
-        StudentModel(
-            name="Sem rótulo", dataset_split=DatasetSplit.TRAIN, synthetic_profile=None
-        )
+        StudentModel(name="Sem rótulo", dataset_split=DatasetSplit.TRAIN, synthetic_profile=None)
     )
     db_session.commit()
     for profile in (SyntheticProfile.STABLE, SyntheticProfile.FALLING_ATTENDANCE):
@@ -306,10 +302,15 @@ def test_training_repository_computes_feature_values_matching_seeded_facts(
 
 
 def test_main_exits_nonzero_and_prints_to_stderr_on_no_training_data(
-    db_session: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    db_session: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(train_module, "SessionLocal", lambda: _SessionContext(db_session))
-    monkeypatch.setattr(train_module, "get_settings", lambda: SimpleNamespace(ml_artifact_dir=str(tmp_path)))
+    monkeypatch.setattr(
+        train_module, "get_settings", lambda: SimpleNamespace(ml_artifact_dir=str(tmp_path))
+    )
 
     with pytest.raises(SystemExit) as exc_info:
         train_module.main([])
@@ -343,7 +344,9 @@ def test_main_exits_zero_and_prints_summary_on_success(
         )
 
     monkeypatch.setattr(train_module, "SessionLocal", lambda: _SessionContext(db_session))
-    monkeypatch.setattr(train_module, "get_settings", lambda: SimpleNamespace(ml_artifact_dir=str(tmp_path)))
+    monkeypatch.setattr(
+        train_module, "get_settings", lambda: SimpleNamespace(ml_artifact_dir=str(tmp_path))
+    )
 
     with pytest.raises(SystemExit) as exc_info:
         train_module.main([])

@@ -236,9 +236,7 @@ def test_every_student_has_dataset_split_and_every_classroom_has_both(
             .filter(EnrollmentModel.classroom_id == classroom.id)
             .all()
         }
-        classroom_splits = {
-            s.dataset_split for s in students if s.id in classroom_student_ids
-        }
+        classroom_splits = {s.dataset_split for s in students if s.id in classroom_student_ids}
         assert DatasetSplit.TRAIN in classroom_splits
         assert DatasetSplit.EVAL_DEMO in classroom_splits
 
@@ -290,9 +288,7 @@ def test_global_train_share_matches_ratio_at_real_default_config() -> None:
     config = GenerationConfig(seed=1, student_count=200, students_per_classroom=25, train_ratio=0.7)
     population = build_population(config)
 
-    train_count = sum(
-        1 for s in population.students if s.dataset_split == DatasetSplit.TRAIN
-    )
+    train_count = sum(1 for s in population.students if s.dataset_split == DatasetSplit.TRAIN)
     assert train_count / len(population.students) == 0.7
 
 
@@ -316,9 +312,7 @@ def test_small_classroom_extreme_ratio_still_has_both_splits() -> None:
     # student_count=2, students_per_classroom=2, train_ratio=0.1: the raw
     # cumulative-remainder calculation gives train_count=0 for this
     # classroom. Every classroom must still have both splits.
-    config = GenerationConfig(
-        seed=1, student_count=2, students_per_classroom=2, train_ratio=0.1
-    )
+    config = GenerationConfig(seed=1, student_count=2, students_per_classroom=2, train_ratio=0.1)
     population = build_population(config)
 
     splits = {s.dataset_split for s in population.students}
