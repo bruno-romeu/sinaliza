@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -74,7 +74,7 @@ class MissingAuthorUserError(RuntimeError):
 
 
 def is_populated(session: Session) -> bool:
-    """"Already populated" means any row in `classrooms`, `students`,
+    """ "Already populated" means any row in `classrooms`, `students`,
     `enrollments` or `synthetic_generation_runs` (Assumption 5) — a database
     holding only `users`/`academic_periods` (the other seed scripts' output)
     is treated as clean."""
@@ -169,9 +169,7 @@ def run_generation(
     # populated database + `--reset` + periods missing/wrong-year must still
     # write nothing, not leave the session holding uncommitted deletes from
     # a reset that started before this validation ran.
-    period_rows = (
-        session.query(AcademicPeriodModel).order_by(AcademicPeriodModel.order_index).all()
-    )
+    period_rows = session.query(AcademicPeriodModel).order_by(AcademicPeriodModel.order_index).all()
     matching_periods = [p for p in period_rows if p.start_date.year == config.academic_year]
     if not matching_periods:
         raise MissingAcademicPeriodsError(
@@ -317,7 +315,7 @@ def run_generation(
     run = SyntheticGenerationRunModel(
         seed=config.seed,
         generator_version=GENERATOR_VERSION,
-        executed_at=datetime.now(timezone.utc),
+        executed_at=datetime.now(UTC),
         student_count=len(population.students),
         train_ratio=Decimal(str(config.train_ratio)),
     )
@@ -352,7 +350,9 @@ def _open_unit_interval(value: str) -> float:
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m app.synthetic.generate",
-        description="Deterministically generate a synthetic base of classrooms, students and enrollments.",
+        description=(
+            "Deterministically generate a synthetic base of classrooms, students and enrollments."
+        ),
     )
     parser.add_argument("--seed", type=_non_negative_int, required=True)
     parser.add_argument("--students", type=_positive_int, default=200, dest="student_count")
@@ -365,9 +365,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=TRAIN_EVAL_SPLIT_RATIO.value,
         dest="train_ratio",
     )
-    parser.add_argument(
-        "--academic-year", type=_positive_int, default=2026, dest="academic_year"
-    )
+    parser.add_argument("--academic-year", type=_positive_int, default=2026, dest="academic_year")
     parser.add_argument("--reset", action="store_true")
     return parser
 

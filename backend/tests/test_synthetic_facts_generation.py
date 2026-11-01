@@ -54,7 +54,9 @@ _PERIODS: list[tuple[str, date, date, int]] = [
 _CONFIG = GenerationConfig(seed=42, student_count=48, students_per_classroom=12)
 
 
-def _seed_periods(db_session: Session, periods: list[tuple[str, date, date, int]] = _PERIODS) -> None:
+def _seed_periods(
+    db_session: Session, periods: list[tuple[str, date, date, int]] = _PERIODS
+) -> None:
     db_session.add_all(
         [
             AcademicPeriodModel(label=label, start_date=start, end_date=end, order_index=order)
@@ -219,7 +221,10 @@ def test_same_seed_twice_produces_byte_identical_fingerprint_covering_facts(
     fingerprint_2, _ = run_generation(db_session, _CONFIG, reset=True)
 
     assert fingerprint_1 == fingerprint_2
-    assert db_session.query(AttendanceRecordModel).count() == _CONFIG.student_count * _total_school_days()
+    assert (
+        db_session.query(AttendanceRecordModel).count()
+        == _CONFIG.student_count * _total_school_days()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +259,9 @@ def test_attendance_records_never_violate_uniqueness(db_session: Session) -> Non
     run_generation(db_session, _CONFIG, reset=False)
 
     rows = db_session.query(
-        AttendanceRecordModel.student_id, AttendanceRecordModel.classroom_id, AttendanceRecordModel.date
+        AttendanceRecordModel.student_id,
+        AttendanceRecordModel.classroom_id,
+        AttendanceRecordModel.date,
     ).all()
     keys = [(r[0], r[1], r[2]) for r in rows]
     assert len(keys) == len(set(keys))
@@ -293,7 +300,9 @@ def test_falling_attendance_student_has_lower_presence_rate_later_in_the_year(
         .filter(StudentModel.synthetic_profile == SyntheticProfile.FALLING_ATTENDANCE)
         .first()
     )
-    assert student is not None, "fixture seed/volume must produce at least one FALLING_ATTENDANCE student"
+    assert student is not None, (
+        "fixture seed/volume must produce at least one FALLING_ATTENDANCE student"
+    )
 
     records = (
         db_session.query(AttendanceRecordModel)
@@ -343,7 +352,9 @@ def test_combined_deterioration_student_worsens_on_all_three_axes(db_session: Se
         .filter(StudentModel.synthetic_profile == SyntheticProfile.COMBINED_DETERIORATION)
         .first()
     )
-    assert student is not None, "fixture seed/volume must produce at least one COMBINED_DETERIORATION student"
+    assert student is not None, (
+        "fixture seed/volume must produce at least one COMBINED_DETERIORATION student"
+    )
 
     # Attendance: last quarter of school days worse than the first.
     records = (

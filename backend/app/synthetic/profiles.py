@@ -57,7 +57,10 @@ _KEY_SPACE = 2**128
 _GRADE_PERIOD_VARIATION = 0.06
 
 #: Profiles whose grade-quantile shift (Assumption 2) applies.
-_GRADE_DECLINING_PROFILES = (SyntheticProfile.FALLING_GRADES, SyntheticProfile.COMBINED_DETERIORATION)
+_GRADE_DECLINING_PROFILES = (
+    SyntheticProfile.FALLING_GRADES,
+    SyntheticProfile.COMBINED_DETERIORATION,
+)
 
 #: Profiles whose daily-attendance decay applies.
 _ATTENDANCE_DECLINING_PROFILES = (

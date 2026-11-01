@@ -21,7 +21,7 @@ relative to the rewound date. Fixed in
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -145,7 +145,7 @@ def test_trajectory_and_home_never_reflect_facts_after_as_of(
         db_session,
         seeded_enrolled_student,
         seeded_academic_period,
-        datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 9, 24, 0, 0, tzinfo=UTC),
     )
 
     home_response = client.get("/home", headers=headers)
@@ -174,7 +174,7 @@ def test_rewinding_as_of_hides_a_previously_detected_change(
         db_session,
         seeded_enrolled_student,
         seeded_academic_period,
-        datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 9, 24, 0, 0, tzinfo=UTC),
     )
 
     headers = _auth_headers(client, seeded_user)
@@ -208,9 +208,7 @@ def test_train_split_student_invisible_across_trajectory_home_and_search(
     train_student = StudentModel(name="Estudante Treino", dataset_split=DatasetSplit.TRAIN)
     db_session.add(train_student)
     db_session.flush()
-    db_session.add(
-        EnrollmentModel(student_id=train_student.id, classroom_id=seeded_classroom.id)
-    )
+    db_session.add(EnrollmentModel(student_id=train_student.id, classroom_id=seeded_classroom.id))
     db_session.add(
         AttendanceRecordModel(
             student_id=train_student.id,
@@ -224,23 +222,19 @@ def test_train_split_student_invisible_across_trajectory_home_and_search(
         db_session,
         train_student,
         seeded_academic_period,
-        datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 9, 24, 0, 0, tzinfo=UTC),
     )
 
     headers = _auth_headers(client, seeded_user)
 
-    trajectory_response = client.get(
-        f"/students/{train_student.id}/trajectory", headers=headers
-    )
+    trajectory_response = client.get(f"/students/{train_student.id}/trajectory", headers=headers)
     assert trajectory_response.status_code == 404
 
     home_response = client.get("/home", headers=headers)
     assert home_response.status_code == 200
     assert home_response.json()["recent_changes"] == []
 
-    search_response = client.get(
-        "/home/search?q=Estudante Treino", headers=headers
-    )
+    search_response = client.get("/home/search?q=Estudante Treino", headers=headers)
     assert search_response.status_code == 200
     assert search_response.json() == {
         "count": 0,

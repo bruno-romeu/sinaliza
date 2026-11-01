@@ -142,7 +142,9 @@ def test_build_observations_created_at_is_noon_utc_mid_period() -> None:
     result = observations.build_observations(population, periods, author_id, SEED)
 
     for observation, period in zip(
-        sorted(result, key=lambda o: o.created_at), sorted(periods, key=lambda p: p.end_date)
+        sorted(result, key=lambda o: o.created_at),
+        sorted(periods, key=lambda p: p.end_date),
+        strict=False,
     ):
         day = observation.created_at.date()
         assert observation.created_at == datetime.combine(day, time(12, 0), tzinfo=UTC)
@@ -184,7 +186,9 @@ def test_falling_attendance_only_uses_attendance_decline_templates_by_stage() ->
     result = observations.build_observations(population, periods, author_id, SEED)
 
     all_decline_texts = {
-        text for stage_set in observations._ATTENDANCE_DECLINE_TEMPLATES.values() for text in stage_set
+        text
+        for stage_set in observations._ATTENDANCE_DECLINE_TEMPLATES.values()
+        for text in stage_set
     }
     for period_index, observation in enumerate(result):
         assert observation.text in all_decline_texts
@@ -329,7 +333,9 @@ def _seed_coordination_user(db_session: Session) -> UserModel:
     return user
 
 
-_REDUCED_CONFIG = GenerationConfig(seed=42, student_count=12, students_per_classroom=4, train_ratio=0.5)
+_REDUCED_CONFIG = GenerationConfig(
+    seed=42, student_count=12, students_per_classroom=4, train_ratio=0.5
+)
 
 
 def test_run_generation_creates_one_observation_per_student_period(db_session: Session) -> None:
@@ -431,7 +437,7 @@ def test_populated_db_with_reset_but_author_user_missing_writes_nothing(
     observation_count_before = db_session.query(PedagogicalObservationModel).count()
 
     # Simulate the lookup no longer resolving, without touching the already
-    #-seeded user row (it is a real FK target of the first run's
+    # -seeded user row (it is a real FK target of the first run's
     # observations, so deleting it would just hit a different constraint).
     monkeypatch.setattr(
         "app.synthetic.generate.get_settings",

@@ -6,7 +6,7 @@ branch (converged / single signal / none)."""
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import UTC, date
 from decimal import Decimal
 
 import pytest
@@ -56,11 +56,17 @@ def _grade(value: str, day: date = date(2026, 9, 1)) -> Grade:
 
 def _assignment(due_date: date = date(2026, 9, 1)) -> Assignment:
     return Assignment(
-        id=uuid.uuid4(), classroom_id=CLASSROOM_ID, subject="Matemática", period_id=PERIOD_ID, due_date=due_date
+        id=uuid.uuid4(),
+        classroom_id=CLASSROOM_ID,
+        subject="Matemática",
+        period_id=PERIOD_ID,
+        due_date=due_date,
     )
 
 
-def _submission(assignment_id: uuid.UUID, status: AssignmentSubmissionStatus) -> AssignmentSubmission:
+def _submission(
+    assignment_id: uuid.UUID, status: AssignmentSubmissionStatus
+) -> AssignmentSubmission:
     return AssignmentSubmission(
         id=uuid.uuid4(),
         assignment_id=assignment_id,
@@ -73,14 +79,14 @@ def _submission(assignment_id: uuid.UUID, status: AssignmentSubmissionStatus) ->
 def _observation(
     day: date = date(2026, 9, 1), registers_concern: bool = True
 ) -> PedagogicalObservation:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     return PedagogicalObservation(
         id=uuid.uuid4(),
         student_id=STUDENT_ID,
         author_user_id=AUTHOR_ID,
         text="Observação de teste.",
-        created_at=datetime(day.year, day.month, day.day, 12, 0, tzinfo=timezone.utc),
+        created_at=datetime(day.year, day.month, day.day, 12, 0, tzinfo=UTC),
         registers_concern=registers_concern,
     )
 
@@ -189,7 +195,8 @@ def test_assignments_signal_ignores_a_count_the_student_always_had() -> None:
     current = [_assignment(), _assignment()]
     earlier = [_assignment(date(2026, 6, 1)), _assignment(date(2026, 6, 2))]
     submissions_by_assignment = {
-        a.id: [_submission(a.id, AssignmentSubmissionStatus.NOT_DELIVERED)] for a in current + earlier
+        a.id: [_submission(a.id, AssignmentSubmissionStatus.NOT_DELIVERED)]
+        for a in current + earlier
     }
 
     signal = evaluate_assignments_signal(current, [earlier], submissions_by_assignment)
@@ -254,13 +261,22 @@ def test_pedagogical_signal_does_not_confirm_with_no_observations() -> None:
 @pytest.mark.parametrize(
     "confirmed_kinds,expected",
     [
-        (frozenset({SignalKind.ATTENDANCE, SignalKind.PEDAGOGICAL_OBSERVATION}), TrajectoryChangeType.ATTENDANCE_DROP),
-        (frozenset({SignalKind.GRADE, SignalKind.PEDAGOGICAL_OBSERVATION}), TrajectoryChangeType.GRADE_DROP),
+        (
+            frozenset({SignalKind.ATTENDANCE, SignalKind.PEDAGOGICAL_OBSERVATION}),
+            TrajectoryChangeType.ATTENDANCE_DROP,
+        ),
+        (
+            frozenset({SignalKind.GRADE, SignalKind.PEDAGOGICAL_OBSERVATION}),
+            TrajectoryChangeType.GRADE_DROP,
+        ),
         (
             frozenset({SignalKind.ASSIGNMENTS, SignalKind.PEDAGOGICAL_OBSERVATION}),
             TrajectoryChangeType.MISSING_ASSIGNMENTS_INCREASE,
         ),
-        (frozenset({SignalKind.ATTENDANCE, SignalKind.GRADE}), TrajectoryChangeType.COMBINED_DETERIORATION),
+        (
+            frozenset({SignalKind.ATTENDANCE, SignalKind.GRADE}),
+            TrajectoryChangeType.COMBINED_DETERIORATION,
+        ),
         (
             frozenset({SignalKind.ATTENDANCE, SignalKind.GRADE, SignalKind.ASSIGNMENTS}),
             TrajectoryChangeType.COMBINED_DETERIORATION,
@@ -310,17 +326,14 @@ def test_build_description_three_kinds() -> None:
     )
 
     assert text == (
-        "Queda de frequência, queda de notas e aumento de "
-        "atividades pendentes no 3º Bimestre"
+        "Queda de frequência, queda de notas e aumento de atividades pendentes no 3º Bimestre"
     )
 
 
 def test_build_description_has_no_dash_and_no_prefix() -> None:
     """spec-ui-1: on-screen text never uses dashes, and the change label is
     the surface's job, not part of the description."""
-    text = build_description(
-        frozenset({SignalKind.ATTENDANCE, SignalKind.GRADE}), "3º Bimestre"
-    )
+    text = build_description(frozenset({SignalKind.ATTENDANCE, SignalKind.GRADE}), "3º Bimestre")
 
     assert "—" not in text
     assert "–" not in text

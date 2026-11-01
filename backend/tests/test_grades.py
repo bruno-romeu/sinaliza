@@ -336,7 +336,9 @@ def test_register_grade_for_student_not_enrolled_returns_422(
     other_classroom = ClassroomModel(name="Outra Turma", academic_year=2026)
     db_session.add(other_classroom)
     db_session.flush()
-    unenrolled_student = StudentModel(name="Aluno Sem Matrícula", dataset_split=DatasetSplit.EVAL_DEMO)
+    unenrolled_student = StudentModel(
+        name="Aluno Sem Matrícula", dataset_split=DatasetSplit.EVAL_DEMO
+    )
     db_session.add(unenrolled_student)
     db_session.commit()
 

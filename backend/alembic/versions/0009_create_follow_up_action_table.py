@@ -5,7 +5,8 @@ Revises: 0008
 Create Date: 2026-10-14
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -13,9 +14,9 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0009"
-down_revision: Union[str, None] = "0008"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0008"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -38,9 +39,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_index("ix_follow_up_action_follow_up_id", "follow_up_action", ["follow_up_id"])
-    op.create_index(
-        "ix_follow_up_action_author_user_id", "follow_up_action", ["author_user_id"]
-    )
+    op.create_index("ix_follow_up_action_author_user_id", "follow_up_action", ["author_user_id"])
 
     # History append-only-ness doesn't rely only on application code (spec
     # Boundaries & Constraints, AD-6): the app's Postgres role may INSERT and

@@ -16,7 +16,6 @@ from decimal import Decimal
 import pytest
 
 from app.domain.assignment_submission import AssignmentSubmissionStatus
-from app.domain.attendance import AttendanceStatus
 from app.domain.student import DatasetSplit, SyntheticProfile
 from app.synthetic import facts, profiles
 from app.synthetic.calibration import (
@@ -189,11 +188,15 @@ def test_attendance_is_present_falling_grades_profile_unaffected() -> None:
 def test_attendance_is_present_reproducible_with_same_seed() -> None:
     student_id = uuid.uuid4()
     sequence_1 = [
-        profiles.attendance_is_present(SEED, student_id, SyntheticProfile.FALLING_ATTENDANCE, d, 100)
+        profiles.attendance_is_present(
+            SEED, student_id, SyntheticProfile.FALLING_ATTENDANCE, d, 100
+        )
         for d in range(100)
     ]
     sequence_2 = [
-        profiles.attendance_is_present(SEED, student_id, SyntheticProfile.FALLING_ATTENDANCE, d, 100)
+        profiles.attendance_is_present(
+            SEED, student_id, SyntheticProfile.FALLING_ATTENDANCE, d, 100
+        )
         for d in range(100)
     ]
     assert sequence_1 == sequence_2
@@ -254,7 +257,9 @@ def test_grade_value_stable_profile_unaffected_by_period_progress() -> None:
     # value obtained by passing progress-irrelevant indices (period_index=0,
     # total_periods=1 forces progress=1.0 internally but STABLE ignores it).
     sid = uuid.uuid4()
-    value_mid_year = profiles.grade_value(SEED, sid, "period-2", "História", SyntheticProfile.STABLE, 2, 4)
+    value_mid_year = profiles.grade_value(
+        SEED, sid, "period-2", "História", SyntheticProfile.STABLE, 2, 4
+    )
     value_single_period = profiles.grade_value(
         SEED, sid, "period-2", "História", SyntheticProfile.STABLE, 0, 1
     )
@@ -264,7 +269,9 @@ def test_grade_value_stable_profile_unaffected_by_period_progress() -> None:
 def test_grade_value_reproducible_with_same_seed() -> None:
     sid = uuid.uuid4()
     first = profiles.grade_value(SEED, sid, "period-1", "Matemática", SyntheticProfile.STABLE, 1, 4)
-    second = profiles.grade_value(SEED, sid, "period-1", "Matemática", SyntheticProfile.STABLE, 1, 4)
+    second = profiles.grade_value(
+        SEED, sid, "period-1", "Matemática", SyntheticProfile.STABLE, 1, 4
+    )
     assert first == second
 
 
@@ -319,7 +326,11 @@ def test_assignment_submission_status_other_profiles_unaffected_by_period() -> N
     total_periods = 4
     student_ids = _student_ids(1000)
 
-    for profile in (SyntheticProfile.STABLE, SyntheticProfile.FALLING_ATTENDANCE, SyntheticProfile.FALLING_GRADES):
+    for profile in (
+        SyntheticProfile.STABLE,
+        SyntheticProfile.FALLING_ATTENDANCE,
+        SyntheticProfile.FALLING_GRADES,
+    ):
         first_period_not_delivered = sum(
             profiles.assignment_submission_status(
                 SEED, sid, "assignment-y", profile, 0, total_periods
@@ -412,10 +423,16 @@ def _tiny_population() -> GeneratedPopulation:
 def _tiny_periods() -> tuple[PeriodWindow, ...]:
     return (
         PeriodWindow(
-            id_label="period-1", start_date=date(2026, 2, 2), end_date=date(2026, 2, 6), order_index=1
+            id_label="period-1",
+            start_date=date(2026, 2, 2),
+            end_date=date(2026, 2, 6),
+            order_index=1,
         ),
         PeriodWindow(
-            id_label="period-2", start_date=date(2026, 3, 2), end_date=date(2026, 3, 6), order_index=2
+            id_label="period-2",
+            start_date=date(2026, 3, 2),
+            end_date=date(2026, 3, 6),
+            order_index=2,
         ),
     )
 
@@ -423,7 +440,9 @@ def _tiny_periods() -> tuple[PeriodWindow, ...]:
 def test_build_facts_has_no_io_dependency_and_is_deterministic() -> None:
     population = _tiny_population()
     periods = _tiny_periods()
-    config = GenerationConfig(seed=SEED, student_count=len(population.students), students_per_classroom=4)
+    config = GenerationConfig(
+        seed=SEED, student_count=len(population.students), students_per_classroom=4
+    )
 
     result_1 = facts.build_facts(population, periods, config)
     result_2 = facts.build_facts(population, periods, config)
@@ -435,7 +454,9 @@ def test_build_facts_has_no_io_dependency_and_is_deterministic() -> None:
 def test_build_facts_row_counts_match_expected_shape() -> None:
     population = _tiny_population()
     periods = _tiny_periods()
-    config = GenerationConfig(seed=SEED, student_count=len(population.students), students_per_classroom=4)
+    config = GenerationConfig(
+        seed=SEED, student_count=len(population.students), students_per_classroom=4
+    )
 
     result = facts.build_facts(population, periods, config)
 
@@ -453,7 +474,9 @@ def test_build_facts_row_counts_match_expected_shape() -> None:
 def test_build_facts_attendance_records_are_unique_per_student_classroom_date() -> None:
     population = _tiny_population()
     periods = _tiny_periods()
-    config = GenerationConfig(seed=SEED, student_count=len(population.students), students_per_classroom=4)
+    config = GenerationConfig(
+        seed=SEED, student_count=len(population.students), students_per_classroom=4
+    )
 
     result = facts.build_facts(population, periods, config)
     keys = [(r.student_id, r.classroom_id, r.date) for r in result.attendance_records]
@@ -463,7 +486,9 @@ def test_build_facts_attendance_records_are_unique_per_student_classroom_date() 
 def test_build_facts_grade_values_within_scale() -> None:
     population = _tiny_population()
     periods = _tiny_periods()
-    config = GenerationConfig(seed=SEED, student_count=len(population.students), students_per_classroom=4)
+    config = GenerationConfig(
+        seed=SEED, student_count=len(population.students), students_per_classroom=4
+    )
 
     result = facts.build_facts(population, periods, config)
     for grade in result.grades:
@@ -473,8 +498,12 @@ def test_build_facts_grade_values_within_scale() -> None:
 def test_build_facts_different_seed_changes_output() -> None:
     population = _tiny_population()
     periods = _tiny_periods()
-    config_a = GenerationConfig(seed=1, student_count=len(population.students), students_per_classroom=4)
-    config_b = GenerationConfig(seed=2, student_count=len(population.students), students_per_classroom=4)
+    config_a = GenerationConfig(
+        seed=1, student_count=len(population.students), students_per_classroom=4
+    )
+    config_b = GenerationConfig(
+        seed=2, student_count=len(population.students), students_per_classroom=4
+    )
 
     result_a = facts.build_facts(population, periods, config_a)
     result_b = facts.build_facts(population, periods, config_b)

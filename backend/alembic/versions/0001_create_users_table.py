@@ -5,7 +5,8 @@ Revises:
 Create Date: 2026-09-23
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -13,9 +14,9 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "0001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Managed explicitly (checkfirst=True on both create and drop) rather than
 # relying on SQLAlchemy's table-level before_create/after_drop auto-hooks:
@@ -40,9 +41,7 @@ def upgrade() -> None:
         sa.Column("password_hash", sa.String(length=255), nullable=False),
         sa.Column(
             "role",
-            postgresql.ENUM(
-                "COORDENACAO_PEDAGOGICA", name="user_role", create_type=False
-            ),
+            postgresql.ENUM("COORDENACAO_PEDAGOGICA", name="user_role", create_type=False),
             nullable=False,
             server_default="COORDENACAO_PEDAGOGICA",
         ),

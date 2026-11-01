@@ -5,7 +5,7 @@ varies surnames, and `prepare_demo` fills the Home on a fresh base."""
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -33,12 +33,14 @@ def _frozen_as_of(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SINALIZA_DEMO_AS_OF", AS_OF)
 
 
-def _observation(student_id, author_id, text: str, registers_concern: bool) -> PedagogicalObservationModel:
+def _observation(
+    student_id, author_id, text: str, registers_concern: bool
+) -> PedagogicalObservationModel:
     return PedagogicalObservationModel(
         student_id=student_id,
         author_user_id=author_id,
         text=text,
-        created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
         registers_concern=registers_concern,
     )
 
@@ -143,9 +145,7 @@ def test_low_but_stable_grades_do_not_make_a_change(
         )
     )
     db_session.add(
-        _observation(
-            seeded_enrolled_student.id, seeded_user.id, "Registro com preocupação.", True
-        )
+        _observation(seeded_enrolled_student.id, seeded_user.id, "Registro com preocupação.", True)
     )
     db_session.commit()
 

@@ -78,9 +78,7 @@ def test_registry_matches_the_module_namespace() -> None:
     is caught too.
     """
     from_namespace = {
-        name
-        for name, value in vars(calibration).items()
-        if isinstance(value, CalibrationParameter)
+        name for name, value in vars(calibration).items() if isinstance(value, CalibrationParameter)
     }
     assert from_namespace, "no calibration parameters found in the module"
     assert {p.name for p in ALL_PARAMETERS} == from_namespace
@@ -326,7 +324,7 @@ def test_grade_distribution_partitions_the_scale_without_gaps_or_overlap() -> No
     for band in bands:
         assert 0.0 < band.share <= 1.0
         assert scale_min <= band.min_value <= band.max_value <= scale_max
-    for lower, upper in zip(bands, bands[1:]):
+    for lower, upper in zip(bands, bands[1:], strict=False):
         assert lower.max_value < upper.min_value, "grade bands must not overlap"
 
 

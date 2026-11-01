@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -59,13 +59,13 @@ def test_register_observation_happy_path_returns_201_and_persists(
     seeded_enrolled_student: StudentModel,
     db_session: Session,
 ) -> None:
-    before = datetime.now(timezone.utc)
+    before = datetime.now(UTC)
     response = client.post(
         "/pedagogical-observations",
         json=_observation_payload(seeded_enrolled_student.id, seeded_classroom.id),
         headers=_auth_headers(client, seeded_user),
     )
-    after = datetime.now(timezone.utc)
+    after = datetime.now(UTC)
 
     assert response.status_code == 201
     body = response.json()

@@ -42,10 +42,10 @@ fixed here for the MVP, calibration deferred):
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
-from typing import Sequence
 
 from app.domain.assignment import Assignment
 from app.domain.assignment_submission import AssignmentSubmission, AssignmentSubmissionStatus
@@ -101,9 +101,7 @@ _DESCRIPTION_ORDER: tuple[SignalKind, ...] = (
     SignalKind.PEDAGOGICAL_OBSERVATION,
 )
 
-_CORE_KINDS = frozenset(
-    {SignalKind.ATTENDANCE, SignalKind.GRADE, SignalKind.ASSIGNMENTS}
-)
+_CORE_KINDS = frozenset({SignalKind.ATTENDANCE, SignalKind.GRADE, SignalKind.ASSIGNMENTS})
 
 _CHANGE_TYPE_BY_CORE_KIND: dict[SignalKind, TrajectoryChangeType] = {
     SignalKind.ATTENDANCE: TrajectoryChangeType.ATTENDANCE_DROP,
@@ -261,7 +259,7 @@ def _signals_in_period(confirmed_kinds: frozenset[SignalKind], period_label: str
 
 
 def build_description(confirmed_kinds: frozenset[SignalKind], period_label: str) -> str:
-    """"{Lista de sinais em PT-BR} no {period.label}", e.g. "Queda de
+    """ "{Lista de sinais em PT-BR} no {period.label}", e.g. "Queda de
     frequência e queda de notas no 3º Bimestre" (spec Design Notes, Voice and
     Tone): always factual, never diagnostic/predictive language.
 

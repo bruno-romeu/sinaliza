@@ -270,7 +270,9 @@ def _build_assignment_submissions(
             )
             submissions.append(
                 GeneratedAssignmentSubmission(
-                    id=stable_uuid(seed, "assignment_submission", str(student_id), str(assignment.id)),
+                    id=stable_uuid(
+                        seed, "assignment_submission", str(student_id), str(assignment.id)
+                    ),
                     assignment_id=assignment.id,
                     student_id=student_id,
                     status=status,

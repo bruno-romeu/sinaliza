@@ -36,9 +36,7 @@ __all__ = [
 
 
 class FollowUpRepositoryPort(Protocol):
-    def save_with_evidence(
-        self, follow_up: FollowUp, evidence: list[FollowUpEvidence]
-    ) -> FollowUp:
+    def save_with_evidence(self, follow_up: FollowUp, evidence: list[FollowUpEvidence]) -> FollowUp:
         """Inserts `follow_up` + every `FollowUpEvidence` row in one
         transaction (spec Boundaries & Constraints, same atomicity pattern as
         `TrajectoryChange`+`TrajectoryChangeSource`, AD-7)."""
@@ -85,9 +83,7 @@ class FollowUpRepositoryPort(Protocol):
         RF-13/RF-14)."""
         ...
 
-    def update_status(
-        self, follow_up_id: uuid.UUID, status: FollowUpStatus
-    ) -> FollowUp | None:
+    def update_status(self, follow_up_id: uuid.UUID, status: FollowUpStatus) -> FollowUp | None:
         """UPDATE scoped to the `status` column only. Returns `None` when
         `follow_up_id` does not exist so `ChangeFollowUpStatusService` can
         raise `FollowUpNotFoundError` without a prior extra read (spec Code
