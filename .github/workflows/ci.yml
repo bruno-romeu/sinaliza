@@ -73,6 +73,14 @@ jobs:
       - name: Instalar dependências
         run: uv sync --frozen
 
+      # Lint antes dos testes: uma violacao de formatacao nao deve custar os
+      # ~2min30 do pytest para aparecer.
+      - name: Ruff (lint)
+        run: uv run ruff check .
+
+      - name: Ruff (format)
+        run: uv run ruff format --check .
+
       - name: pytest
         run: uv run pytest -q
 
@@ -118,6 +126,19 @@ jobs:
 
       - name: Gerar tipos da API
         run: npm run generate:api-types
+
+      # `npm run lint` falha so em erro; os 45 avisos atuais (regras do
+      # React Compiler sobre workarounds deliberados nas telas de lancamento,
+      # mais estilo de teste) ficam visiveis no log sem bloquear o PR. Fechar
+      # esses avisos e trabalho de um PR dedicado.
+      - name: ESLint
+        run: npm run lint
+
+      # O .gitattributes do repo forca eol=lf, entao o checkout do runner
+      # sempre tem LF e o endOfLine do Prettier bate. Num clone Windows com
+      # core.autocrlf=true este check pode dar falso positivo localmente.
+      - name: Prettier
+        run: npm run format:check
 
       - name: tsc --noEmit
         run: npx tsc --noEmit
