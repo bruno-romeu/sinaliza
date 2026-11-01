@@ -10,6 +10,48 @@ writes and the schema only needs to be created once per session.
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+# Variaveis que a suite aceita herdar de `backend/.env`. E uma lista explicita,
+# nao o arquivo inteiro, por um motivo concreto: o `.env` define DATABASE_URL
+# apontando para o banco de DESENVOLVIMENTO, e carrega-lo aqui faria os testes
+# escreverem nele. DATABASE_URL continua sendo derivado de TEST_DATABASE_URL
+# logo abaixo, como sempre foi. JWT_SECRET tambem fica de fora: a suite usa o
+# seu proprio segredo de teste, nunca o de dev.
+_ENV_FILE_KEYS = (
+    "TEST_DATABASE_URL",
+    "DEV_SEED_EMAIL",
+    "DEV_SEED_NAME",
+    "DEV_SEED_PASSWORD",
+)
+
+
+def _load_env_file() -> None:
+    """Preenche `os.environ` a partir de `backend/.env`, sem sobrescrever nada.
+
+    Antes disto, `TEST_DATABASE_URL` so era lido do ambiente do processo, com um
+    default fixo na porta 5433 — entao um `.env` apontando para outra porta era
+    silenciosamente ignorado e a suite rodava contra o banco errado. Isso mordeu
+    de verdade: dois worktrees paralelos, cada um com o seu `.env`, acabaram no
+    mesmo banco e produziram `deadlock detected` que parecia defeito de codigo.
+
+    `setdefault` garante a precedencia correta: variavel ja exportada no
+    ambiente (como o CI faz) vence o arquivo, que vence o default do modulo.
+    """
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if not env_path.is_file():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if key in _ENV_FILE_KEYS:
+            os.environ.setdefault(key, value.strip())
+
+
+_load_env_file()
 
 # Settings() is constructed at import time by app.infrastructure.db.base, so
 # required env vars must exist before any `app.*` module is imported.
