@@ -18,7 +18,10 @@ import uuid
 from datetime import date
 
 from app.application.assignments.errors import AssignmentNotFoundError, StudentNotEnrolledError
-from app.application.assignments.ports import AssignmentRepositoryPort, AssignmentSubmissionRepositoryPort
+from app.application.assignments.ports import (
+    AssignmentRepositoryPort,
+    AssignmentSubmissionRepositoryPort,
+)
 from app.application.attendance.ports import StudentRepositoryPort
 from app.domain.assignment_submission import AssignmentSubmission, AssignmentSubmissionStatus
 

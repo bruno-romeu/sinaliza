@@ -8,7 +8,7 @@ see the spec's Design Notes.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -30,7 +30,7 @@ class JwtTokenIssuer:
         self._settings = settings
 
     def issue(self, user: User) -> str:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         payload = {
             "sub": str(user.id),
             "name": user.name,

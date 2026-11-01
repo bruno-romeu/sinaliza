@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 
 from app.application.trajectory.errors import StudentNotFoundError
 from app.application.trajectory.ports import (
@@ -53,6 +53,7 @@ from app.application.trajectory.ports import (
 )
 from app.domain.academic_period import AcademicPeriod
 from app.domain.as_of import as_of
+from app.domain.assignment_submission import AssignmentSubmission
 from app.domain.convergence import (
     SOURCE_TYPE_BY_SIGNAL_KIND,
     SignalKind,
@@ -64,7 +65,6 @@ from app.domain.convergence import (
     evaluate_grade_signal,
     evaluate_pedagogical_signal,
 )
-from app.domain.assignment_submission import AssignmentSubmission
 from app.domain.grade import Grade
 from app.domain.trajectory import TrajectoryIndicators, compute_trajectory_indicators
 from app.domain.trajectory_change import SourceType, TrajectoryChange, TrajectoryChangeSource
@@ -278,7 +278,7 @@ class GetStudentTrajectoryService:
             change_id = uuid.uuid4()
             kinds = frozenset(signal.kind for signal in result.confirmed_signals)
             description = build_description(kinds, current_period.label)
-            detected_at = datetime.combine(as_of_date, time.min, tzinfo=timezone.utc)
+            detected_at = datetime.combine(as_of_date, time.min, tzinfo=UTC)
             change = TrajectoryChange(
                 id=change_id,
                 student_id=student_id,
@@ -322,6 +322,8 @@ class GetStudentTrajectoryService:
             description = build_concerning_description(
                 result.concerning_signal.kind, current_period.label
             )
-            return None, ConcerningFactor(kind=result.concerning_signal.kind, description=description)
+            return None, ConcerningFactor(
+                kind=result.concerning_signal.kind, description=description
+            )
 
         return None, None

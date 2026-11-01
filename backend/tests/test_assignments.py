@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -299,7 +298,9 @@ def test_register_submission_for_student_not_enrolled_returns_422(
     seeded_assignment: AssignmentModel,
     db_session: Session,
 ) -> None:
-    unenrolled_student = StudentModel(name="Aluno Sem Matrícula", dataset_split=DatasetSplit.EVAL_DEMO)
+    unenrolled_student = StudentModel(
+        name="Aluno Sem Matrícula", dataset_split=DatasetSplit.EVAL_DEMO
+    )
     db_session.add(unenrolled_student)
     db_session.commit()
 

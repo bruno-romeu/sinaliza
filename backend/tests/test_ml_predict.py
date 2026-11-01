@@ -9,7 +9,7 @@ function.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -111,7 +111,7 @@ def _seed_train_student(
                     student_id=student.id,
                     author_user_id=author_user_id,
                     text="Observação de teste.",
-                    created_at=datetime(2026, 3, 6, tzinfo=timezone.utc),
+                    created_at=datetime(2026, 3, 6, tzinfo=UTC),
                 )
             )
     db_session.commit()
@@ -171,7 +171,7 @@ def _seed_eval_demo_student(
                     student_id=student.id,
                     author_user_id=author_user_id,
                     text="Observação de teste.",
-                    created_at=datetime(2026, 3, 6, tzinfo=timezone.utc),
+                    created_at=datetime(2026, 3, 6, tzinfo=UTC),
                 )
             )
     db_session.commit()
@@ -213,7 +213,12 @@ def _seed_model_version(
     tests control which of several model versions is "latest" without
     depending on wall-clock timing between successive `run_training` calls."""
     pipeline = build_pipeline()
-    feature_matrix = [[0.9, 7.0, 1.0, 2], [0.1, 3.0, 0.2, 0], [0.5, 5.0, 0.5, 1], [0.8, 6.0, 0.9, 2]]
+    feature_matrix = [
+        [0.9, 7.0, 1.0, 2],
+        [0.1, 3.0, 0.2, 0],
+        [0.5, 5.0, 0.5, 1],
+        [0.8, 6.0, 0.9, 2],
+    ]
     labels = [
         SyntheticProfile.STABLE.value,
         SyntheticProfile.FALLING_ATTENDANCE.value,
@@ -250,10 +255,10 @@ def test_run_prediction_uses_the_most_recently_trained_model_version(
     tmp_path: Path,
 ) -> None:
     older_version = _seed_model_version(
-        db_session, tmp_path, "older", datetime(2020, 1, 1, tzinfo=timezone.utc)
+        db_session, tmp_path, "older", datetime(2020, 1, 1, tzinfo=UTC)
     )
     newer_version = _seed_model_version(
-        db_session, tmp_path, "newer", datetime(2026, 1, 1, tzinfo=timezone.utc)
+        db_session, tmp_path, "newer", datetime(2026, 1, 1, tzinfo=UTC)
     )
     student = _seed_eval_demo_student(
         db_session,
@@ -286,7 +291,12 @@ def test_happy_path_scores_every_eval_demo_student(
     tmp_path: Path,
 ) -> None:
     trained_version = _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
 
     eval_students = [
@@ -347,7 +357,12 @@ def test_no_eval_demo_rows_raises_and_writes_nothing(
     tmp_path: Path,
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
 
     with pytest.raises(NoScoringDataError):
@@ -370,7 +385,12 @@ def test_eval_demo_student_missing_facts_is_scored_not_skipped(
     tmp_path: Path,
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     student = _seed_eval_demo_student(
         db_session, seeded_classroom, with_facts=False, period_id=seeded_academic_period.id
@@ -397,7 +417,12 @@ def test_two_runs_produce_two_rows_per_student_same_model_version(
     tmp_path: Path,
 ) -> None:
     trained_version = _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     student = _seed_eval_demo_student(
         db_session,
@@ -461,7 +486,12 @@ def test_main_exits_nonzero_and_prints_to_stderr_on_no_eval_demo_rows(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     monkeypatch.setattr(predict_module, "SessionLocal", lambda: _SessionContext(db_session))
     monkeypatch.setattr(
@@ -488,7 +518,12 @@ def test_main_exits_zero_and_prints_summary_on_success(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _train_a_model(
-        db_session, seeded_classroom, seeded_academic_period, seeded_assignment, seeded_user, tmp_path
+        db_session,
+        seeded_classroom,
+        seeded_academic_period,
+        seeded_assignment,
+        seeded_user,
+        tmp_path,
     )
     _seed_eval_demo_student(
         db_session,

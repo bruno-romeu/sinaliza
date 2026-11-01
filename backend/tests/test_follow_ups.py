@@ -6,7 +6,7 @@ upsert."""
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -40,9 +40,7 @@ TRAJECTORY_CHANGE_NOT_FOUND_BODY = {
 FOLLOW_UP_NOT_FOUND_BODY = {
     "error": {"code": "follow_up_not_found", "message": "Acompanhamento não encontrado."}
 }
-INVALID_TOKEN_BODY = {
-    "error": {"code": "invalid_token", "message": "Sessão expirada ou inválida."}
-}
+INVALID_TOKEN_BODY = {"error": {"code": "invalid_token", "message": "Sessão expirada ou inválida."}}
 
 # Falls inside `seeded_academic_period`'s window (2026-07-27 .. 2026-09-25).
 AS_OF = "2026-09-24"
@@ -98,7 +96,7 @@ def _detect_attendance_drop_change(
             student_id=student.id,
             author_user_id=author_user_id,
             text="Observação de teste.",
-            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )
@@ -277,7 +275,7 @@ def test_recompute_after_follow_up_evidence_exists_keeps_change_frozen(
             student_id=seeded_enrolled_student.id,
             author_user_id=seeded_user.id,
             text="Nova observação pós-congelamento.",
-            created_at=datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 20, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )
@@ -372,7 +370,7 @@ def _seed_follow_up(
         reason=None,
         responsible_user_id=responsible_user_id,
         next_review_date=None,
-        created_at=datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 24, 12, 0, tzinfo=UTC),
     )
     db_session.add(follow_up)
     db_session.commit()
@@ -601,21 +599,21 @@ def test_get_follow_up_returns_actions_chronologically_oldest_first(
                 follow_up_id=follow_up.id,
                 description="Terceira ação (mais recente).",
                 author_user_id=seeded_user.id,
-                created_at=datetime(2026, 9, 24, 15, 0, tzinfo=timezone.utc),
+                created_at=datetime(2026, 9, 24, 15, 0, tzinfo=UTC),
             ),
             FollowUpActionModel(
                 id=uuid.uuid4(),
                 follow_up_id=follow_up.id,
                 description="Primeira ação (mais antiga).",
                 author_user_id=seeded_user.id,
-                created_at=datetime(2026, 9, 24, 13, 0, tzinfo=timezone.utc),
+                created_at=datetime(2026, 9, 24, 13, 0, tzinfo=UTC),
             ),
             FollowUpActionModel(
                 id=uuid.uuid4(),
                 follow_up_id=follow_up.id,
                 description="Segunda ação.",
                 author_user_id=seeded_user.id,
-                created_at=datetime(2026, 9, 24, 14, 0, tzinfo=timezone.utc),
+                created_at=datetime(2026, 9, 24, 14, 0, tzinfo=UTC),
             ),
         ]
     )
@@ -680,7 +678,7 @@ def test_get_follow_up_groups_evidence_by_trajectory_change_ordered_by_detected_
         student_id=seeded_enrolled_student.id,
         type=TrajectoryChangeType.GRADE_DROP,
         period_id=seeded_academic_period.id,
-        detected_at=datetime(2026, 8, 1, 0, 0, tzinfo=timezone.utc),
+        detected_at=datetime(2026, 8, 1, 0, 0, tzinfo=UTC),
         description="Queda de notas detectada.",
     )
     db_session.add(earlier_change)
@@ -821,7 +819,7 @@ def test_get_follow_up_visible_to_second_responsible_user_citing_same_observatio
         student_id=seeded_enrolled_student.id,
         type=TrajectoryChangeType.GRADE_DROP,
         period_id=seeded_academic_period.id,
-        detected_at=datetime(2026, 8, 5, 0, 0, tzinfo=timezone.utc),
+        detected_at=datetime(2026, 8, 5, 0, 0, tzinfo=UTC),
         description="Segunda mudança detectada.",
     )
     db_session.add(second_change)
@@ -841,7 +839,7 @@ def test_get_follow_up_visible_to_second_responsible_user_citing_same_observatio
         reason=None,
         responsible_user_id=second_user.id,
         next_review_date=None,
-        created_at=datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc),
+        created_at=datetime(2026, 9, 24, 12, 0, tzinfo=UTC),
     )
     db_session.add(second_follow_up)
     db_session.flush()

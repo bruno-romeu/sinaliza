@@ -5,7 +5,7 @@ follow-up id on the trajectory detail, and on-screen texts without dashes."""
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -112,7 +112,7 @@ def test_opening_for_a_new_change_attaches_it_to_the_open_follow_up(
         student_id=seeded_enrolled_student.id,
         type=TrajectoryChangeType.GRADE_DROP,
         period_id=seeded_academic_period.id,
-        detected_at=datetime(2026, 8, 1, 0, 0, tzinfo=timezone.utc),
+        detected_at=datetime(2026, 8, 1, 0, 0, tzinfo=UTC),
         description="Queda de notas no 3º Bimestre Teste",
     )
     db_session.add(other_change)

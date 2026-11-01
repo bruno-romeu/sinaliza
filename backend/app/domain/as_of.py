@@ -16,7 +16,7 @@ it without a restart.
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 _ENV_VAR = "SINALIZA_DEMO_AS_OF"
 
@@ -34,4 +34,4 @@ def as_of() -> date:
                 f"{_ENV_VAR}={override!r} is not a valid ISO-8601 date "
                 "(expected format: YYYY-MM-DD)."
             ) from exc
-    return datetime.now(timezone.utc).date()
+    return datetime.now(UTC).date()

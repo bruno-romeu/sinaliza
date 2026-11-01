@@ -34,11 +34,15 @@ def prepare_demo(session: Session, window_days: int | None = None) -> tuple[int,
     of them have a detected change."""
     window = window_days if window_days is not None else get_settings().trajectory_window_days
     service = get_get_student_trajectory_service(session)
-    student_ids = session.execute(
-        select(StudentModel.id)
-        .where(StudentModel.dataset_split == DatasetSplit.EVAL_DEMO)
-        .order_by(StudentModel.id)
-    ).scalars().all()
+    student_ids = (
+        session.execute(
+            select(StudentModel.id)
+            .where(StudentModel.dataset_split == DatasetSplit.EVAL_DEMO)
+            .order_by(StudentModel.id)
+        )
+        .scalars()
+        .all()
+    )
 
     changes = 0
     for student_id in student_ids:

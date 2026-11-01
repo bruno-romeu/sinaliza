@@ -66,3 +66,6 @@ extend-immutable-calls = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
+# `backend/alembic/` é um diretório local, então o isort classificaria o
+# pacote `alembic` como first-party; ele é dependência externa.
+known-third-party = ["alembic"]

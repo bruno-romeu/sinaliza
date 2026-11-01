@@ -154,9 +154,7 @@ def compose_name(index: int) -> str:
     second_index = rest // len(FIRST_SURNAMES)
 
     return (
-        f"{GIVEN_NAMES[given_index]} "
-        f"{FIRST_SURNAMES[first_index]} "
-        f"{SECOND_SURNAMES[second_index]}"
+        f"{GIVEN_NAMES[given_index]} {FIRST_SURNAMES[first_index]} {SECOND_SURNAMES[second_index]}"
     )
 
 

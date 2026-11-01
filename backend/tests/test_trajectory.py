@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -520,7 +520,10 @@ def _add_low_attendance(
     for _ in range(present_count):
         db_session.add(
             AttendanceRecordModel(
-                student_id=student_id, classroom_id=classroom_id, date=day, status=AttendanceStatus.PRESENT
+                student_id=student_id,
+                classroom_id=classroom_id,
+                date=day,
+                status=AttendanceStatus.PRESENT,
             )
         )
         day += timedelta(days=1)
@@ -554,7 +557,7 @@ def test_trajectory_two_confirmed_signals_creates_trajectory_change_with_sources
             student_id=seeded_enrolled_student.id,
             author_user_id=seeded_user.id,
             text="Observação de teste.",
-            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )
@@ -574,11 +577,10 @@ def test_trajectory_two_confirmed_signals_creates_trajectory_change_with_sources
     assert change["type"] == "ATTENDANCE_DROP"
     assert change["period_id"] == str(seeded_academic_period.id)
     assert change["description"] == (
-        "Queda de frequência e preocupação registrada pela equipe "
-        "no 3º Bimestre Teste"
+        "Queda de frequência e preocupação registrada pela equipe no 3º Bimestre Teste"
     )
     detected_at = datetime.fromisoformat(change["detected_at"].replace("Z", "+00:00"))
-    assert detected_at == datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    assert detected_at == datetime(2026, 9, 24, 0, 0, tzinfo=UTC)
 
     db_rows = db_session.execute(select(TrajectoryChangeModel)).scalars().all()
     assert len(db_rows) == 1
@@ -615,7 +617,7 @@ def test_trajectory_pedagogical_observation_after_as_of_is_excluded_from_signal(
             text="Observação futura, não deve contar ainda.",
             # After AS_OF ("2026-09-24") but still inside the período
             # vigente (ends 2026-09-25).
-            created_at=datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 25, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )
@@ -729,8 +731,7 @@ def test_trajectory_recompute_same_period_replaces_description_and_sources(
     second_change = second.json()["trajectory_change"]
     assert second_change["type"] == "COMBINED_DETERIORATION"
     assert second_change["description"] == (
-        "Queda de frequência e aumento de atividades "
-        "pendentes no 3º Bimestre Teste"
+        "Queda de frequência e aumento de atividades pendentes no 3º Bimestre Teste"
     )
     assert second_change["detected_at"] != first_change["detected_at"]
     assert second_change["detected_at"].startswith("2026-09-25")
@@ -739,7 +740,7 @@ def test_trajectory_recompute_same_period_replaces_description_and_sources(
     assert len(rows) == 1
     assert rows[0].id == first_id
     assert rows[0].description == second_change["description"]
-    assert rows[0].detected_at == datetime(2026, 9, 25, 0, 0, tzinfo=timezone.utc)
+    assert rows[0].detected_at == datetime(2026, 9, 25, 0, 0, tzinfo=UTC)
 
     source_types = {
         row.source_type
@@ -775,7 +776,7 @@ def test_trajectory_recompute_leaves_prior_period_change_untouched(
         student_id=seeded_enrolled_student.id,
         type=TrajectoryChangeType.GRADE_DROP,
         period_id=previous_period.id,
-        detected_at=datetime(2026, 7, 20, 0, 0, tzinfo=timezone.utc),
+        detected_at=datetime(2026, 7, 20, 0, 0, tzinfo=UTC),
         description="Mudança recente: queda de notas — 2º Bimestre Teste",
     )
     db_session.add(prior_change)
@@ -814,7 +815,7 @@ def test_trajectory_two_requests_with_convergence_produce_identical_change_no_du
             student_id=seeded_enrolled_student.id,
             author_user_id=seeded_user.id,
             text="Observação de teste.",
-            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
             # spec-ui-3: only a concern-marked observation is a signal.
             registers_concern=True,
         )

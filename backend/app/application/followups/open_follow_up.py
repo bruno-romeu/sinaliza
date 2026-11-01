@@ -64,9 +64,7 @@ class OpenFollowUpService:
         if change.student_id != student_id:
             raise TrajectoryChangeMismatchError()
 
-        existing = self._follow_up_repository.find_open_for_student(
-            student_id, responsible_user_id
-        )
+        existing = self._follow_up_repository.find_open_for_student(student_id, responsible_user_id)
         if existing is not None:
             linked = {
                 item.trajectory_change_id

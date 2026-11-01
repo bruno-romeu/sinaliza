@@ -159,7 +159,7 @@ def _attendance_description(record: AttendanceRecord) -> str:
 
 
 def _format_grade_br(value: Decimal) -> str:
-    """"4.50" -> "4,5", "7.00" -> "7,0", "7.25" -> "7,25" (spec-ui-1): comma
+    """ "4.50" -> "4,5", "7.00" -> "7,0", "7.25" -> "7,25" (spec-ui-1): comma
     decimal separator, at least one and at most two decimal places."""
     text = f"{value:.2f}".rstrip("0")
     if text.endswith("."):
@@ -174,10 +174,7 @@ def _grade_description(grade: Grade) -> str:
 
 
 def _assignment_submission_description(submission: AssignmentSubmission) -> str:
-    return (
-        f"{_SUBMISSION_STATUS_LABEL[submission.status]} em "
-        f"{_format_date_br(submission.date)}"
-    )
+    return f"{_SUBMISSION_STATUS_LABEL[submission.status]} em {_format_date_br(submission.date)}"
 
 
 def _observation_description(observation: PedagogicalObservation) -> str:

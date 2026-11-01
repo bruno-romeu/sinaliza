@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -86,14 +86,14 @@ def test_home_returns_recent_changes_ordered_by_detected_at_desc(
         db_session,
         seeded_enrolled_student,
         seeded_academic_period,
-        datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 9, 24, 0, 0, tzinfo=UTC),
         TrajectoryChangeType.ATTENDANCE_DROP,
     )
     _add_change(
         db_session,
         older_student,
         seeded_academic_period,
-        datetime(2026, 9, 20, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 9, 20, 0, 0, tzinfo=UTC),
         TrajectoryChangeType.GRADE_DROP,
     )
     db_session.commit()
@@ -140,7 +140,7 @@ def test_home_first_page_of_recent_changes_has_five_and_the_total(
     seeded_academic_period: AcademicPeriodModel,
     db_session: Session,
 ) -> None:
-    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=UTC)
     for i in range(25):
         student = StudentModel(name=f"Estudante {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
         db_session.add(student)
@@ -175,7 +175,7 @@ def test_home_pages_through_every_recent_change_without_gaps_or_repeats(
     """All changes share one `detected_at` (the usual shape: `prepare_demo`
     computes everything on the same "today"), so only the `id` tiebreaker
     keeps pages from overlapping."""
-    detected_at = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    detected_at = datetime(2026, 9, 24, 0, 0, tzinfo=UTC)
     for i in range(12):
         student = StudentModel(name=f"Estudante {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
         db_session.add(student)
@@ -238,7 +238,7 @@ def test_home_breaks_detected_at_tie_by_id_desc(
     db_session.add_all([student_low, student_high])
     db_session.flush()
 
-    same_detected_at = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    same_detected_at = datetime(2026, 9, 24, 0, 0, tzinfo=UTC)
     change_low = TrajectoryChangeModel(
         id=uuid.UUID(int=1),
         student_id=student_low.id,
@@ -285,14 +285,14 @@ def test_home_includes_active_follow_ups_ordered_by_created_at_desc(
         seeded_enrolled_student,
         seeded_user.id,
         FollowUpStatus.EM_OBSERVACAO,
-        datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 9, 24, 0, 0, tzinfo=UTC),
     )
     _add_follow_up(
         db_session,
         older_student,
         seeded_user.id,
         FollowUpStatus.ACOMPANHAMENTO_ATIVO,
-        datetime(2026, 9, 20, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 9, 20, 0, 0, tzinfo=UTC),
     )
     db_session.commit()
 
@@ -322,7 +322,7 @@ def test_home_breaks_follow_up_created_at_tie_by_id_desc(
     db_session.add_all([student_low, student_high])
     db_session.flush()
 
-    same_created_at = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    same_created_at = datetime(2026, 9, 24, 0, 0, tzinfo=UTC)
     follow_up_low = FollowUpModel(
         id=uuid.UUID(int=1),
         student_id=student_low.id,
@@ -362,7 +362,7 @@ def test_home_paginates_active_follow_ups_at_five_per_page_by_default(
     lifetime, so `list_active` is paginated (5 per page by default) rather
     than returned whole — pins that 25 seeded active follow-ups come back as
     a 5-item first page plus an accurate `total`."""
-    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=UTC)
     for i in range(25):
         student = StudentModel(name=f"Estudante FU {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
         db_session.add(student)
@@ -391,7 +391,7 @@ def test_home_follow_ups_second_page_returns_the_remainder(
     seeded_user,
     db_session: Session,
 ) -> None:
-    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=UTC)
     for i in range(25):
         student = StudentModel(name=f"Estudante FU {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
         db_session.add(student)
@@ -405,9 +405,7 @@ def test_home_follow_ups_second_page_returns_the_remainder(
         )
     db_session.commit()
 
-    response = client.get(
-        "/home?follow_ups_page=2", headers=_auth_headers(client, seeded_user)
-    )
+    response = client.get("/home?follow_ups_page=2", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
     body = response.json()
@@ -426,7 +424,7 @@ def test_home_follow_ups_page_size_query_param_overrides_default(
     seeded_user,
     db_session: Session,
 ) -> None:
-    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2026, 9, 24, 0, 0, tzinfo=UTC)
     for i in range(5):
         student = StudentModel(name=f"Estudante FU {i:02d}", dataset_split=DatasetSplit.EVAL_DEMO)
         db_session.add(student)
@@ -462,8 +460,10 @@ def test_home_excludes_encerrado_follow_ups(
     db_session.add_all([active_student, closed_student])
     db_session.flush()
 
-    now = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
-    _add_follow_up(db_session, active_student, seeded_user.id, FollowUpStatus.AGUARDANDO_RETORNO, now)
+    now = datetime(2026, 9, 24, 0, 0, tzinfo=UTC)
+    _add_follow_up(
+        db_session, active_student, seeded_user.id, FollowUpStatus.AGUARDANDO_RETORNO, now
+    )
     _add_follow_up(db_session, closed_student, seeded_user.id, FollowUpStatus.ENCERRADO, now)
     db_session.commit()
 
@@ -475,9 +475,7 @@ def test_home_excludes_encerrado_follow_ups(
     assert student_names == ["Estudante Ativo"]
 
 
-def test_home_with_no_active_follow_ups_returns_empty_list(
-    client: TestClient, seeded_user
-) -> None:
+def test_home_with_no_active_follow_ups_returns_empty_list(client: TestClient, seeded_user) -> None:
     response = client.get("/home", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
@@ -692,9 +690,7 @@ def test_home_search_second_page_returns_the_remainder(
         db_session.add(EnrollmentModel(student_id=student.id, classroom_id=seeded_classroom.id))
     db_session.commit()
 
-    response = client.get(
-        "/home/search?q=Busca&page=2", headers=_auth_headers(client, seeded_user)
-    )
+    response = client.get("/home/search?q=Busca&page=2", headers=_auth_headers(client, seeded_user))
 
     assert response.status_code == 200
     body = response.json()

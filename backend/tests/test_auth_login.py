@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
@@ -54,7 +54,9 @@ def test_login_wrong_password_returns_generic_401_and_no_token(
     assert response.json() == INVALID_CREDENTIALS_BODY
 
 
-def test_login_unknown_email_returns_identical_401(client: TestClient, seeded_user: UserModel) -> None:
+def test_login_unknown_email_returns_identical_401(
+    client: TestClient, seeded_user: UserModel
+) -> None:
     response = client.post(
         "/auth/login", json={"email": "does-not-exist@escola.test", "password": "whatever"}
     )
@@ -109,7 +111,7 @@ def test_get_current_user_rejects_garbage_token(test_settings: Settings) -> None
 
 
 def test_get_current_user_rejects_expired_token(test_settings: Settings) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expired_payload = {
         "sub": str(uuid.uuid4()),
         "name": "Fulano",
@@ -139,7 +141,9 @@ def test_get_current_user_accepts_a_valid_token_without_a_db_round_trip(
     token = JwtTokenIssuer(test_settings).issue(user)
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
-    current_user = get_current_user(credentials=credentials, token_issuer=JwtTokenIssuer(test_settings))
+    current_user = get_current_user(
+        credentials=credentials, token_issuer=JwtTokenIssuer(test_settings)
+    )
 
     assert current_user.id == str(user.id)
     assert current_user.name == user.name

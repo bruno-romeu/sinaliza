@@ -23,9 +23,7 @@ class SqlAlchemyFollowUpRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def save_with_evidence(
-        self, follow_up: FollowUp, evidence: list[FollowUpEvidence]
-    ) -> FollowUp:
+    def save_with_evidence(self, follow_up: FollowUp, evidence: list[FollowUpEvidence]) -> FollowUp:
         self._session.add(
             FollowUpModel(
                 id=follow_up.id,
@@ -135,8 +133,10 @@ class SqlAlchemyFollowUpRepository:
         ]
 
     def count_active(self) -> int:
-        stmt = select(func.count()).select_from(FollowUpModel).where(
-            FollowUpModel.status != FollowUpStatus.ENCERRADO
+        stmt = (
+            select(func.count())
+            .select_from(FollowUpModel)
+            .where(FollowUpModel.status != FollowUpStatus.ENCERRADO)
         )
         return self._session.execute(stmt).scalar_one()
 
@@ -194,9 +194,7 @@ class SqlAlchemyFollowUpRepository:
         self._session.commit()
         return action
 
-    def update_status(
-        self, follow_up_id: uuid.UUID, status: FollowUpStatus
-    ) -> FollowUp | None:
+    def update_status(self, follow_up_id: uuid.UUID, status: FollowUpStatus) -> FollowUp | None:
         model = self._session.get(FollowUpModel, follow_up_id)
         if model is None:
             return None

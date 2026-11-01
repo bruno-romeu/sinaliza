@@ -6,10 +6,22 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Integer, Numeric
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import String, Text, false
-from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,7 +34,9 @@ from app.domain.user import UserRole
 from app.infrastructure.db.base import Base
 
 user_role_enum = SAEnum(UserRole, name="user_role", native_enum=True, validate_strings=True)
-dataset_split_enum = SAEnum(DatasetSplit, name="dataset_split", native_enum=True, validate_strings=True)
+dataset_split_enum = SAEnum(
+    DatasetSplit, name="dataset_split", native_enum=True, validate_strings=True
+)
 attendance_status_enum = SAEnum(
     AttendanceStatus, name="attendance_status", native_enum=True, validate_strings=True
 )
@@ -49,7 +63,9 @@ follow_up_status_enum = SAEnum(
 class UserModel(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -62,7 +78,9 @@ class ClassroomModel(Base):
     __tablename__ = "classrooms"
     __table_args__ = (UniqueConstraint("name", name="uq_classroom_name"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     academic_year: Mapped[int] = mapped_column(Integer, nullable=False)
 
@@ -77,7 +95,9 @@ class StudentModel(Base):
 
     __tablename__ = "students"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     dataset_split: Mapped[DatasetSplit] = mapped_column(dataset_split_enum, nullable=False)
     synthetic_profile: Mapped[SyntheticProfile | None] = mapped_column(
@@ -91,7 +111,9 @@ class EnrollmentModel(Base):
         UniqueConstraint("student_id", "classroom_id", name="uq_enrollment_student_classroom"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     student_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
     )
@@ -103,10 +125,14 @@ class EnrollmentModel(Base):
 class AttendanceRecordModel(Base):
     __tablename__ = "attendance_records"
     __table_args__ = (
-        UniqueConstraint("student_id", "classroom_id", "date", name="uq_attendance_student_classroom_date"),
+        UniqueConstraint(
+            "student_id", "classroom_id", "date", name="uq_attendance_student_classroom_date"
+        ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     student_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
     )
@@ -123,7 +149,9 @@ class AcademicPeriodModel(Base):
 
     __tablename__ = "academic_periods"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
@@ -139,11 +167,11 @@ class GradeModel(Base):
     the same período (spec Boundaries & Constraints)."""
 
     __tablename__ = "grades"
-    __table_args__ = (
-        CheckConstraint("value >= 0 AND value <= 10", name="ck_grade_value_range"),
-    )
+    __table_args__ = (CheckConstraint("value >= 0 AND value <= 10", name="ck_grade_value_range"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     student_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
     )
@@ -164,7 +192,9 @@ class AssignmentModel(Base):
 
     __tablename__ = "assignments"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     classroom_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False, index=True
     )
@@ -182,7 +212,9 @@ class AssignmentSubmissionModel(Base):
 
     __tablename__ = "assignment_submissions"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     assignment_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("assignments.id"), nullable=False, index=True
     )
@@ -205,7 +237,9 @@ class PedagogicalObservationModel(Base):
 
     __tablename__ = "pedagogical_observations"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     student_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
     )
@@ -237,7 +271,9 @@ class TrajectoryChangeModel(Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     student_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
     )
@@ -258,7 +294,9 @@ class TrajectoryChangeSourceModel(Base):
 
     __tablename__ = "trajectory_change_sources"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     trajectory_change_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("trajectory_changes.id"), nullable=False, index=True
     )
@@ -276,7 +314,9 @@ class FollowUpModel(Base):
 
     __tablename__ = "follow_ups"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     student_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
     )
@@ -296,7 +336,9 @@ class FollowUpEvidenceModel(Base):
 
     __tablename__ = "follow_up_evidence"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     follow_up_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("follow_ups.id"), nullable=False, index=True
     )
@@ -315,7 +357,9 @@ class FollowUpActionModel(Base):
 
     __tablename__ = "follow_up_action"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     follow_up_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("follow_ups.id"), nullable=False, index=True
     )
@@ -340,7 +384,9 @@ class SyntheticGenerationRunModel(Base):
 
     __tablename__ = "synthetic_generation_runs"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
     generator_version: Mapped[str] = mapped_column(String(50), nullable=False)
     executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -358,7 +404,9 @@ class MLModelVersionModel(Base):
     __tablename__ = "ml_model_version"
     __table_args__ = (UniqueConstraint("version", name="uq_ml_model_version_version"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     artifact_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     trained_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -376,7 +424,9 @@ class MLPredictionModel(Base):
 
     __tablename__ = "ml_prediction"
 
-    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     student_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
     )
