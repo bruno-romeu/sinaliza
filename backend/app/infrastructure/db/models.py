@@ -115,10 +115,16 @@ class EnrollmentModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     classroom_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("classrooms.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
 
 
@@ -134,10 +140,16 @@ class AttendanceRecordModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     classroom_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("classrooms.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[AttendanceStatus] = mapped_column(attendance_status_enum, nullable=False)
@@ -173,14 +185,23 @@ class GradeModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     classroom_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("classrooms.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     period_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("academic_periods.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("academic_periods.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
     value: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
@@ -196,11 +217,17 @@ class AssignmentModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     classroom_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("classrooms.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("classrooms.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     period_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("academic_periods.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("academic_periods.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
 
@@ -216,10 +243,16 @@ class AssignmentSubmissionModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     assignment_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("assignments.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("assignments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     status: Mapped[AssignmentSubmissionStatus] = mapped_column(
         assignment_submission_status_enum, nullable=False
@@ -241,10 +274,16 @@ class PedagogicalObservationModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     author_user_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -260,9 +299,9 @@ class TrajectoryChangeModel(Base):
     (AD-1, spec Boundaries & Constraints) — writes always go through `INSERT
     ... ON CONFLICT ... DO UPDATE` against this index
     (`sqlalchemy_trajectory_change_repository.py`), never a `SELECT`-then-
-    write. No `ondelete` on either FK — same unaddressed, already-accepted
-    codebase-wide pattern as every other fact table here (see
-    `deferred-work.md`)."""
+    write. `student_id` é `CASCADE` (a mudança é interpretação dos fatos
+    daquele estudante) e `period_id` é `RESTRICT` (o período letivo é
+    calendário compartilhado por muitos estudantes) — migration 0014."""
 
     __tablename__ = "trajectory_changes"
     __table_args__ = (
@@ -275,11 +314,17 @@ class TrajectoryChangeModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     type: Mapped[TrajectoryChangeType] = mapped_column(trajectory_change_type_enum, nullable=False)
     period_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("academic_periods.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("academic_periods.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -289,8 +334,11 @@ class TrajectoryChangeSourceModel(Base):
     """`source_id` is necessarily polymorphic (points at `AttendanceRecord`,
     `Grade`, `AssignmentSubmission`, or `PedagogicalObservation` depending on
     `source_type`) so it carries no FK of its own — only `trajectory_change_id`
-    is a real FK (data-model.md). No UNIQUE constraint — a single
-    `TrajectoryChange` legitimately cites several source rows."""
+    is a real FK (data-model.md) — e por isso `source_id` segue sem `ondelete`
+    **de propósito**: não há FK possível para uma coluna polimórfica
+    (migration 0014). `trajectory_change_id` é `CASCADE`: a linha de origem não
+    tem significado fora da mudança que ela sustenta. No UNIQUE constraint — a
+    single `TrajectoryChange` legitimately cites several source rows."""
 
     __tablename__ = "trajectory_change_sources"
 
@@ -298,7 +346,10 @@ class TrajectoryChangeSourceModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     trajectory_change_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("trajectory_changes.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("trajectory_changes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     source_type: Mapped[SourceType] = mapped_column(
         trajectory_change_source_type_enum, nullable=False
@@ -307,10 +358,12 @@ class TrajectoryChangeSourceModel(Base):
 
 
 class FollowUpModel(Base):
-    """No `ondelete` on either FK — same unaddressed, already-accepted
-    codebase-wide pattern as `TrajectoryChangeModel`/`TrajectoryChangeSourceModel`
-    (see `deferred-work.md`). `reason`/`next_review_date` are nullable: no UI
-    captures them in this story (spec Boundaries & Constraints)."""
+    """Ambas as FKs são `ondelete="RESTRICT"` (migration 0014): `FollowUp` é
+    processo humano com valor de auditoria (`AGENTS.md` §Acompanhamento), então
+    apagar o estudante ou o usuário responsável não pode fazê-lo desaparecer
+    por efeito colateral — o acompanhamento tem de ser encerrado antes, como
+    decisão explícita. `reason`/`next_review_date` are nullable: no UI captures
+    them in this story (spec Boundaries & Constraints)."""
 
     __tablename__ = "follow_ups"
 
@@ -318,12 +371,18 @@ class FollowUpModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("students.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     status: Mapped[FollowUpStatus] = mapped_column(follow_up_status_enum, nullable=False)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     responsible_user_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     next_review_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -332,7 +391,14 @@ class FollowUpModel(Base):
 class FollowUpEvidenceModel(Base):
     """`trajectory_change_id` is a real `NOT NULL` FK (RNF-11, AD-7) — unlike
     `TrajectoryChangeSource.source_id`, this is never polymorphic: a
-    `FollowUpEvidence` row always points at exactly one `TrajectoryChange`."""
+    `FollowUpEvidence` row always points at exactly one `TrajectoryChange`.
+
+    `follow_up_id` é `CASCADE` (linha de ligação, sem valor próprio fora do
+    acompanhamento) e `trajectory_change_id` é `RESTRICT` — este último espelha
+    no schema a regra de freeze-on-evidence que
+    `sqlalchemy_trajectory_change_repository.py` já aplica: uma
+    `TrajectoryChange` citada como evidência não pode ser removida
+    (migration 0014)."""
 
     __tablename__ = "follow_up_evidence"
 
@@ -340,10 +406,16 @@ class FollowUpEvidenceModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     follow_up_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("follow_ups.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("follow_ups.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     trajectory_change_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("trajectory_changes.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("trajectory_changes.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
 
 
@@ -353,7 +425,12 @@ class FollowUpActionModel(Base):
     table also carries DB-level `GRANT INSERT, SELECT` / revoked
     `UPDATE`/`DELETE` for the app's role, applied in the Alembic migration
     and mirrored in `tests/conftest.py` so append-only-ness doesn't rely only
-    on application code (AD-6)."""
+    on application code (AD-6).
+
+    Ambas as FKs são `ondelete="RESTRICT"` (migration 0014) justamente por
+    causa desse backstop: um `CASCADE` é executado pelo sistema de integridade
+    referencial do Postgres e contornaria o `REVOKE DELETE`, apagando registro
+    de auditoria por via indireta."""
 
     __tablename__ = "follow_up_action"
 
@@ -361,11 +438,17 @@ class FollowUpActionModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     follow_up_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("follow_ups.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("follow_ups.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     description: Mapped[str] = mapped_column(Text, nullable=False)
     author_user_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -420,7 +503,12 @@ class MLPredictionModel(Base):
     rather than updating or deduping prior ones — `model_version_id` is what
     ties a row back to the `MLModelVersion` whose fitted `Pipeline` produced
     its `score`. Never written by the web process, never read by
-    `presentation/` (AD-3's boundary applied to this research artifact)."""
+    `presentation/` (AD-3's boundary applied to this research artifact).
+
+    `student_id` é `CASCADE` (resultado experimental não sobrevive ao
+    estudante) e `model_version_id` é `RESTRICT` (migration 0014): `AGENTS.md`
+    §Versionamento de modelo exige que a prediction aponte para a versão que a
+    produziu — apagar a `MLModelVersion` tornaria o score não auditável."""
 
     __tablename__ = "ml_prediction"
 
@@ -428,10 +516,16 @@ class MLPredictionModel(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     model_version_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("ml_model_version.id"), nullable=False, index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey("ml_model_version.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
     )
     score: Mapped[float] = mapped_column(Float, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

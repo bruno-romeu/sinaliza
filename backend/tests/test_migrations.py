@@ -20,12 +20,79 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 
 from app.domain.follow_up import FollowUpStatus
 from app.domain.student import SyntheticProfile
 from app.domain.trajectory_change import SourceType, TrajectoryChangeType
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+# Every table and every native Postgres enum type the migration chain owns.
+# `downgrade("base")` must leave none of them behind.
+_ALL_TABLES: tuple[str, ...] = (
+    "users",
+    "classrooms",
+    "students",
+    "enrollments",
+    "academic_periods",
+    "attendance_records",
+    "grades",
+    "assignments",
+    "assignment_submissions",
+    "pedagogical_observations",
+    "synthetic_generation_runs",
+    "trajectory_changes",
+    "trajectory_change_sources",
+    "follow_ups",
+    "follow_up_evidence",
+    "follow_up_action",
+    "ml_model_version",
+    "ml_prediction",
+)
+
+_ALL_NATIVE_ENUMS: tuple[str, ...] = (
+    "user_role",
+    "dataset_split",
+    "attendance_status",
+    "assignment_submission_status",
+    "synthetic_profile",
+    "trajectory_change_type",
+    "trajectory_change_source_type",
+    "follow_up_status",
+)
+
+# Migration 0014: the `ondelete` each FK must carry, as Postgres records it in
+# `pg_constraint.confdeltype` ('c' = CASCADE, 'r' = RESTRICT). The rationale
+# for each choice lives in the migration's own docstring; this table is the
+# executable half of it, so a future `op.create_table` that silently omits an
+# `ondelete` (the gap `deferred-work.md` tracked since Story 1.5) fails here.
+_EXPECTED_ONDELETE: dict[str, str] = {
+    "enrollments_student_id_fkey": "c",
+    "enrollments_classroom_id_fkey": "r",
+    "attendance_records_student_id_fkey": "c",
+    "attendance_records_classroom_id_fkey": "r",
+    "grades_student_id_fkey": "c",
+    "grades_classroom_id_fkey": "r",
+    "grades_period_id_fkey": "r",
+    "assignments_classroom_id_fkey": "r",
+    "assignments_period_id_fkey": "r",
+    "assignment_submissions_assignment_id_fkey": "c",
+    "assignment_submissions_student_id_fkey": "c",
+    "pedagogical_observations_student_id_fkey": "c",
+    "pedagogical_observations_author_user_id_fkey": "r",
+    "trajectory_changes_student_id_fkey": "c",
+    "trajectory_changes_period_id_fkey": "r",
+    "trajectory_change_sources_trajectory_change_id_fkey": "c",
+    "follow_ups_student_id_fkey": "r",
+    "follow_ups_responsible_user_id_fkey": "r",
+    "follow_up_evidence_follow_up_id_fkey": "c",
+    "follow_up_evidence_trajectory_change_id_fkey": "r",
+    "follow_up_action_follow_up_id_fkey": "r",
+    "follow_up_action_author_user_id_fkey": "r",
+    "ml_prediction_student_id_fkey": "c",
+    "ml_prediction_model_version_id_fkey": "r",
+}
 
 
 def _alembic_config() -> Config:
@@ -105,6 +172,32 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
             text("SELECT to_regclass('public.ml_prediction') IS NULL")
         ).scalar_one()
     assert ml_prediction_dropped is True
+
+    # `deferred-work.md` (Story 1.3 entry): until now this test only checked
+    # that a handful of *tables* were gone after `downgrade("base")`. Every
+    # migration manages its native enum type explicitly with
+    # `checkfirst=True` on both `create()` and `drop()` — which means a drop
+    # that silently did nothing would leave the type behind and never raise.
+    # Assert every table and every native enum type is really gone, so a
+    # `downgrade()` that forgets one is a failure here instead of a surprise
+    # on the next `upgrade`.
+    with migration_engine.connect() as connection:
+        surviving_tables = [
+            table
+            for table in _ALL_TABLES
+            if connection.execute(
+                text("SELECT to_regclass(:name) IS NOT NULL"), {"name": f"public.{table}"}
+            ).scalar_one()
+        ]
+        surviving_types = [
+            enum_type
+            for enum_type in _ALL_NATIVE_ENUMS
+            if connection.execute(
+                text("SELECT to_regtype(:name) IS NOT NULL"), {"name": enum_type}
+            ).scalar_one()
+        ]
+    assert surviving_tables == []
+    assert surviving_types == []
 
     # This second upgrade is exactly the step that used to raise
     # `DuplicateObject: type "user_role" already exists`.
@@ -253,3 +346,104 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
             )
         ).scalar_one_or_none()
     assert constraint_def == "CHECK (((value >= (0)::numeric) AND (value <= (10)::numeric)))"
+
+
+def test_every_foreign_key_declares_its_ondelete(migration_engine: Engine) -> None:
+    """Migration 0014. Until it landed, every FK fell through to Postgres'
+    implicit `NO ACTION` — a default, never a domain decision
+    (`deferred-work.md`, Stories 1.5 and 3.2). This asserts both halves: the
+    exact `ondelete` each FK carries, and that the set of FKs in the schema is
+    exactly the set the migration enumerates — so a new table added later with
+    an un-declared FK fails here instead of silently reintroducing the gap."""
+    cfg = _alembic_config()
+    command.upgrade(cfg, "head")
+
+    with migration_engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                "SELECT c.conname, c.confdeltype FROM pg_constraint c "
+                "JOIN pg_class t ON t.oid = c.conrelid "
+                "JOIN pg_namespace n ON n.oid = t.relnamespace "
+                "WHERE c.contype = 'f' AND n.nspname = 'public'"
+            )
+        ).all()
+
+    assert {name: delete_action for name, delete_action in rows} == _EXPECTED_ONDELETE
+
+
+def test_ondelete_rules_hold_against_real_deletes(migration_engine: Engine) -> None:
+    """The catalog check above proves the clauses are recorded; this proves
+    they behave. Fictitious identities only (`AGENTS.md` §Privacidade)."""
+    cfg = _alembic_config()
+    command.upgrade(cfg, "head")
+
+    with migration_engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO users (id, name, email, password_hash, role) VALUES "
+                "('11111111-1111-1111-1111-111111111111', 'Pessoa Fictícia QA', "
+                "'qa-ondelete@exemplo.invalid', 'x', 'COORDENACAO_PEDAGOGICA')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO classrooms (id, name, academic_year) VALUES "
+                "('22222222-2222-2222-2222-222222222222', 'Turma Fictícia QA', 2026)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO students (id, name, dataset_split) VALUES "
+                "('33333333-3333-3333-3333-333333333333', 'Estudante Fictício QA', 'EVAL_DEMO')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO attendance_records (id, student_id, classroom_id, date, status) "
+                "VALUES ('44444444-4444-4444-4444-444444444444', "
+                "'33333333-3333-3333-3333-333333333333', "
+                "'22222222-2222-2222-2222-222222222222', DATE '2026-03-02', 'PRESENT')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO follow_ups (id, student_id, status, responsible_user_id, created_at) "
+                "VALUES ('55555555-5555-5555-5555-555555555555', "
+                "'33333333-3333-3333-3333-333333333333', 'EM_OBSERVACAO', "
+                "'11111111-1111-1111-1111-111111111111', now())"
+            )
+        )
+
+    # `follow_ups.student_id` is RESTRICT: an open human process is never
+    # collateral damage of deleting the student row.
+    with pytest.raises(IntegrityError):
+        with migration_engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM students WHERE id = '33333333-3333-3333-3333-333333333333'")
+            )
+
+    # Once the acompanhamento is explicitly removed, the student's academic
+    # facts do cascade — they have no meaning without the student.
+    with migration_engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM follow_ups WHERE id = '55555555-5555-5555-5555-555555555555'")
+        )
+        connection.execute(
+            text("DELETE FROM students WHERE id = '33333333-3333-3333-3333-333333333333'")
+        )
+    with migration_engine.connect() as connection:
+        remaining = connection.execute(
+            text(
+                "SELECT count(*) FROM attendance_records "
+                "WHERE student_id = '33333333-3333-3333-3333-333333333333'"
+            )
+        ).scalar_one()
+    assert remaining == 0
+
+    with migration_engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM classrooms WHERE id = '22222222-2222-2222-2222-222222222222'")
+        )
+        connection.execute(
+            text("DELETE FROM users WHERE id = '11111111-1111-1111-1111-111111111111'")
+        )
