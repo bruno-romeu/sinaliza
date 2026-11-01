@@ -1,12 +1,18 @@
 """Implements `PedagogicalObservationRepositoryPort` on top of SQLAlchemy.
 
-`save` never needs to translate an `IntegrityError` into a domain error —
-`pedagogical_observations` carries no UNIQUE constraint (spec Boundaries &
-Constraints: multiple observations for the same student are expected and
-valid, each a new row, same precedent as `Grade`/`AssignmentSubmission`).
+`save` carries no UNIQUE constraint (spec Boundaries & Constraints: multiple
+observations for the same student are expected and valid, each a new row,
+same precedent as `Grade`/`AssignmentSubmission`), so no *duplicate* can be
+raised here — but its two FKs (`student_id`, `author_user_id`) can still be
+violated, and that used to escape as a raw `IntegrityError` with the session
+left unusable. It now goes through `translating_integrity_errors`, like every
+other write path in `infrastructure/repositories` (see
+`repositories/errors.py`).
 
 `list_by_student_in_range` (Story 3.2) feeds the pedagogical
-`SignalEvaluator` — it filters on `created_at`'s date, mirroring
+`SignalEvaluator` — it buckets `created_at` into its **UTC** calendar date
+(`base.utc_date_of`, never a bare `::date` resolved at the session's
+`timezone` GUC), mirroring
 `SqlAlchemyAttendanceRepository.list_by_student_in_range`'s shape, and applies
 `filter_as_of` (AD-11) as the same leak-prevention invariant every other
 trajectory-facing read already carries. Story 4.4 never touches this method
@@ -17,15 +23,17 @@ unfiltered set of observations (AD-8).
 read-time visibility filter (RF-22, AD-8, AD-11): the scoping rule lives
 here, the only place both evidence-resolution call sites
 (`GetStudentTrajectoryDetailService`, `GetFollowUpService`) share, so it is
-never duplicated inline in a router or application service."""
+never duplicated inline in a router or application service. Its
+restricted/visible lookup is a single grouped query (not the two near-
+identical ones it used to run), so resolving evidence costs 2 round trips
+instead of 3."""
 
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date as SA_Date
-from sqlalchemy import cast, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.domain.pedagogical_observation import PedagogicalObservation
@@ -36,7 +44,8 @@ from app.infrastructure.db.models import (
     PedagogicalObservationModel,
     TrajectoryChangeSourceModel,
 )
-from app.infrastructure.repositories.base import filter_as_of
+from app.infrastructure.repositories.base import filter_as_of_timestamp, utc_date_of
+from app.infrastructure.repositories.errors import translating_integrity_errors
 
 # Story 4.4 (RF-22, AD-8): shown in place of the real text whenever an
 # observation is cited as evidence of a real `FollowUp` and the requesting
@@ -68,7 +77,8 @@ class SqlAlchemyPedagogicalObservationRepository:
             registers_concern=registers_concern,
         )
         self._session.add(model)
-        self._session.commit()
+        with translating_integrity_errors(self._session):
+            self._session.commit()
         self._session.refresh(model)
         return PedagogicalObservation(
             id=model.id,
@@ -82,13 +92,13 @@ class SqlAlchemyPedagogicalObservationRepository:
     def list_by_student_in_range(
         self, student_id: uuid.UUID, start_date: date, end_date: date
     ) -> list[PedagogicalObservation]:
-        created_at_date = cast(PedagogicalObservationModel.created_at, SA_Date)
+        created_at_date = utc_date_of(PedagogicalObservationModel.created_at)
         stmt = select(PedagogicalObservationModel).where(
             PedagogicalObservationModel.student_id == student_id,
             created_at_date >= start_date,
             created_at_date <= end_date,
         )
-        stmt = filter_as_of(stmt, created_at_date)
+        stmt = filter_as_of_timestamp(stmt, PedagogicalObservationModel.created_at)
         models = self._session.execute(stmt).scalars().all()
         return [
             PedagogicalObservation(
@@ -113,15 +123,11 @@ class SqlAlchemyPedagogicalObservationRepository:
         of at least one `FollowUp` citing it (RF-22, AD-8)."""
         if not ids:
             return []
-        created_at_date = cast(PedagogicalObservationModel.created_at, SA_Date)
         stmt = select(PedagogicalObservationModel).where(PedagogicalObservationModel.id.in_(ids))
-        stmt = filter_as_of(stmt, created_at_date)
+        stmt = filter_as_of_timestamp(stmt, PedagogicalObservationModel.created_at)
         models = self._session.execute(stmt).scalars().all()
 
-        restricted_ids = self._restricted_ids(ids)
-        visible_ids = (
-            self._visible_to_user_ids(ids, requesting_user_id) if restricted_ids else set()
-        )
+        restricted_ids, visible_ids = self._visibility(ids, requesting_user_id)
 
         return [
             PedagogicalObservation(
@@ -139,35 +145,33 @@ class SqlAlchemyPedagogicalObservationRepository:
             for model in models
         ]
 
-    def _restricted_ids(self, ids: list[uuid.UUID]) -> set[uuid.UUID]:
-        """Every id in `ids` cited (via `TrajectoryChangeSource`) by a
-        `TrajectoryChange` that has at least one real `FollowUpEvidence` row
-        — i.e. actually cited as evidence of some `FollowUp` (RF-22)."""
-        stmt = (
-            select(TrajectoryChangeSourceModel.source_id)
-            .distinct()
-            .join(
-                FollowUpEvidenceModel,
-                FollowUpEvidenceModel.trajectory_change_id
-                == TrajectoryChangeSourceModel.trajectory_change_id,
-            )
-            .where(
-                TrajectoryChangeSourceModel.source_type == SourceType.PEDAGOGICAL_OBSERVATION,
-                TrajectoryChangeSourceModel.source_id.in_(ids),
-            )
-        )
-        return set(self._session.execute(stmt).scalars().all())
-
-    def _visible_to_user_ids(
+    def _visibility(
         self, ids: list[uuid.UUID], requesting_user_id: uuid.UUID
-    ) -> set[uuid.UUID]:
-        """Subset of `_restricted_ids(ids)` where `requesting_user_id` is the
+    ) -> tuple[set[uuid.UUID], set[uuid.UUID]]:
+        """`(restricted_ids, visible_ids)` in one round trip.
+
+        `restricted_ids`: every id in `ids` cited (via
+        `TrajectoryChangeSource`) by a `TrajectoryChange` that has at least
+        one real `FollowUpEvidence` row — i.e. actually cited as evidence of
+        some `FollowUp` (RF-22).
+
+        `visible_ids`: the subset of those where `requesting_user_id` is the
         `responsible_user_id` of at least one citing `FollowUp` — a
-        restricted observation cited by several `FollowUp`s is visible to
-        any of their responsible users, never only one (AD-8)."""
+        restricted observation cited by several `FollowUp`s is visible to any
+        of their responsible users, never only one (AD-8). That is exactly
+        `bool_or(responsible_user_id = :requesting_user_id)` over the same
+        grouped rows.
+
+        This used to be two near-identical queries (`_restricted_ids` then
+        `_visible_to_user_ids`), differing only by the extra join to
+        `follow_ups` and the `responsible_user_id` predicate. The join to
+        `follow_ups` is lossless here — `FollowUpEvidence.follow_up_id` is a
+        `NOT NULL` FK — so grouping once answers both questions and drops one
+        round trip per evidence resolution.
+        """
+        visible = func.bool_or(FollowUpModel.responsible_user_id == requesting_user_id)
         stmt = (
-            select(TrajectoryChangeSourceModel.source_id)
-            .distinct()
+            select(TrajectoryChangeSourceModel.source_id, visible)
             .join(
                 FollowUpEvidenceModel,
                 FollowUpEvidenceModel.trajectory_change_id
@@ -177,7 +181,13 @@ class SqlAlchemyPedagogicalObservationRepository:
             .where(
                 TrajectoryChangeSourceModel.source_type == SourceType.PEDAGOGICAL_OBSERVATION,
                 TrajectoryChangeSourceModel.source_id.in_(ids),
-                FollowUpModel.responsible_user_id == requesting_user_id,
             )
+            .group_by(TrajectoryChangeSourceModel.source_id)
         )
-        return set(self._session.execute(stmt).scalars().all())
+        restricted_ids: set[uuid.UUID] = set()
+        visible_ids: set[uuid.UUID] = set()
+        for source_id, is_visible in self._session.execute(stmt).all():
+            restricted_ids.add(source_id)
+            if is_visible:
+                visible_ids.add(source_id)
+        return restricted_ids, visible_ids
