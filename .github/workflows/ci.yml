@@ -1,0 +1,120 @@
+# Gate automatizado de regressão: roda as duas suítes em todo PR e em todo
+# push para master. Existe para que "nada parou de funcionar" seja uma
+# verificação, e não uma promessa — e para fechar o item de retro da epic 3
+# (merge-before-done gate), aberto desde 2026-10-13.
+#
+# `backend/openapi.json` e `frontend/src/api/schema.d.ts` são gerados, não
+# versionados (.gitignore). O job `backend` exporta o OpenAPI do app real e
+# o publica como artifact; o job `frontend` o consome e regenera os tipos.
+# Com isso o CI também detecta drift de contrato entre API e frontend: se um
+# router mudar sem o frontend acompanhar, o `tsc` quebra aqui.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# Um PR que recebe vários pushes seguidos cancela as execuções anteriores em
+# vez de enfileirá-las.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest + migrations)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sinaliza
+          POSTGRES_PASSWORD: sinaliza
+          POSTGRES_DB: sinaliza_test
+        # 5433 no host espelha backend/.env.example, então o mesmo
+        # TEST_DATABASE_URL vale no CI e na máquina do desenvolvedor.
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U sinaliza"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://sinaliza:sinaliza@localhost:5433/sinaliza_test
+      DATABASE_URL: postgresql+psycopg://sinaliza:sinaliza@localhost:5433/sinaliza_test
+      JWT_SECRET: ci-only-secret-do-not-use-in-prod
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      # --frozen falha se uv.lock estiver dessincronizado do pyproject.toml,
+      # em vez de resolver dependências diferentes das que a imagem usa.
+      - name: Instalar dependências
+        run: uv sync --frozen
+
+      - name: pytest
+        run: uv run pytest -q
+
+      - name: Exportar OpenAPI
+        run: uv run python -m app.export_openapi
+
+      - name: Publicar OpenAPI para o job de frontend
+        uses: actions/upload-artifact@v5
+        with:
+          name: openapi
+          path: backend/openapi.json
+          retention-days: 1
+          if-no-files-found: error
+
+  frontend:
+    name: Frontend (tsc + vitest)
+    runs-on: ubuntu-latest
+    # Depende do backend porque consome o openapi.json que ele exporta.
+    needs: backend
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Baixar OpenAPI do job de backend
+        uses: actions/download-artifact@v6
+        with:
+          name: openapi
+          path: backend
+
+      # `npm ci` (e não `install`) para respeitar o package-lock.json.
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar tipos da API
+        run: npm run generate:api-types
+
+      - name: tsc --noEmit
+        run: npx tsc --noEmit
+
+      - name: vitest
+        run: npm test
