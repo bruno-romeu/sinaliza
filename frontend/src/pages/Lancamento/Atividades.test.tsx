@@ -33,7 +33,12 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
       STORAGE_KEY,
       JSON.stringify({
         token: 'fake-token',
-        user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'COORDENACAO_PEDAGOGICA' },
+        user: {
+          id: 'u1',
+          name: 'Test User',
+          email: 'test@example.com',
+          role: 'COORDENACAO_PEDAGOGICA',
+        },
       }),
     )
 
@@ -43,7 +48,9 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
       const url = typeof input === 'string' ? input : input.toString()
 
       if (url === '/api/classrooms') {
-        return jsonResponse([{ id: 'classroom-1', name: 'Turma Teste', academic_year: 2026 }])
+        return jsonResponse([
+          { id: 'classroom-1', name: 'Turma Teste', academic_year: 2026 },
+        ])
       }
       if (url === '/api/academic-periods') {
         return jsonResponse([
@@ -59,7 +66,10 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
       if (url === '/api/classrooms/classroom-1/students') {
         return jsonResponse([{ id: 'student-1', name: 'Estudante Teste' }])
       }
-      if (url === '/api/classrooms/classroom-1/assignments' && init?.method !== 'POST') {
+      if (
+        url === '/api/classrooms/classroom-1/assignments' &&
+        init?.method !== 'POST'
+      ) {
         assignmentsListCallCount += 1
         if (assignmentsListCallCount === 1) {
           return jsonResponse([])
@@ -100,7 +110,9 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
           201,
         )
       }
-      throw new Error(`Unexpected fetch call in test: ${url} ${init?.method ?? 'GET'}`)
+      throw new Error(
+        `Unexpected fetch call in test: ${url} ${init?.method ?? 'GET'}`,
+      )
     })
     vi.stubGlobal('fetch', fetchMock)
   })
@@ -113,30 +125,47 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
     renderAtividades()
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Turma Teste' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Turma Teste' }),
+      ).toBeInTheDocument()
     })
-    fireEvent.change(screen.getByLabelText('Turma'), { target: { value: 'classroom-1' } })
+    fireEvent.change(screen.getByLabelText('Turma'), {
+      target: { value: 'classroom-1' },
+    })
 
     await waitFor(() => {
       expect(screen.getByLabelText('Disciplina')).toBeInTheDocument()
     })
 
-    fireEvent.change(screen.getByLabelText('Disciplina'), { target: { value: 'Matemática' } })
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: '3º Bimestre' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Disciplina'), {
+      target: { value: 'Matemática' },
     })
-    fireEvent.change(screen.getByLabelText('Período letivo'), { target: { value: 'period-1' } })
-    fireEvent.change(screen.getByLabelText('Data de entrega'), { target: { value: '2026-09-30' } })
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: '3º Bimestre' }),
+      ).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByLabelText('Período letivo'), {
+      target: { value: 'period-1' },
+    })
+    fireEvent.change(screen.getByLabelText('Data de entrega'), {
+      target: { value: '2026-09-30' },
+    })
 
-    const submitButton = screen.getByRole('button', { name: 'Cadastrar atividade' })
-    expect(submitButton).not.toBeDisabled()
+    const submitButton = screen.getByRole('button', {
+      name: 'Cadastrar atividade',
+    })
+    expect(submitButton).toBeEnabled()
     fireEvent.click(submitButton)
 
     await screen.findByText('Atividade cadastrada.')
 
     const assignmentsCall = fetchMock.mock.calls.find(([input, init]) => {
       const url = typeof input === 'string' ? input : String(input)
-      return url === '/api/assignments' && (init as RequestInit | undefined)?.method === 'POST'
+      return (
+        url === '/api/assignments' &&
+        (init as RequestInit | undefined)?.method === 'POST'
+      )
     })
     expect(assignmentsCall).toBeDefined()
     const [, init] = assignmentsCall as [RequestInfo | URL, RequestInit]
@@ -149,7 +178,9 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
 
     // The newly cadastrada atividade appears in the atividade selector.
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Matemática · prazo 30/09/2026' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Matemática · prazo 30/09/2026' }),
+      ).toBeInTheDocument()
     })
   })
 
@@ -161,22 +192,32 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
     renderAtividades()
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Turma Teste' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Turma Teste' }),
+      ).toBeInTheDocument()
     })
-    fireEvent.change(screen.getByLabelText('Turma'), { target: { value: 'classroom-1' } })
+    fireEvent.change(screen.getByLabelText('Turma'), {
+      target: { value: 'classroom-1' },
+    })
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Matemática · prazo 30/09/2026' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Matemática · prazo 30/09/2026' }),
+      ).toBeInTheDocument()
     })
-    fireEvent.change(screen.getByLabelText('Atividade'), { target: { value: 'assignment-1' } })
-    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-09-30' } })
+    fireEvent.change(screen.getByLabelText('Atividade'), {
+      target: { value: 'assignment-1' },
+    })
+    fireEvent.change(screen.getByLabelText('Data'), {
+      target: { value: '2026-09-30' },
+    })
 
     await screen.findByText('Estudante Teste')
 
     fireEvent.click(screen.getByLabelText('Parcial'))
 
     const saveButton = screen.getByRole('button', { name: 'Salvar' })
-    expect(saveButton).not.toBeDisabled()
+    expect(saveButton).toBeEnabled()
     fireEvent.click(saveButton)
 
     await screen.findByText('Registro salvo.')
@@ -184,7 +225,8 @@ describe('Atividades — cadastro de atividade e registro de status de entrega (
     const submissionCall = fetchMock.mock.calls.find(([input, init]) => {
       const url = typeof input === 'string' ? input : String(input)
       return (
-        url === '/api/assignment-submissions' && (init as RequestInit | undefined)?.method === 'POST'
+        url === '/api/assignment-submissions' &&
+        (init as RequestInit | undefined)?.method === 'POST'
       )
     })
     expect(submissionCall).toBeDefined()

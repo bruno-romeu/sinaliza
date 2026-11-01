@@ -45,7 +45,9 @@ function applyPreference(preference: ThemePreference) {
  * — and would otherwise have to wrap every page-level test render.
  */
 export function useTheme(): { preference: ThemePreference; cycle: () => void } {
-  const [preference, setPreference] = useState<ThemePreference>(() => readStoredPreference())
+  const [preference, setPreference] = useState<ThemePreference>(() =>
+    readStoredPreference(),
+  )
 
   const cycle = useCallback(() => {
     setPreference((current) => {

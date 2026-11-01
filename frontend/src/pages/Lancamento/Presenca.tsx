@@ -9,7 +9,14 @@ import {
   type Classroom,
   type Student,
 } from '../../api/client'
-import { Button, ChoiceGroup, RosterRow, Section, SelectField, TextField } from '../../components/ui'
+import {
+  Button,
+  ChoiceGroup,
+  RosterRow,
+  Section,
+  SelectField,
+  TextField,
+} from '../../components/ui'
 import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 type AttendanceStatusValue = AttendanceCreateRequest['status']
@@ -62,7 +69,9 @@ export function Presenca() {
     if (!token) return
     listClassrooms(token)
       .then(setClassrooms)
-      .catch(() => setClassroomsError('Não foi possível carregar as turmas agora.'))
+      .catch(() =>
+        setClassroomsError('Não foi possível carregar as turmas agora.'),
+      )
   }, [token])
 
   useEffect(() => {
@@ -82,7 +91,12 @@ export function Presenca() {
           Object.fromEntries(
             fetched.map((student) => [
               student.id,
-              { status: 'PRESENT', saving: false, message: null, isError: false } as RowState,
+              {
+                status: 'PRESENT',
+                saving: false,
+                message: null,
+                isError: false,
+              } as RowState,
             ]),
           ),
         )
@@ -101,7 +115,10 @@ export function Presenca() {
   }, [token, selectedClassroomId, date])
 
   function updateRow(studentId: string, patch: Partial<RowState>) {
-    setRowStates((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }))
+    setRowStates((prev) => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], ...patch },
+    }))
   }
 
   async function handleSave(studentId: string) {
@@ -119,11 +136,17 @@ export function Presenca() {
         status: row.status,
       })
       if (selectedClassroomIdRef.current !== classroomIdAtSaveStart) return
-      updateRow(studentId, { saving: false, message: 'Registro salvo.', isError: false })
+      updateRow(studentId, {
+        saving: false,
+        message: 'Registro salvo.',
+        isError: false,
+      })
     } catch (caught) {
       if (selectedClassroomIdRef.current !== classroomIdAtSaveStart) return
       const message =
-        caught instanceof ApiError ? caught.message : 'Não foi possível salvar o registro agora.'
+        caught instanceof ApiError
+          ? caught.message
+          : 'Não foi possível salvar o registro agora.'
       updateRow(studentId, { saving: false, message, isError: true })
     }
   }
@@ -148,13 +171,29 @@ export function Presenca() {
               </option>
             ))}
           </SelectField>
-          <TextField label="Data" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+          <TextField
+            label="Data"
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
         </>
       }
     >
       <Section id="lancamento-alunos" title="Estudantes">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <p className="sz-muted">Todos começam como "Presente". Ajuste quem faltou e salve linha por linha.</p>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <p className="sz-muted">
+            Todos começam como "Presente". Ajuste quem faltou e salve linha por
+            linha.
+          </p>
           {students.length > 0 && (
             <Button
               variant="quiet"
@@ -164,7 +203,12 @@ export function Presenca() {
                   Object.fromEntries(
                     Object.entries(prev).map(([id, row]) => [
                       id,
-                      row.saving ? row : { ...row, status: 'PRESENT' as AttendanceStatusValue },
+                      row.saving
+                        ? row
+                        : {
+                            ...row,
+                            status: 'PRESENT' as AttendanceStatusValue,
+                          },
                     ]),
                   ),
                 )
@@ -187,7 +231,13 @@ export function Presenca() {
                 key={student.id}
                 student={student}
                 rowState={rowStates[student.id]}
-                onStatusChange={(status) => updateRow(student.id, { status, message: null, isError: false })}
+                onStatusChange={(status) =>
+                  updateRow(student.id, {
+                    status,
+                    message: null,
+                    isError: false,
+                  })
+                }
                 onSave={() => handleSave(student.id)}
               />
             ))}

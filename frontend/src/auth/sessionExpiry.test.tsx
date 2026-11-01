@@ -72,7 +72,12 @@ describe('Session expiry on 401 invalid_token (spec-1-1 I/O Matrix)', () => {
   it('clears the stored session and redirects to /login when a protected call returns 401 invalid_token', async () => {
     fetchMock = vi.fn(async () =>
       jsonResponse(
-        { error: { code: 'invalid_token', message: 'Credenciais inválidas ou expiradas.' } },
+        {
+          error: {
+            code: 'invalid_token',
+            message: 'Credenciais inválidas ou expiradas.',
+          },
+        },
         401,
       ),
     )
@@ -92,7 +97,12 @@ describe('Session expiry on 401 invalid_token (spec-1-1 I/O Matrix)', () => {
   it('keeps the session when a protected call fails with a non-401 error', async () => {
     fetchMock = vi.fn(async () =>
       jsonResponse(
-        { error: { code: 'student_not_enrolled', message: 'Estudante não matriculado.' } },
+        {
+          error: {
+            code: 'student_not_enrolled',
+            message: 'Estudante não matriculado.',
+          },
+        },
         422,
       ),
     )
@@ -113,13 +123,20 @@ describe('Session expiry on 401 invalid_token (spec-1-1 I/O Matrix)', () => {
     // in the app, so the handler must not fire.
     fetchMock = vi.fn(async () =>
       jsonResponse(
-        { error: { code: 'invalid_credentials', message: 'Login ou senha inválidos.' } },
+        {
+          error: {
+            code: 'invalid_credentials',
+            message: 'Login ou senha inválidos.',
+          },
+        },
         401,
       ),
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    renderProtected(() => login({ email: 'coordenacao@sinaliza.dev', password: 'errada' }))
+    renderProtected(() =>
+      login({ email: 'coordenacao@sinaliza.dev', password: 'errada' }),
+    )
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalled()

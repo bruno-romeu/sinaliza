@@ -8,7 +8,15 @@ function classes(variant: Variant, className?: string) {
   return ['sz-btn', `sz-btn-${variant}`, className].filter(Boolean).join(' ')
 }
 
-function Content({ icon, iconRight, children }: { icon?: IconName; iconRight?: IconName; children: ReactNode }) {
+function Content({
+  icon,
+  iconRight,
+  children,
+}: {
+  icon?: IconName
+  iconRight?: IconName
+  children: ReactNode
+}) {
   return (
     <>
       {icon && <Icon name={icon} size={18} />}

@@ -1,11 +1,30 @@
 import type { ReactNode } from 'react'
-import { NavTabs, Notice, Page, ScreenHead, Section, type RosterStatus } from '../../components/ui'
+import {
+  NavTabs,
+  Notice,
+  Page,
+  ScreenHead,
+  Section,
+  type RosterStatus,
+} from '../../components/ui'
 
 const TIPOS = [
-  { to: '/lancamento/presenca', label: 'Presença', indicator: 'frequencia' as const },
+  {
+    to: '/lancamento/presenca',
+    label: 'Presença',
+    indicator: 'frequencia' as const,
+  },
   { to: '/lancamento/notas', label: 'Notas', indicator: 'notas' as const },
-  { to: '/lancamento/atividades', label: 'Atividades', indicator: 'entregas' as const },
-  { to: '/lancamento/observacoes', label: 'Observações', indicator: 'observacao' as const },
+  {
+    to: '/lancamento/atividades',
+    label: 'Atividades',
+    indicator: 'entregas' as const,
+  },
+  {
+    to: '/lancamento/observacoes',
+    label: 'Observações',
+    indicator: 'observacao' as const,
+  },
 ]
 
 /**
@@ -36,7 +55,11 @@ export function LancamentoLayout({
       <div style={{ marginTop: 32 }}>
         <NavTabs label="Tipo de registro" items={TIPOS} />
       </div>
-      <Section id="lancamento-contexto" title={contextTitle} style={{ marginTop: 24 }}>
+      <Section
+        id="lancamento-contexto"
+        title={contextTitle}
+        style={{ marginTop: 24 }}
+      >
         <div className="sz-ctx">{context}</div>
         {contextError && <Notice tone="attention">{contextError}</Notice>}
       </Section>
@@ -46,7 +69,11 @@ export function LancamentoLayout({
 }
 
 /** Estado de linha das telas de Lançamento traduzido para o `RosterRow`. */
-export function rowStatus(row: { saving: boolean; message: string | null; isError: boolean }): RosterStatus {
+export function rowStatus(row: {
+  saving: boolean
+  message: string | null
+  isError: boolean
+}): RosterStatus {
   if (row.saving) return 'saving'
   if (row.isError) return 'error'
   if (row.message) return 'saved'
@@ -65,9 +92,11 @@ export function RosterStates({
   error: string | null
   empty: boolean
 }) {
-  if (!selected) return <p className="sz-muted">Selecione a turma para ver os estudantes.</p>
+  if (!selected)
+    return <p className="sz-muted">Selecione a turma para ver os estudantes.</p>
   if (loading) return <p className="sz-muted">Carregando estudantes…</p>
   if (error) return <Notice tone="attention">{error}</Notice>
-  if (empty) return <p className="sz-muted">Nenhum estudante matriculado nesta turma.</p>
+  if (empty)
+    return <p className="sz-muted">Nenhum estudante matriculado nesta turma.</p>
   return null
 }
