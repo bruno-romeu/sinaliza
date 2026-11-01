@@ -26,7 +26,11 @@ export function ScreenHead({
   children?: ReactNode
 }) {
   return (
-    <div className={['sz-screen-head', center ? 'is-center' : null].filter(Boolean).join(' ')}>
+    <div
+      className={['sz-screen-head', center ? 'is-center' : null]
+        .filter(Boolean)
+        .join(' ')}
+    >
       {kicker && <p className="sz-kick">{kicker}</p>}
       <h1 className={display ? 'sz-display' : 'sz-title'}>{title}</h1>
       {children}
@@ -57,7 +61,10 @@ export function Section({
 /** Blocos de carregamento: skeleton, nunca spinner de tela cheia. */
 export function Skeleton({ heights }: { heights: number[] }) {
   return (
-    <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div
+      aria-hidden="true"
+      style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+    >
       {heights.map((height, index) => (
         <div key={index} className="sz-skeleton" style={{ height }} />
       ))}

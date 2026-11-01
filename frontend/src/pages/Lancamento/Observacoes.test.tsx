@@ -32,14 +32,21 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
       STORAGE_KEY,
       JSON.stringify({
         token: 'fake-token',
-        user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'COORDENACAO_PEDAGOGICA' },
+        user: {
+          id: 'u1',
+          name: 'Test User',
+          email: 'test@example.com',
+          role: 'COORDENACAO_PEDAGOGICA',
+        },
       }),
     )
 
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url === '/api/classrooms') {
-        return jsonResponse([{ id: 'classroom-1', name: 'Turma Teste', academic_year: 2026 }])
+        return jsonResponse([
+          { id: 'classroom-1', name: 'Turma Teste', academic_year: 2026 },
+        ])
       }
       if (url === '/api/classrooms/classroom-1/students') {
         return jsonResponse([{ id: 'student-1', name: 'Estudante Teste' }])
@@ -70,9 +77,13 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
     renderObservacoes()
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Turma Teste' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Turma Teste' }),
+      ).toBeInTheDocument()
     })
-    fireEvent.change(screen.getByLabelText('Turma'), { target: { value: 'classroom-1' } })
+    fireEvent.change(screen.getByLabelText('Turma'), {
+      target: { value: 'classroom-1' },
+    })
 
     await screen.findByText('Estudante Teste')
 
@@ -84,8 +95,10 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
     fireEvent.change(observacaoTextarea, { target: { value: '   ' } })
     expect(saveButton).toBeDisabled()
 
-    fireEvent.change(observacaoTextarea, { target: { value: 'Participou bem da aula.' } })
-    expect(saveButton).not.toBeDisabled()
+    fireEvent.change(observacaoTextarea, {
+      target: { value: 'Participou bem da aula.' },
+    })
+    expect(saveButton).toBeEnabled()
 
     // No request sent while blank/whitespace-only (spec I/O Matrix, "Blank
     // text (UI gate)").
@@ -100,9 +113,13 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
     renderObservacoes()
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Turma Teste' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Turma Teste' }),
+      ).toBeInTheDocument()
     })
-    fireEvent.change(screen.getByLabelText('Turma'), { target: { value: 'classroom-1' } })
+    fireEvent.change(screen.getByLabelText('Turma'), {
+      target: { value: 'classroom-1' },
+    })
 
     await screen.findByText('Estudante Teste')
 
@@ -137,16 +154,22 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
     renderObservacoes()
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Turma Teste' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('option', { name: 'Turma Teste' }),
+      ).toBeInTheDocument()
     })
-    fireEvent.change(screen.getByLabelText('Turma'), { target: { value: 'classroom-1' } })
+    fireEvent.change(screen.getByLabelText('Turma'), {
+      target: { value: 'classroom-1' },
+    })
     await screen.findByText('Estudante Teste')
 
     fireEvent.click(screen.getByRole('button', { name: 'Escrever observação' }))
     fireEvent.change(screen.getByLabelText(/Observação sobre/), {
       target: { value: 'Faltou às duas últimas avaliações.' },
     })
-    const concern = screen.getByRole('checkbox', { name: /Registra uma preocupação/ })
+    const concern = screen.getByRole('checkbox', {
+      name: /Registra uma preocupação/,
+    })
     expect(concern).not.toBeChecked()
     fireEvent.click(concern)
     fireEvent.click(screen.getByRole('button', { name: 'Salvar observação' }))
@@ -157,6 +180,8 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
       return url === '/api/pedagogical-observations'
     })
     const [, init] = observationCall as [RequestInfo | URL, RequestInit]
-    expect(JSON.parse(String(init?.body))).toMatchObject({ registers_concern: true })
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      registers_concern: true,
+    })
   })
 })

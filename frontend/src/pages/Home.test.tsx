@@ -32,7 +32,12 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
       STORAGE_KEY,
       JSON.stringify({
         token: 'fake-token',
-        user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'COORDENACAO_PEDAGOGICA' },
+        user: {
+          id: 'u1',
+          name: 'Test User',
+          email: 'test@example.com',
+          role: 'COORDENACAO_PEDAGOGICA',
+        },
       }),
     )
   })
@@ -58,7 +63,8 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
               student_id: 'student-2',
               student_name: 'João Souza',
               type: 'COMBINED_DETERIORATION',
-              description: 'Queda de frequência e queda de notas no 3º Bimestre',
+              description:
+                'Queda de frequência e queda de notas no 3º Bimestre',
               detected_at: '2026-09-20T00:00:00Z',
             },
           ],
@@ -74,13 +80,17 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     await screen.findByText('Maria Silva')
     expect(screen.getByText('João Souza')).toBeInTheDocument()
 
-    const links = screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/estudantes/'))
+    const links = screen
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href')?.startsWith('/estudantes/'))
     expect(links[0]).toHaveAttribute('href', '/estudantes/student-1')
     expect(links[1]).toHaveAttribute('href', '/estudantes/student-2')
   })
 
   it('shows the explicit empty-state message when there are no recent changes', async () => {
-    fetchMock = vi.fn(async () => jsonResponse({ recent_changes: [], in_progress_follow_ups: [] }))
+    fetchMock = vi.fn(async () =>
+      jsonResponse({ recent_changes: [], in_progress_follow_ups: [] }),
+    )
     vi.stubGlobal('fetch', fetchMock)
 
     renderHome()
@@ -89,13 +99,17 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
   })
 
   it('shows a factual error message with a retry action on load failure', async () => {
-    fetchMock = vi.fn(async () => jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500))
+    fetchMock = vi.fn(async () =>
+      jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500),
+    )
     vi.stubGlobal('fetch', fetchMock)
 
     renderHome()
 
     await screen.findByText('Não foi possível carregar os dados agora.')
-    expect(screen.getByRole('button', { name: 'Tentar novamente' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Tentar novamente' }),
+    ).toBeInTheDocument()
   })
 
   it('searches by name/turma and announces the result count via aria-live', async () => {
@@ -106,7 +120,13 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
       }
       if (url.startsWith('/api/home/search')) {
         return jsonResponse({
-          results: [{ id: 'student-3', name: 'Ana Pereira', classroom_name: '7º Ano A' }],
+          results: [
+            {
+              id: 'student-3',
+              name: 'Ana Pereira',
+              classroom_name: '7º Ano A',
+            },
+          ],
           count: 1,
           total: 1,
           page: 1,
@@ -120,9 +140,12 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     renderHome()
     await screen.findByText('Nenhuma mudança a revisar hoje.')
 
-    fireEvent.change(screen.getByLabelText('Buscar estudante por nome ou turma'), {
-      target: { value: 'Ana' },
-    })
+    fireEvent.change(
+      screen.getByLabelText('Buscar estudante por nome ou turma'),
+      {
+        target: { value: 'Ana' },
+      },
+    )
 
     await screen.findByText('Ana Pereira')
     expect(screen.getByText('1 estudante encontrado')).toBeInTheDocument()
@@ -139,7 +162,10 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
         return jsonResponse({ recent_changes: [], in_progress_follow_ups: [] })
       }
       if (url.startsWith('/api/home/search')) {
-        return jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500)
+        return jsonResponse(
+          { error: { code: 'server_error', message: 'boom' } },
+          500,
+        )
       }
       throw new Error(`Unexpected fetch call in test: ${url}`)
     })
@@ -148,9 +174,12 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     renderHome()
     await screen.findByText('Nenhuma mudança a revisar hoje.')
 
-    fireEvent.change(screen.getByLabelText('Buscar estudante por nome ou turma'), {
-      target: { value: 'Ana' },
-    })
+    fireEvent.change(
+      screen.getByLabelText('Buscar estudante por nome ou turma'),
+      {
+        target: { value: 'Ana' },
+      },
+    )
 
     await screen.findByText('boom')
   })
@@ -164,7 +193,13 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
       if (url.startsWith('/api/home/search')) {
         if (url.includes('page=2')) {
           return jsonResponse({
-            results: [{ id: 'student-4', name: 'Bruna Lima', classroom_name: '7º Ano B' }],
+            results: [
+              {
+                id: 'student-4',
+                name: 'Bruna Lima',
+                classroom_name: '7º Ano B',
+              },
+            ],
             count: 1,
             total: 2,
             page: 2,
@@ -172,7 +207,13 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
           })
         }
         return jsonResponse({
-          results: [{ id: 'student-3', name: 'Ana Pereira', classroom_name: '7º Ano A' }],
+          results: [
+            {
+              id: 'student-3',
+              name: 'Ana Pereira',
+              classroom_name: '7º Ano A',
+            },
+          ],
           count: 1,
           total: 2,
           page: 1,
@@ -186,18 +227,25 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     renderHome()
     await screen.findByText('Nenhuma mudança a revisar hoje.')
 
-    fireEvent.change(screen.getByLabelText('Buscar estudante por nome ou turma'), {
-      target: { value: 'a' },
-    })
+    fireEvent.change(
+      screen.getByLabelText('Buscar estudante por nome ou turma'),
+      {
+        target: { value: 'a' },
+      },
+    )
 
     await screen.findByText('Ana Pereira')
-    const loadMore = screen.getByRole('button', { name: 'Ver mais (1 restante)' })
+    const loadMore = screen.getByRole('button', {
+      name: 'Ver mais (1 restante)',
+    })
 
     fireEvent.click(loadMore)
 
     await screen.findByText('Bruna Lima')
     expect(screen.getByText('Ana Pereira')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Ver mais/ })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /Ver mais/ }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows the no-match message, with no suggestions, when search returns nothing', async () => {
@@ -216,9 +264,12 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     renderHome()
     await screen.findByText('Nenhuma mudança a revisar hoje.')
 
-    fireEvent.change(screen.getByLabelText('Buscar estudante por nome ou turma'), {
-      target: { value: 'Inexistente' },
-    })
+    fireEvent.change(
+      screen.getByLabelText('Buscar estudante por nome ou turma'),
+      {
+        target: { value: 'Inexistente' },
+      },
+    )
 
     await screen.findByText('Nenhum estudante encontrado com esse nome/turma.')
   })
@@ -233,7 +284,12 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
       STORAGE_KEY,
       JSON.stringify({
         token: 'fake-token',
-        user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'COORDENACAO_PEDAGOGICA' },
+        user: {
+          id: 'u1',
+          name: 'Test User',
+          email: 'test@example.com',
+          role: 'COORDENACAO_PEDAGOGICA',
+        },
       }),
     )
   })
@@ -247,8 +303,18 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
       jsonResponse({
         recent_changes: [],
         in_progress_follow_ups: [
-          { id: 'fu-1', student_id: 'student-1', student_name: 'Maria Silva', status: 'EM_OBSERVACAO' },
-          { id: 'fu-2', student_id: 'student-2', student_name: 'João Souza', status: 'ACOMPANHAMENTO_ATIVO' },
+          {
+            id: 'fu-1',
+            student_id: 'student-1',
+            student_name: 'Maria Silva',
+            status: 'EM_OBSERVACAO',
+          },
+          {
+            id: 'fu-2',
+            student_id: 'student-2',
+            student_name: 'João Souza',
+            status: 'ACOMPANHAMENTO_ATIVO',
+          },
         ],
       }),
     )
@@ -266,7 +332,9 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
   })
 
   it('shows the neutral empty-state message when there are no active follow-ups', async () => {
-    fetchMock = vi.fn(async () => jsonResponse({ recent_changes: [], in_progress_follow_ups: [] }))
+    fetchMock = vi.fn(async () =>
+      jsonResponse({ recent_changes: [], in_progress_follow_ups: [] }),
+    )
     vi.stubGlobal('fetch', fetchMock)
 
     renderHome()
@@ -281,7 +349,12 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
         return jsonResponse({
           recent_changes: [],
           in_progress_follow_ups: [
-            { id: 'fu-2', student_id: 'student-2', student_name: 'João Souza', status: 'ACOMPANHAMENTO_ATIVO' },
+            {
+              id: 'fu-2',
+              student_id: 'student-2',
+              student_name: 'João Souza',
+              status: 'ACOMPANHAMENTO_ATIVO',
+            },
           ],
           in_progress_follow_ups_total: 2,
           in_progress_follow_ups_page: 2,
@@ -291,7 +364,12 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
       return jsonResponse({
         recent_changes: [],
         in_progress_follow_ups: [
-          { id: 'fu-1', student_id: 'student-1', student_name: 'Maria Silva', status: 'EM_OBSERVACAO' },
+          {
+            id: 'fu-1',
+            student_id: 'student-1',
+            student_name: 'Maria Silva',
+            status: 'EM_OBSERVACAO',
+          },
         ],
         in_progress_follow_ups_total: 2,
         in_progress_follow_ups_page: 1,
@@ -302,13 +380,17 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
 
     renderHome()
     await screen.findByText('Maria Silva')
-    const loadMore = screen.getByRole('button', { name: 'Ver mais (1 restante)' })
+    const loadMore = screen.getByRole('button', {
+      name: 'Ver mais (1 restante)',
+    })
 
     fireEvent.click(loadMore)
 
     await screen.findByText('João Souza')
     expect(screen.getByText('Maria Silva')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Ver mais/ })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /Ver mais/ }),
+    ).not.toBeInTheDocument()
   })
 
   it('keeps the active-follow-ups section visible while search results are showing', async () => {
@@ -318,7 +400,12 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
         return jsonResponse({
           recent_changes: [],
           in_progress_follow_ups: [
-            { id: 'fu-1', student_id: 'student-1', student_name: 'Maria Silva', status: 'EM_OBSERVACAO' },
+            {
+              id: 'fu-1',
+              student_id: 'student-1',
+              student_name: 'Maria Silva',
+              status: 'EM_OBSERVACAO',
+            },
           ],
         })
       }
@@ -332,16 +419,23 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
     renderHome()
     await screen.findByText('Maria Silva')
 
-    fireEvent.change(screen.getByLabelText('Buscar estudante por nome ou turma'), {
-      target: { value: 'Inexistente' },
-    })
+    fireEvent.change(
+      screen.getByLabelText('Buscar estudante por nome ou turma'),
+      {
+        target: { value: 'Inexistente' },
+      },
+    )
 
     await screen.findByText('Nenhum estudante encontrado com esse nome/turma.')
     expect(screen.getByText('Maria Silva')).toBeInTheDocument()
   })
 
   // spec-ui-4: the recent-changes list pages like the other two.
-  const HOME_PAGE = (page: number, items: Array<{ id: string; name: string }>, total: number) => ({
+  const HOME_PAGE = (
+    page: number,
+    items: Array<{ id: string; name: string }>,
+    total: number,
+  ) => ({
     recent_changes: items.map((item) => ({
       student_id: item.id,
       student_name: item.name,
@@ -365,10 +459,14 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
         return jsonResponse(HOME_PAGE(2, [{ id: 's3', name: 'Carla Dias' }], 3))
       }
       return jsonResponse(
-        HOME_PAGE(1, [
-          { id: 's1', name: 'Ana Lima' },
-          { id: 's2', name: 'Bruno Reis' },
-        ], 3),
+        HOME_PAGE(
+          1,
+          [
+            { id: 's1', name: 'Ana Lima' },
+            { id: 's2', name: 'Bruno Reis' },
+          ],
+          3,
+        ),
       )
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -378,11 +476,15 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
     // The total, not the 2 rows loaded so far.
     expect(screen.getByText('3 mudanças')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ver mais (1 restante)' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Ver mais (1 restante)' }),
+    )
 
     await screen.findByText('Carla Dias')
     expect(screen.getByText('Ana Lima')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Ver mais/ })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /Ver mais/ }),
+    ).not.toBeInTheDocument()
     // Asking for page 2 of changes keeps the follow-ups on their first page.
     const secondCall = String(fetchMock.mock.calls[1][0])
     expect(secondCall).toContain('changes_page=2')
@@ -395,24 +497,34 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
       if (url.includes('changes_page=2')) {
         // The list shifted: page 2 now starts with a row already shown.
         return jsonResponse(
-          HOME_PAGE(2, [
-            { id: 's2', name: 'Bruno Reis' },
-            { id: 's3', name: 'Carla Dias' },
-          ], 3),
+          HOME_PAGE(
+            2,
+            [
+              { id: 's2', name: 'Bruno Reis' },
+              { id: 's3', name: 'Carla Dias' },
+            ],
+            3,
+          ),
         )
       }
       return jsonResponse(
-        HOME_PAGE(1, [
-          { id: 's1', name: 'Ana Lima' },
-          { id: 's2', name: 'Bruno Reis' },
-        ], 3),
+        HOME_PAGE(
+          1,
+          [
+            { id: 's1', name: 'Ana Lima' },
+            { id: 's2', name: 'Bruno Reis' },
+          ],
+          3,
+        ),
       )
     })
     vi.stubGlobal('fetch', fetchMock)
 
     renderHome()
     await screen.findByText('Ana Lima')
-    fireEvent.click(screen.getByRole('button', { name: 'Ver mais (1 restante)' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Ver mais (1 restante)' }),
+    )
     await screen.findByText('Carla Dias')
 
     expect(screen.getAllByText('Bruno Reis')).toHaveLength(1)
@@ -422,23 +534,36 @@ describe('Home — acompanhamentos em andamento (Story 4.5)', () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url.includes('changes_page=2')) {
-        return jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500)
+        return jsonResponse(
+          { error: { code: 'server_error', message: 'boom' } },
+          500,
+        )
       }
       return jsonResponse(
-        HOME_PAGE(1, [
-          { id: 's1', name: 'Ana Lima' },
-          { id: 's2', name: 'Bruno Reis' },
-        ], 3),
+        HOME_PAGE(
+          1,
+          [
+            { id: 's1', name: 'Ana Lima' },
+            { id: 's2', name: 'Bruno Reis' },
+          ],
+          3,
+        ),
       )
     })
     vi.stubGlobal('fetch', fetchMock)
 
     renderHome()
     await screen.findByText('Ana Lima')
-    fireEvent.click(screen.getByRole('button', { name: 'Ver mais (1 restante)' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Ver mais (1 restante)' }),
+    )
 
-    await screen.findByText('Não foi possível carregar mais agora. Tente de novo.')
+    await screen.findByText(
+      'Não foi possível carregar mais agora. Tente de novo.',
+    )
     expect(screen.getByText('Bruno Reis')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Ver mais (1 restante)' })).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'Ver mais (1 restante)' }),
+    ).toBeEnabled()
   })
 })

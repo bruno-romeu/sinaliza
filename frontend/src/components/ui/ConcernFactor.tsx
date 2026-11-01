@@ -28,7 +28,9 @@ export function ConcernFactor({
       >
         <span className="sz-concern-ring" aria-hidden="true" />
         <span>
-          <span className="sz-concern-k">Fator preocupante · ainda não confirmado</span>
+          <span className="sz-concern-k">
+            Fator preocupante · ainda não confirmado
+          </span>
           <span className="sz-concern-t">{title}</span>
         </span>
         <Icon name="chevron" size={20} className="sz-concern-chev" />

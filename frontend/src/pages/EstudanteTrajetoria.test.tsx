@@ -18,9 +18,15 @@ function renderPage(studentId = 'student-1') {
     <MemoryRouter initialEntries={[`/estudantes/${studentId}`]}>
       <AuthProvider>
         <Routes>
-          <Route path="/estudantes/:studentId" element={<EstudanteTrajetoria />} />
+          <Route
+            path="/estudantes/:studentId"
+            element={<EstudanteTrajetoria />}
+          />
           <Route path="/home" element={<div>Home mock</div>} />
-          <Route path="/acompanhamentos/:followUpId" element={<div>Acompanhamento mock</div>} />
+          <Route
+            path="/acompanhamentos/:followUpId"
+            element={<div>Acompanhamento mock</div>}
+          />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -41,7 +47,12 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
       STORAGE_KEY,
       JSON.stringify({
         token: 'fake-token',
-        user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'COORDENACAO_PEDAGOGICA' },
+        user: {
+          id: 'u1',
+          name: 'Test User',
+          email: 'test@example.com',
+          role: 'COORDENACAO_PEDAGOGICA',
+        },
       }),
     )
   })
@@ -64,8 +75,16 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
           description: 'Queda de frequência no 3º Bimestre',
         },
         evidence: [
-          { source_type: 'ATTENDANCE_RECORD', description: 'Falta não justificada em 20/09/2026', date: '2026-09-20' },
-          { source_type: 'PEDAGOGICAL_OBSERVATION', description: 'Registro pedagógico em 01/09/2026: Observação.', date: '2026-09-01' },
+          {
+            source_type: 'ATTENDANCE_RECORD',
+            description: 'Falta não justificada em 20/09/2026',
+            date: '2026-09-20',
+          },
+          {
+            source_type: 'PEDAGOGICAL_OBSERVATION',
+            description: 'Registro pedagógico em 01/09/2026: Observação.',
+            date: '2026-09-01',
+          },
         ],
         concerning_factor: null,
         observations: [],
@@ -76,12 +95,18 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     renderPage()
 
     await screen.findByText('Queda de frequência')
-    expect(screen.getByRole('img', { name: /Gráfico de frequência por bimestre/ })).toBeInTheDocument()
-    expect(screen.getByText('Falta não justificada em 20/09/2026', { exact: false })).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: /Gráfico de frequência por bimestre/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Falta não justificada em 20/09/2026', { exact: false }),
+    ).toBeInTheDocument()
     expect(screen.queryByText('Fator preocupante')).not.toBeInTheDocument()
     expect(screen.queryByText('Trajetória estável')).not.toBeInTheDocument()
 
-    const changePointButton = screen.getByRole('button', { name: /Mudança detectada em 3º Bimestre/ })
+    const changePointButton = screen.getByRole('button', {
+      name: /Mudança detectada em 3º Bimestre/,
+    })
     expect(changePointButton).toBeInTheDocument()
 
     // WCAG 1.1.1 text-table alternative to the SVG chart.
@@ -89,7 +114,9 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     expect(table).toHaveAccessibleName(/Gráfico de frequência por bimestre/)
     const rows = screen.getAllByRole('row')
     expect(rows).toHaveLength(SERIES.length + 1) // header + one per series point
-    expect(screen.getByRole('cell', { name: '3º Bimestre' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('cell', { name: '3º Bimestre' }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: '50%' })).toBeInTheDocument()
   })
 
@@ -117,7 +144,9 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     fetchMock = vi.fn(async () =>
       jsonResponse({
         chart_indicator: 'attendance_rate',
-        series: [{ period_id: 'p1', period_label: '3º Bimestre', value: '0.9000' }],
+        series: [
+          { period_id: 'p1', period_label: '3º Bimestre', value: '0.9000' },
+        ],
         habitual_range: null,
         trajectory_change: null,
         evidence: [],
@@ -132,8 +161,12 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     await screen.findByText('Trajetória estável')
     // No fabricated range -> the chart renders the trend line with no band,
     // never a crash (code review finding, Story 3.4).
-    expect(container.querySelector('svg[role="img"] .band')).not.toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /Gráfico de frequência por bimestre/ })).toBeInTheDocument()
+    expect(
+      container.querySelector('svg[role="img"] .band'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: /Gráfico de frequência por bimestre/ }),
+    ).toBeInTheDocument()
   })
 
   it('shows the concerning-factor header closed by default, expandable via keyboard, with no evidence list', async () => {
@@ -155,36 +188,56 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     renderPage()
 
-    const toggle = await screen.findByRole('button', { name: /Fator preocupante/ })
+    const toggle = await screen.findByRole('button', {
+      name: /Fator preocupante/,
+    })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('Sinal isolado: queda de frequência no 3º Bimestre')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Sinal isolado: queda de frequência no 3º Bimestre'),
+    ).not.toBeInTheDocument()
 
     fireEvent.click(toggle)
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByText('Sinal isolado: queda de frequência no 3º Bimestre')).toBeInTheDocument()
+    expect(
+      screen.getByText('Sinal isolado: queda de frequência no 3º Bimestre'),
+    ).toBeInTheDocument()
   })
 
   it('shows a factual not-found message with a link back to Home for an unknown student', async () => {
     fetchMock = vi.fn(async () =>
-      jsonResponse({ error: { code: 'student_not_found', message: 'Estudante não encontrado.' } }, 404),
+      jsonResponse(
+        {
+          error: {
+            code: 'student_not_found',
+            message: 'Estudante não encontrado.',
+          },
+        },
+        404,
+      ),
     )
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage('unknown-student')
 
     await screen.findByText('Estudante não encontrado.')
-    expect(screen.getByRole('link', { name: 'Voltar para a Home' })).toHaveAttribute('href', '/home')
+    expect(
+      screen.getByRole('link', { name: 'Voltar para a Home' }),
+    ).toHaveAttribute('href', '/home')
   })
 
   it('shows a factual error message with retry on load failure', async () => {
-    fetchMock = vi.fn(async () => jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500))
+    fetchMock = vi.fn(async () =>
+      jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500),
+    )
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
 
     await screen.findByText('Não foi possível carregar os dados agora.')
-    expect(screen.getByRole('button', { name: 'Tentar novamente' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Tentar novamente' }),
+    ).toBeInTheDocument()
   })
 
   // --- "Abrir acompanhamento" button (Story 4.1, replaces Story 3.4's stub) ---------
@@ -201,7 +254,11 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
       description: 'Queda de frequência no 3º Bimestre',
     },
     evidence: [
-      { source_type: 'ATTENDANCE_RECORD', description: 'Falta não justificada em 20/09/2026', date: '2026-09-20' },
+      {
+        source_type: 'ATTENDANCE_RECORD',
+        description: 'Falta não justificada em 20/09/2026',
+        date: '2026-09-20',
+      },
     ],
     concerning_factor: null,
     observations: [],
@@ -240,7 +297,9 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     renderPage()
 
-    const button = await screen.findByRole('button', { name: 'Abrir acompanhamento' })
+    const button = await screen.findByRole('button', {
+      name: 'Abrir acompanhamento',
+    })
     expect(button).toBeEnabled()
 
     fireEvent.click(button)
@@ -248,12 +307,16 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     await screen.findByText('Acompanhamento mock')
     const postCall = fetchMock.mock.calls.find(
       ([input, init]) =>
-        (typeof input === 'string' ? input : input.toString()).includes('/follow-ups') &&
-        init?.method === 'POST',
+        (typeof input === 'string' ? input : input.toString()).includes(
+          '/follow-ups',
+        ) && init?.method === 'POST',
     )
     expect(postCall).toBeDefined()
     const body = JSON.parse((postCall![1] as RequestInit).body as string)
-    expect(body).toEqual({ student_id: 'student-1', trajectory_change_id: 'change-1' })
+    expect(body).toEqual({
+      student_id: 'student-1',
+      trajectory_change_id: 'change-1',
+    })
   })
 
   it('shows an inline error and stays on the page when opening the follow-up fails', async () => {
@@ -264,7 +327,12 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
       }
       if (url.includes('/follow-ups') && init?.method === 'POST') {
         return jsonResponse(
-          { error: { code: 'trajectory_change_not_found', message: 'Mudança de trajetória não encontrada.' } },
+          {
+            error: {
+              code: 'trajectory_change_not_found',
+              message: 'Mudança de trajetória não encontrada.',
+            },
+          },
           404,
         )
       }
@@ -274,7 +342,9 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     renderPage()
 
-    const button = await screen.findByRole('button', { name: 'Abrir acompanhamento' })
+    const button = await screen.findByRole('button', {
+      name: 'Abrir acompanhamento',
+    })
     fireEvent.click(button)
 
     await screen.findByText('Não foi possível abrir o acompanhamento agora.')
@@ -287,7 +357,9 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     renderPage()
 
-    const button = await screen.findByRole('button', { name: 'Abrir acompanhamento' })
+    const button = await screen.findByRole('button', {
+      name: 'Abrir acompanhamento',
+    })
     expect(button).toBeDisabled()
   })
 
@@ -297,7 +369,11 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     fetchMock = vi.fn(async () =>
       jsonResponse({
         ...DETAIL_CALM,
-        student: { id: 'student-1', name: 'Ana Beatriz Souza', classroom_name: 'Turma Aurora' },
+        student: {
+          id: 'student-1',
+          name: 'Ana Beatriz Souza',
+          classroom_name: 'Turma Aurora',
+        },
         open_follow_up_id: null,
       }),
     )
@@ -305,7 +381,12 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     renderPage()
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Ana Beatriz Souza' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Ana Beatriz Souza',
+      }),
+    ).toBeInTheDocument()
     expect(screen.getByText('Turma Aurora')).toBeInTheDocument()
   })
 
@@ -313,7 +394,11 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     fetchMock = vi.fn(async () =>
       jsonResponse({
         ...DETAIL_WITH_CHANGE,
-        student: { id: 'student-1', name: 'Ana Beatriz Souza', classroom_name: 'Turma Aurora' },
+        student: {
+          id: 'student-1',
+          name: 'Ana Beatriz Souza',
+          classroom_name: 'Turma Aurora',
+        },
         open_follow_up_id: 'follow-up-1',
       }),
     )
@@ -323,6 +408,8 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     const link = await screen.findByRole('link', { name: 'Ver acompanhamento' })
     expect(link).toHaveAttribute('href', '/acompanhamentos/follow-up-1')
-    expect(screen.queryByRole('button', { name: 'Abrir acompanhamento' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Abrir acompanhamento' }),
+    ).not.toBeInTheDocument()
   })
 })

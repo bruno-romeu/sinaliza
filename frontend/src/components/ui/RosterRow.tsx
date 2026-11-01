@@ -63,11 +63,23 @@ export function RosterRow({
       <p
         id={messageId}
         className={shown ? 'sz-rrow-msg' : 'sz-sr'}
-        data-tone={status === 'error' ? 'error' : status === 'saved' ? 'saved' : undefined}
+        data-tone={
+          status === 'error'
+            ? 'error'
+            : status === 'saved'
+              ? 'saved'
+              : undefined
+        }
         role={status === 'error' ? 'alert' : 'status'}
         aria-live="polite"
       >
-        {shown && <Icon name={status === 'error' ? 'info' : 'check'} size={15} strokeWidth={2.4} />}
+        {shown && (
+          <Icon
+            name={status === 'error' ? 'info' : 'check'}
+            size={15}
+            strokeWidth={2.4}
+          />
+        )}
         {shown}
       </p>
     </div>

@@ -27,10 +27,16 @@ import {
 type ChartIndicator = TrajectoryDetail['chart_indicator']
 type ChangeType = NonNullable<TrajectoryDetail['trajectory_change']>['type']
 
-const CHART_INDICATOR: Record<ChartIndicator, { label: string; indicator: Indicator }> = {
+const CHART_INDICATOR: Record<
+  ChartIndicator,
+  { label: string; indicator: Indicator }
+> = {
   attendance_rate: { label: 'Frequência', indicator: 'frequencia' },
   grade_average: { label: 'Nota média', indicator: 'notas' },
-  missing_assignments_count: { label: 'Atividades pendentes', indicator: 'entregas' },
+  missing_assignments_count: {
+    label: 'Atividades pendentes',
+    indicator: 'entregas',
+  },
 }
 
 const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
@@ -40,7 +46,10 @@ const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
   COMBINED_DETERIORATION: 'Mudança combinada',
 }
 
-const CONCERNING_KIND_LABEL: Record<NonNullable<TrajectoryDetail['concerning_factor']>['kind'], string> = {
+const CONCERNING_KIND_LABEL: Record<
+  NonNullable<TrajectoryDetail['concerning_factor']>['kind'],
+  string
+> = {
   ATTENDANCE: 'Sinal isolado em frequência',
   GRADE: 'Sinal isolado em notas',
   ASSIGNMENTS: 'Sinal isolado em atividades',
@@ -51,7 +60,10 @@ function toNumber(value: string | null): number | null {
   return value === null ? null : Number(value)
 }
 
-function formatIndicatorValue(indicator: ChartIndicator, value: number | null): string {
+function formatIndicatorValue(
+  indicator: ChartIndicator,
+  value: number | null,
+): string {
   if (value === null) return 'Sem dado'
   if (indicator === 'attendance_rate') return `${Math.round(value * 100)}%`
   if (indicator === 'grade_average') return value.toFixed(1).replace('.', ',')
@@ -104,14 +116,19 @@ export function EstudanteTrajetoria() {
     }
   }, [token, studentId, loadAttempt])
 
-  const student = loadState.status === 'loaded' ? loadState.detail.student : null
+  const student =
+    loadState.status === 'loaded' ? loadState.detail.student : null
 
   return (
     <Page>
       {/* spec-ui-1: the detail endpoint carries the student's name and
           classroom; the generic title stays as the fallback while loading. */}
       <ScreenHead
-        kicker={student?.classroom_name ? `Coordenação pedagógica › ${student.classroom_name}` : 'Coordenação pedagógica'}
+        kicker={
+          student?.classroom_name
+            ? `Coordenação pedagógica › ${student.classroom_name}`
+            : 'Coordenação pedagógica'
+        }
         title={student ? student.name : 'Trajetória do estudante'}
         display
         center
@@ -135,7 +152,10 @@ export function EstudanteTrajetoria() {
       )}
 
       {loadState.status === 'not_found' && (
-        <div className="sz-section" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div
+          className="sz-section"
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
           <p className="sz-muted">Estudante não encontrado.</p>
           <div>
             <ButtonLink to="/home" variant="secondary" icon="voltar">
@@ -150,7 +170,10 @@ export function EstudanteTrajetoria() {
           <Notice
             tone="attention"
             action={
-              <Button variant="secondary" onClick={() => setLoadAttempt((n) => n + 1)}>
+              <Button
+                variant="secondary"
+                onClick={() => setLoadAttempt((n) => n + 1)}
+              >
                 Tentar novamente
               </Button>
             }
@@ -161,13 +184,18 @@ export function EstudanteTrajetoria() {
       )}
 
       {loadState.status === 'loaded' && studentId && (
-        <TrajectoryDetailContent detail={loadState.detail} studentId={studentId} token={token} />
+        <TrajectoryDetailContent
+          detail={loadState.detail}
+          studentId={studentId}
+          token={token}
+        />
       )}
     </Page>
   )
 }
 
-type OpenFollowUpState = { status: 'idle' } | { status: 'submitting' } | { status: 'error' }
+type OpenFollowUpState =
+  { status: 'idle' } | { status: 'submitting' } | { status: 'error' }
 
 function TrajectoryDetailContent({
   detail,
@@ -183,7 +211,9 @@ function TrajectoryDetailContent({
   const hasChange = change !== null
   const hasConcerningFactor = detail.concerning_factor !== null
   const isCalm = !hasChange && !hasConcerningFactor
-  const [openFollowUpState, setOpenFollowUpState] = useState<OpenFollowUpState>({ status: 'idle' })
+  const [openFollowUpState, setOpenFollowUpState] = useState<OpenFollowUpState>(
+    { status: 'idle' },
+  )
 
   const chart = CHART_INDICATOR[detail.chart_indicator]
   const points = detail.series.map((point) => ({
@@ -191,10 +221,16 @@ function TrajectoryDetailContent({
     label: point.period_label,
     value: toNumber(point.value),
   }))
-  const changeIndex = change ? detail.series.findIndex((point) => point.period_id === change.period_id) : -1
-  const changePeriodLabel = changeIndex >= 0 ? detail.series[changeIndex].period_label : undefined
+  const changeIndex = change
+    ? detail.series.findIndex((point) => point.period_id === change.period_id)
+    : -1
+  const changePeriodLabel =
+    changeIndex >= 0 ? detail.series[changeIndex].period_label : undefined
   const band = detail.habitual_range
-    ? { low: Number(detail.habitual_range.low), high: Number(detail.habitual_range.high) }
+    ? {
+        low: Number(detail.habitual_range.low),
+        high: Number(detail.habitual_range.high),
+      }
     : null
   const summary =
     `Gráfico de ${chart.label.toLowerCase()} por bimestre` +
@@ -204,7 +240,10 @@ function TrajectoryDetailContent({
   function handleOpenFollowUp() {
     if (!token || change === null) return
     setOpenFollowUpState({ status: 'submitting' })
-    openFollowUp(token, { student_id: studentId, trajectory_change_id: change.id })
+    openFollowUp(token, {
+      student_id: studentId,
+      trajectory_change_id: change.id,
+    })
       .then((followUp) => {
         navigate(`/acompanhamentos/${followUp.id}`)
       })
@@ -230,10 +269,16 @@ function TrajectoryDetailContent({
           indicatorLabel={chart.label}
           points={points}
           band={band}
-          bandLabel={detail.student ? `Faixa habitual de ${detail.student.name.split(' ')[0]}` : 'Faixa habitual do estudante'}
+          bandLabel={
+            detail.student
+              ? `Faixa habitual de ${detail.student.name.split(' ')[0]}`
+              : 'Faixa habitual do estudante'
+          }
           changeIndex={changeIndex >= 0 ? changeIndex : undefined}
           changeDescription={change?.description}
-          format={(value) => formatIndicatorValue(detail.chart_indicator, value)}
+          format={(value) =>
+            formatIndicatorValue(detail.chart_indicator, value)
+          }
           onChangePoint={goToEvidence}
         />
       </Section>
@@ -244,7 +289,11 @@ function TrajectoryDetailContent({
         <Section id="trajetoria-mudanca" title="O que mudou">
           <EvidenceCard
             id="evidencia-mudanca"
-            kicker={changePeriodLabel ? `Mudança detectada · ${changePeriodLabel}` : 'Mudança detectada'}
+            kicker={
+              changePeriodLabel
+                ? `Mudança detectada · ${changePeriodLabel}`
+                : 'Mudança detectada'
+            }
             title={CHANGE_TYPE_LABEL[change.type]}
             description={change.description}
             evidence={detail.evidence}
@@ -255,9 +304,14 @@ function TrajectoryDetailContent({
       {/* Concerning factor — one isolated signal, closed by default. */}
       {detail.concerning_factor && !hasChange && (
         <Section id="trajetoria-observacao" title="Em observação">
-          <ConcernFactor title={CONCERNING_KIND_LABEL[detail.concerning_factor.kind]}>
+          <ConcernFactor
+            title={CONCERNING_KIND_LABEL[detail.concerning_factor.kind]}
+          >
             <p>{detail.concerning_factor.description}</p>
-            <p>Um único sinal fora da faixa habitual ainda não caracteriza mudança de padrão.</p>
+            <p>
+              Um único sinal fora da faixa habitual ainda não caracteriza
+              mudança de padrão.
+            </p>
           </ConcernFactor>
         </Section>
       )}
@@ -273,7 +327,9 @@ function TrajectoryDetailContent({
 
       <Section id="trajetoria-registros" title="Registros pedagógicos recentes">
         {detail.observations.length === 0 ? (
-          <p className="sz-muted">Nenhum registro pedagógico nos últimos 12 meses.</p>
+          <p className="sz-muted">
+            Nenhum registro pedagógico nos últimos 12 meses.
+          </p>
         ) : (
           <Timeline
             items={detail.observations.map((observation, index) => ({
@@ -283,7 +339,9 @@ function TrajectoryDetailContent({
               indicator: 'observacao' as const,
               // spec-ui-3: say when the team registered a concern; only those
               // observations count as a signal.
-              label: observation.registers_concern ? 'Observação · preocupação registrada' : undefined,
+              label: observation.registers_concern
+                ? 'Observação · preocupação registrada'
+                : undefined,
             }))}
           />
         )}
@@ -292,13 +350,30 @@ function TrajectoryDetailContent({
       {/* Follow-up action — enabled once a change was detected (Story 4.1).
           spec-ui-1: when the user already has an open follow-up for this
           student, link to it instead of offering to open another one. */}
-      <div className="sz-actions" style={{ flexDirection: 'column', alignItems: 'flex-end' }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <ButtonLink to="/lancamento/observacoes" variant="secondary" icon="observacao">
+      <div
+        className="sz-actions"
+        style={{ flexDirection: 'column', alignItems: 'flex-end' }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            gap: 12,
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <ButtonLink
+            to="/lancamento/observacoes"
+            variant="secondary"
+            icon="observacao"
+          >
             Registrar observação
           </ButtonLink>
           {detail.open_follow_up_id ? (
-            <ButtonLink to={`/acompanhamentos/${detail.open_follow_up_id}`} icon="seta">
+            <ButtonLink
+              to={`/acompanhamentos/${detail.open_follow_up_id}`}
+              icon="seta"
+            >
               Ver acompanhamento
             </ButtonLink>
           ) : (
@@ -306,14 +381,22 @@ function TrajectoryDetailContent({
               icon="mais"
               disabled={!hasChange || openFollowUpState.status === 'submitting'}
               onClick={handleOpenFollowUp}
-              title={hasChange ? undefined : 'Acompanhamento vinculado a evidências requer uma mudança detectada.'}
+              title={
+                hasChange
+                  ? undefined
+                  : 'Acompanhamento vinculado a evidências requer uma mudança detectada.'
+              }
             >
-              {openFollowUpState.status === 'submitting' ? 'Abrindo…' : 'Abrir acompanhamento'}
+              {openFollowUpState.status === 'submitting'
+                ? 'Abrindo…'
+                : 'Abrir acompanhamento'}
             </Button>
           )}
         </div>
         {openFollowUpState.status === 'error' && (
-          <Notice tone="attention">Não foi possível abrir o acompanhamento agora.</Notice>
+          <Notice tone="attention">
+            Não foi possível abrir o acompanhamento agora.
+          </Notice>
         )}
       </div>
     </>
