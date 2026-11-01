@@ -1,9 +1,12 @@
 """Implements `AssignmentSubmissionRepositoryPort` on top of SQLAlchemy.
 
-`save` never needs to translate an `IntegrityError` into a domain error —
 `assignment_submissions` carries no UNIQUE constraint (spec Boundaries &
-Constraints) — a corrected/updated status is simply a new row, mirrors
-`SqlAlchemyGradeRepository`'s precedent.
+Constraints) — a corrected/updated status is simply a new row — but its FKs
+(`assignment_id`, `student_id`) can still be violated, so `save` goes through
+`translating_integrity_errors`: the session is rolled back and the violation
+surfaces as a typed `ForeignKeyViolationError` rather than a raw
+`IntegrityError` over a poisoned session, mirroring
+`SqlAlchemyGradeRepository`'s precedent (`repositories/errors.py`).
 
 `list_by_student_and_assignments` (Story 3.1) feeds the "pendente" check in
 `domain/trajectory.py`: it is matched by `assignment_id`, not by its own
@@ -22,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.domain.assignment_submission import AssignmentSubmission, AssignmentSubmissionStatus
 from app.infrastructure.db.models import AssignmentSubmissionModel
 from app.infrastructure.repositories.base import filter_as_of
+from app.infrastructure.repositories.errors import translating_integrity_errors
 
 
 class SqlAlchemyAssignmentSubmissionRepository:
@@ -42,7 +46,8 @@ class SqlAlchemyAssignmentSubmissionRepository:
             date=date_,
         )
         self._session.add(model)
-        self._session.commit()
+        with translating_integrity_errors(self._session):
+            self._session.commit()
         self._session.refresh(model)
         return AssignmentSubmission(
             id=model.id,

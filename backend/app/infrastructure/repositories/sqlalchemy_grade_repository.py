@@ -1,11 +1,14 @@
 """Implements `GradeRepositoryPort` on top of SQLAlchemy.
 
-Unlike `SqlAlchemyAttendanceRepository`, `save` never needs to translate an
-`IntegrityError` into a domain error — `grades` carries no UNIQUE constraint
-(spec Boundaries & Constraints), so the only constraint that can fail at
-write time is the `ck_grade_value_range` CHECK, which is already unreachable
-here because `RegisterGradeService`'s caller validates `value` via Pydantic
-before this is ever called (spec I/O Matrix).
+`grades` carries no UNIQUE constraint (spec Boundaries & Constraints), and
+the `ck_grade_value_range` CHECK is already unreachable here because
+`RegisterGradeService`'s caller validates `value` via Pydantic before this is
+ever called (spec I/O Matrix) — but the FKs (`student_id`, `classroom_id`,
+`period_id`) remain violable, so `save` goes through
+`translating_integrity_errors` like every other write path here: the session
+is rolled back and the violation surfaces as a typed
+`ForeignKeyViolationError`/`CheckViolationError` instead of a raw
+`IntegrityError` over a poisoned session (`repositories/errors.py`).
 
 `list_by_student_and_periods` (Story 3.1) reads grades for the current and
 previous `AcademicPeriod` at once (`grade_average`/`grade_trend` follow
@@ -24,6 +27,7 @@ from sqlalchemy.orm import Session
 from app.domain.grade import Grade
 from app.infrastructure.db.models import GradeModel
 from app.infrastructure.repositories.base import filter_as_of
+from app.infrastructure.repositories.errors import translating_integrity_errors
 
 
 def _to_domain(model: GradeModel) -> Grade:
@@ -60,7 +64,8 @@ class SqlAlchemyGradeRepository:
             value=value,
         )
         self._session.add(model)
-        self._session.commit()
+        with translating_integrity_errors(self._session):
+            self._session.commit()
         self._session.refresh(model)
         return _to_domain(model)
 
