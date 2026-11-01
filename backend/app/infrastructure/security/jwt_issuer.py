@@ -42,7 +42,19 @@ class JwtTokenIssuer:
 
     def decode(self, token: str) -> dict[str, Any]:
         try:
-            claims = jwt.decode(token, self._settings.jwt_secret, algorithms=[self.algorithm])
+            claims = jwt.decode(
+                token,
+                self._settings.jwt_secret,
+                algorithms=[self.algorithm],
+                # `algorithms` já fecha a confusão de algoritmo (`alg: none`,
+                # ou RS256 verificado com a chave pública tratada como
+                # segredo HMAC). `require` fecha o resto: sem ele, PyJWT só
+                # valida `exp` *se* o token trouxer um — um token sem `exp`
+                # seria aceito para sempre. `issue()` sempre emite `exp`, e
+                # isto torna a expiração um invariante verificado na entrada
+                # em vez de uma propriedade acidental de quem emite.
+                options={"require": ["exp"]},
+            )
         except jwt.PyJWTError as exc:
             raise InvalidTokenError(str(exc)) from exc
 
