@@ -48,6 +48,12 @@ jobs:
       TEST_DATABASE_URL: postgresql+psycopg://sinaliza:sinaliza@localhost:5433/sinaliza_test
       DATABASE_URL: postgresql+psycopg://sinaliza:sinaliza@localhost:5433/sinaliza_test
       JWT_SECRET: ci-only-secret-do-not-use-in-prod
+      # Exigido por tests/test_synthetic_{generation,facts_generation,observations}.py,
+      # que resolvem o usuario autor das observacoes via get_settings().dev_seed_email
+      # e falham explicitamente se ele nao existir. Localmente vem de backend/.env,
+      # que e gitignored — por isso precisa ser declarado aqui. Identidade ficticia,
+      # mesmo valor de backend/.env.example (AGENTS.md: nunca dado real).
+      DEV_SEED_EMAIL: coordenacao@sinaliza.dev
 
     defaults:
       run:
