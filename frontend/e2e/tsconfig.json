@@ -1,0 +1,19 @@
+{
+  // tsconfig próprio para os testes end-to-end.
+  //
+  // O tsconfig da raiz cobre apenas `src` e, via `vite.config.ts`, carrega os
+  // globais do Vitest (`describe`/`it`/`expect` do Vitest). Os globais do
+  // Playwright (`test`/`expect` de `@playwright/test`) têm assinaturas
+  // diferentes e não podem compartilhar o mesmo escopo de tipos sem
+  // ambiguidade. Por isso `e2e/` fica fora do `include` da raiz e ganha este
+  // arquivo. Consequência prática: `npm run build` (`tsc && vite build`) não
+  // tenta compilar os testes de e2e, que não fazem parte do bundle.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true
+  },
+  // A config do Playwright também só faz sentido sob estes tipos (usa
+  // `process.env` e a API de `@playwright/test`), então é checada aqui.
+  "include": [".", "../playwright.config.ts"]
+}
