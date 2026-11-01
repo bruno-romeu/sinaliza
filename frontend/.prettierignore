@@ -1,0 +1,12 @@
+node_modules
+dist
+package-lock.json
+
+# Gerado por `npm run generate:api-types` a partir de backend/openapi.json
+# (gitignored). Formatá-lo seria desfeito na próxima regeneração.
+src/api/schema.d.ts
+
+# Gerado a partir do design system Sinaliza (tokens.json), conforme o
+# cabeçalho do próprio arquivo. Mesma razão: formatar aqui seria desfeito
+# na próxima regeneração do design system.
+src/styles/tokens.css
