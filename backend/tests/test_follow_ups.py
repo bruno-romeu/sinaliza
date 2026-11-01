@@ -704,12 +704,12 @@ def test_get_follow_up_groups_evidence_by_trajectory_change_ordered_by_detected_
     assert groups[0]["evidence"] == []
 
 
-# --- Story 4.4: RF-22 visibility scoping of PedagogicalObservation evidence --------------
-
-_RESTRICTED_TEXT = (
-    "Texto do registro pedagógico restrito ao responsável pelo "
-    "acompanhamento que o cita como evidência."
-)
+# --- RF-22: escopo de visibilidade do acompanhamento e de suas evidências ----------------
+#
+# A redação de texto da `PedagogicalObservation` em si (Story 4.4) continua
+# coberta por `test_trajectory_detail.py`, que exercita `resolve_evidence`
+# pela rota de trajetória — a rota que de fato entrega evidência a quem não é
+# responsável por nenhum acompanhamento.
 
 
 def _create_user(db_session: Session, email: str) -> UserModel:
@@ -726,7 +726,7 @@ def _create_user(db_session: Session, email: str) -> UserModel:
     return user
 
 
-def test_get_follow_up_redacts_observation_text_for_non_responsible_user(
+def test_get_follow_up_is_scoped_to_the_responsible_user(
     client: TestClient,
     seeded_user,
     seeded_classroom: ClassroomModel,
@@ -734,6 +734,16 @@ def test_get_follow_up_redacts_observation_text_for_non_responsible_user(
     seeded_academic_period: AcademicPeriodModel,
     db_session: Session,
 ) -> None:
+    """RF-22 na leitura: `GET /follow-ups/{id}` responde 200 ao responsável e
+    403 a qualquer outro usuário autenticado — a mesma fronteira que
+    `POST .../actions` e `PATCH .../status` já aplicam.
+
+    Antes disso, a redação de texto da Story 4.4 protegia apenas a observação
+    pedagógica citada como evidência: nome do estudante, status e o texto
+    integral de toda `FollowUpAction` continuavam legíveis para quem
+    soubesse/adivinhasse o id. O corpo do 403 é o envelope, e nada do
+    acompanhamento aparece nele.
+    """
     headers = _auth_headers(client, seeded_user)
     change = _detect_attendance_drop_change(
         client, headers, db_session, seeded_enrolled_student, seeded_classroom, seeded_user.id
@@ -749,31 +759,57 @@ def test_get_follow_up_redacts_observation_text_for_non_responsible_user(
     assert open_response.status_code == 201
     follow_up_id = open_response.json()["id"]
 
+    # Uma ação registrada, para provar que o texto dela também não vaza.
+    action_text = "Contato com a família agendado para sexta."
+    assert (
+        client.post(
+            f"/follow-ups/{follow_up_id}/actions",
+            json={"description": action_text},
+            headers=headers,
+        ).status_code
+        == 201
+    )
+
     other_user = _create_user(db_session, "outra.coordenacao@escola.test")
     other_headers = _auth_headers(client, other_user)
+    assert other_user.id != seeded_user.id
 
-    # Responsible user sees the real observation text.
-    own_detail = client.get(f"/follow-ups/{follow_up_id}", headers=headers).json()
+    # O responsável continua lendo tudo: 200, com a observação sem redação.
+    own_response = client.get(f"/follow-ups/{follow_up_id}", headers=headers)
+    assert own_response.status_code == 200
+    own_detail = own_response.json()
     own_descriptions = "".join(
         item["description"]
         for group in own_detail["trajectory_changes"]
         for item in group["evidence"]
     )
     assert "Observação de teste." in own_descriptions
+    assert [action["description"] for action in own_detail["actions"]] == [action_text]
 
-    # A different authenticated user is redacted.
-    other_detail = client.get(f"/follow-ups/{follow_up_id}", headers=other_headers).json()
-    other_descriptions = [
-        item["description"]
-        for group in other_detail["trajectory_changes"]
-        for item in group["evidence"]
-        if item["source_type"] == "PEDAGOGICAL_OBSERVATION"
-    ]
-    assert other_descriptions
-    for description in other_descriptions:
-        assert "Observação de teste." not in description
-        assert _RESTRICTED_TEXT in description
-    assert other_user.id != seeded_user.id
+    # Qualquer outro usuário autenticado: 403, sem corpo do acompanhamento.
+    other_response = client.get(f"/follow-ups/{follow_up_id}", headers=other_headers)
+    assert other_response.status_code == 403
+    assert other_response.json() == {
+        "error": {
+            "code": "follow_up_access_denied",
+            "message": "Você não tem permissão para ver este acompanhamento.",
+        }
+    }
+    assert seeded_enrolled_student.name not in other_response.text
+    assert action_text not in other_response.text
+
+
+def test_get_follow_up_by_non_responsible_user_on_unknown_id_is_still_404(
+    client: TestClient, seeded_user, db_session: Session
+) -> None:
+    """A checagem de escopo vem depois da de existência, então um id
+    inexistente nunca é distinguível de um id alheio pelo status code."""
+    other_user = _create_user(db_session, "outra.coordenacao.404@escola.test")
+
+    response = client.get(f"/follow-ups/{uuid.uuid4()}", headers=_auth_headers(client, other_user))
+
+    assert response.status_code == 404
+    assert response.json() == FOLLOW_UP_NOT_FOUND_BODY
 
 
 def test_get_follow_up_visible_to_second_responsible_user_citing_same_observation(
