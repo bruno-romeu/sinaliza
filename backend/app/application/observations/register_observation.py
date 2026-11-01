@@ -21,6 +21,7 @@ import uuid
 from datetime import UTC, datetime
 
 from app.application.attendance.ports import ClassroomRepositoryPort, StudentRepositoryPort
+from app.application.integrity import translating_repository_integrity_errors
 from app.application.observations.errors import ClassroomNotFoundError, StudentNotEnrolledError
 from app.application.observations.ports import PedagogicalObservationRepositoryPort
 from app.domain.pedagogical_observation import PedagogicalObservation
@@ -51,10 +52,11 @@ class RegisterObservationService:
         if not self._student_repository.exists_enrollment(student_id, classroom_id):
             raise StudentNotEnrolledError()
 
-        return self._observation_repository.save(
-            student_id=student_id,
-            author_user_id=author_user_id,
-            text=text,
-            created_at=datetime.now(UTC),
-            registers_concern=registers_concern,
-        )
+        with translating_repository_integrity_errors():
+            return self._observation_repository.save(
+                student_id=student_id,
+                author_user_id=author_user_id,
+                text=text,
+                created_at=datetime.now(UTC),
+                registers_concern=registers_concern,
+            )
