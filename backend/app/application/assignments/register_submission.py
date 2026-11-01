@@ -23,6 +23,7 @@ from app.application.assignments.ports import (
     AssignmentSubmissionRepositoryPort,
 )
 from app.application.attendance.ports import StudentRepositoryPort
+from app.application.integrity import translating_repository_integrity_errors
 from app.domain.assignment_submission import AssignmentSubmission, AssignmentSubmissionStatus
 
 
@@ -51,9 +52,10 @@ class RegisterSubmissionService:
         if not self._student_repository.exists_enrollment(student_id, assignment.classroom_id):
             raise StudentNotEnrolledError()
 
-        return self._assignment_submission_repository.save(
-            assignment_id=assignment_id,
-            student_id=student_id,
-            status=status,
-            date_=date_,
-        )
+        with translating_repository_integrity_errors():
+            return self._assignment_submission_repository.save(
+                assignment_id=assignment_id,
+                student_id=student_id,
+                status=status,
+                date_=date_,
+            )

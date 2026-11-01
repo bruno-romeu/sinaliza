@@ -40,6 +40,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 
+from app.application.integrity import translating_repository_integrity_errors
 from app.application.trajectory.errors import StudentNotFoundError
 from app.application.trajectory.ports import (
     AcademicPeriodRepositoryPort,
@@ -315,7 +316,8 @@ class GetStudentTrajectoryService:
                 for observation in current_period_observations
                 if observation.id not in cited_observation_ids
             )
-            persisted_change = self._trajectory_change_repository.upsert(change, sources)
+            with translating_repository_integrity_errors():
+                persisted_change = self._trajectory_change_repository.upsert(change, sources)
             return persisted_change, None
 
         if result.concerning_signal is not None:
