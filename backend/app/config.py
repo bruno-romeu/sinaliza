@@ -37,6 +37,26 @@ class Settings(BaseSettings):
     # `datetime.date`'s range and raise an unhandled `OverflowError`.
     trajectory_window_days: int = Field(default=30, gt=0, le=3650)
 
+    # Rate limiting de `POST /auth/login` (app.presentation.rate_limit) — a
+    # única rota anônima do sistema. Desligável (`RATE_LIMIT_ENABLED=false`)
+    # para diagnóstico/demonstração; os testes do limitador constroem o app
+    # com seus próprios valores em vez de depender do ambiente.
+    rate_limit_enabled: bool = True
+
+    # 10 tentativas por cliente a cada 5 minutos. O número vem do uso real:
+    # há uma única conta semeada, operada por uma pessoa, que erra a senha
+    # poucas vezes — 2/min é folgado para isso e inútil para adivinhação
+    # (120 tentativas/hora contra um espaço de senhas). `gt=0` para falhar
+    # cedo: 0 bloquearia todo login, inclusive o legítimo.
+    rate_limit_login_max_attempts: int = Field(default=10, gt=0)
+    rate_limit_login_window_seconds: int = Field(default=300, gt=0)
+
+    # Quantos proxies confiáveis existem à frente do backend. 1 = o Nginx do
+    # docker-compose. `ge=0` (e não `gt=0`) porque 0 é um valor válido e
+    # significativo: ignorar `X-Forwarded-For` por completo, para um backend
+    # exposto diretamente. Ver `app.presentation.rate_limit.client_key`.
+    rate_limit_trusted_proxy_hops: int = Field(default=1, ge=0)
+
     # Where `python -m app.ml.train` (spec-5-1) writes serialized `Pipeline`
     # artifacts. Offline-only — never read by the web process or FastAPI
     # `Depends` (AD-3); Story 5.2's live-inference loader will read this same
