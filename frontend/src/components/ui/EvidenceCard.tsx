@@ -33,10 +33,16 @@ export function EvidenceCard({
   const titleId = id ? `${id}-title` : undefined
   const [showAll, setShowAll] = useState(false)
   const hidden = evidence.length - EVIDENCE_PREVIEW
-  const shown = showAll || hidden <= 0 ? evidence : evidence.slice(0, EVIDENCE_PREVIEW)
+  const shown =
+    showAll || hidden <= 0 ? evidence : evidence.slice(0, EVIDENCE_PREVIEW)
   const listId = id ? `${id}-sources` : undefined
   return (
-    <article className="sz-card sz-evidence" id={id} aria-labelledby={titleId} tabIndex={id ? -1 : undefined}>
+    <article
+      className="sz-card sz-evidence"
+      id={id}
+      aria-labelledby={titleId}
+      tabIndex={id ? -1 : undefined}
+    >
       <div className="sz-evidence-head">
         <span className="sz-badge sz-badge-attention" aria-hidden="true">
           <Icon name="sinal" size={20} />
@@ -55,10 +61,16 @@ export function EvidenceCard({
             <p className="sz-sources-k">Registros que sustentam esta leitura</p>
             <ul className="sz-sources" id={listId}>
               {shown.map((item, index) => {
-                const info = INDICATORS[INDICATOR_BY_SOURCE_TYPE[item.source_type]]
+                const info =
+                  INDICATORS[INDICATOR_BY_SOURCE_TYPE[item.source_type]]
                 return (
                   <li key={`${item.source_type}-${index}`}>
-                    <Icon name={info.icon} size={18} style={{ color: info.color }} title={info.label} />
+                    <Icon
+                      name={info.icon}
+                      size={18}
+                      style={{ color: info.color }}
+                      title={info.label}
+                    />
                     <span>{item.description}</span>
                   </li>
                 )
@@ -72,8 +84,14 @@ export function EvidenceCard({
                 aria-controls={listId}
                 onClick={() => setShowAll((value) => !value)}
               >
-                <Icon name="chevron" size={18} style={{ transform: showAll ? 'rotate(180deg)' : undefined }} />
-                {showAll ? 'Mostrar menos' : `Ver todos os ${evidence.length} registros`}
+                <Icon
+                  name="chevron"
+                  size={18}
+                  style={{ transform: showAll ? 'rotate(180deg)' : undefined }}
+                />
+                {showAll
+                  ? 'Mostrar menos'
+                  : `Ver todos os ${evidence.length} registros`}
               </button>
             )}
           </>

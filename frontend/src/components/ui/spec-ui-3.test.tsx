@@ -26,13 +26,19 @@ function chart(band: { low: number; high: number } | null) {
 describe('TrajectoryChart (spec-ui-3)', () => {
   it('says "Saiu da faixa" only when the change point is outside the band', () => {
     const { container, rerender } = render(chart({ low: 0.85, high: 0.95 }))
-    expect(container.querySelector('.cp-label')?.textContent).toBe('Saiu da faixa')
+    expect(container.querySelector('.cp-label')?.textContent).toBe(
+      'Saiu da faixa',
+    )
 
     rerender(chart({ low: 0.5, high: 0.95 }))
-    expect(container.querySelector('.cp-label')?.textContent).toBe('Mudança detectada')
+    expect(container.querySelector('.cp-label')?.textContent).toBe(
+      'Mudança detectada',
+    )
 
     rerender(chart(null))
-    expect(container.querySelector('.cp-label')?.textContent).toBe('Mudança detectada')
+    expect(container.querySelector('.cp-label')?.textContent).toBe(
+      'Mudança detectada',
+    )
   })
 })
 
@@ -51,18 +57,25 @@ describe('EvidenceCard (spec-ui-3)', () => {
     )
 
     expect(screen.getAllByRole('listitem')).toHaveLength(5)
-    const toggle = screen.getByRole('button', { name: 'Ver todos os 8 registros' })
+    const toggle = screen.getByRole('button', {
+      name: 'Ver todos os 8 registros',
+    })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
 
     fireEvent.click(toggle)
     expect(screen.getAllByRole('listitem')).toHaveLength(8)
-    expect(screen.getByRole('button', { name: 'Mostrar menos' })).toHaveAttribute('aria-expanded', 'true')
+    expect(
+      screen.getByRole('button', { name: 'Mostrar menos' }),
+    ).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('has no toggle with 5 records or fewer', () => {
     render(
       <MemoryRouter>
-        <EvidenceCard title="Queda de frequência" evidence={evidence.slice(0, 5)} />
+        <EvidenceCard
+          title="Queda de frequência"
+          evidence={evidence.slice(0, 5)}
+        />
       </MemoryRouter>,
     )
 

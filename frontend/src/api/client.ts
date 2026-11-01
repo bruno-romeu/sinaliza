@@ -2,7 +2,8 @@ import type { paths } from './schema'
 
 // Types generated from the backend's OpenAPI schema — never hand-transcribed
 // (Consistency Conventions). Regenerate with `npm run generate:api-types`.
-export type LoginRequest = paths['/auth/login']['post']['requestBody']['content']['application/json']
+export type LoginRequest =
+  paths['/auth/login']['post']['requestBody']['content']['application/json']
 export type LoginResponse =
   paths['/auth/login']['post']['responses'][200]['content']['application/json']
 
@@ -19,7 +20,8 @@ export type AcademicPeriod =
   paths['/academic-periods']['get']['responses'][200]['content']['application/json'][number]
 export type GradeCreateRequest =
   paths['/grades']['post']['requestBody']['content']['application/json']
-export type Grade = paths['/grades']['post']['responses'][201]['content']['application/json']
+export type Grade =
+  paths['/grades']['post']['responses'][201]['content']['application/json']
 
 export type AssignmentCreateRequest =
   paths['/assignments']['post']['requestBody']['content']['application/json']
@@ -35,7 +37,8 @@ export type PedagogicalObservationCreateRequest =
 export type PedagogicalObservation =
   paths['/pedagogical-observations']['post']['responses'][201]['content']['application/json']
 
-export type Home = paths['/home']['get']['responses'][200]['content']['application/json']
+export type Home =
+  paths['/home']['get']['responses'][200]['content']['application/json']
 export type RecentChange = Home['recent_changes'][number]
 export type InProgressFollowUp = Home['in_progress_follow_ups'][number]
 export type StudentSearchResults =
@@ -46,17 +49,23 @@ export type TrajectoryDetail =
   paths['/students/{student_id}/trajectory/detail']['get']['responses'][200]['content']['application/json']
 export type TrajectorySeriesPoint = TrajectoryDetail['series'][number]
 export type HabitualRange = NonNullable<TrajectoryDetail['habitual_range']>
-export type TrajectoryChange = NonNullable<TrajectoryDetail['trajectory_change']>
+export type TrajectoryChange = NonNullable<
+  TrajectoryDetail['trajectory_change']
+>
 export type EvidenceItem = TrajectoryDetail['evidence'][number]
-export type ConcerningFactor = NonNullable<TrajectoryDetail['concerning_factor']>
+export type ConcerningFactor = NonNullable<
+  TrajectoryDetail['concerning_factor']
+>
 export type ObservationItem = TrajectoryDetail['observations'][number]
 
 export type OpenFollowUpRequest =
   paths['/follow-ups']['post']['requestBody']['content']['application/json']
-export type FollowUp = paths['/follow-ups']['post']['responses'][201]['content']['application/json']
+export type FollowUp =
+  paths['/follow-ups']['post']['responses'][201]['content']['application/json']
 export type FollowUpDetail =
   paths['/follow-ups/{follow_up_id}']['get']['responses'][200]['content']['application/json']
-export type TrajectoryChangeEvidenceGroup = FollowUpDetail['trajectory_changes'][number]
+export type TrajectoryChangeEvidenceGroup =
+  FollowUpDetail['trajectory_changes'][number]
 
 export type RegisterFollowUpActionRequest =
   paths['/follow-ups/{follow_up_id}/actions']['post']['requestBody']['content']['application/json']
@@ -101,7 +110,9 @@ type UnauthorizedHandler = () => void
 
 let unauthorizedHandler: UnauthorizedHandler | null = null
 
-export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+export function setUnauthorizedHandler(
+  handler: UnauthorizedHandler | null,
+): void {
   unauthorizedHandler = handler
 }
 
@@ -122,7 +133,13 @@ interface RequestOptions {
   fallbackMessage: string
 }
 
-async function request<T>({ method, path, body, token, fallbackMessage }: RequestOptions): Promise<T> {
+async function request<T>({
+  method,
+  path,
+  body,
+  token,
+  fallbackMessage,
+}: RequestOptions): Promise<T> {
   let response: Response
   try {
     response = await fetch(`${API_BASE}${path}`, {
@@ -136,9 +153,17 @@ async function request<T>({ method, path, body, token, fallbackMessage }: Reques
     })
   } catch (caught) {
     if (caught instanceof DOMException && caught.name === 'TimeoutError') {
-      throw new ApiError(0, 'request_timeout', 'O servidor demorou para responder. Tente novamente.')
+      throw new ApiError(
+        0,
+        'request_timeout',
+        'O servidor demorou para responder. Tente novamente.',
+      )
     }
-    throw new ApiError(0, 'network_error', 'Não foi possível conectar ao servidor.')
+    throw new ApiError(
+      0,
+      'network_error',
+      'Não foi possível conectar ao servidor.',
+    )
   }
 
   if (!response.ok) {
@@ -150,7 +175,11 @@ async function request<T>({ method, path, body, token, fallbackMessage }: Reques
       if (response.status === 401 && errorBody.error.code === 'invalid_token') {
         unauthorizedHandler?.()
       }
-      throw new ApiError(response.status, errorBody.error.code, errorBody.error.message)
+      throw new ApiError(
+        response.status,
+        errorBody.error.code,
+        errorBody.error.message,
+      )
     }
     throw new ApiError(response.status, 'unknown_error', fallbackMessage)
   }
@@ -179,7 +208,10 @@ export async function listClassrooms(token: string): Promise<Classroom[]> {
   })
 }
 
-export async function listEnrolledStudents(token: string, classroomId: string): Promise<Student[]> {
+export async function listEnrolledStudents(
+  token: string,
+  classroomId: string,
+): Promise<Student[]> {
   return request<Student[]>({
     method: 'GET',
     path: `/classrooms/${classroomId}/students`,
@@ -201,7 +233,9 @@ export async function registerAttendance(
   })
 }
 
-export async function listAcademicPeriods(token: string): Promise<AcademicPeriod[]> {
+export async function listAcademicPeriods(
+  token: string,
+): Promise<AcademicPeriod[]> {
   return request<AcademicPeriod[]>({
     method: 'GET',
     path: '/academic-periods',
@@ -210,7 +244,10 @@ export async function listAcademicPeriods(token: string): Promise<AcademicPeriod
   })
 }
 
-export async function registerGrade(token: string, payload: GradeCreateRequest): Promise<Grade> {
+export async function registerGrade(
+  token: string,
+  payload: GradeCreateRequest,
+): Promise<Grade> {
   return request<Grade>({
     method: 'POST',
     path: '/grades',
@@ -312,7 +349,10 @@ export async function registerPedagogicalObservation(
   })
 }
 
-export async function openFollowUp(token: string, payload: OpenFollowUpRequest): Promise<FollowUp> {
+export async function openFollowUp(
+  token: string,
+  payload: OpenFollowUpRequest,
+): Promise<FollowUp> {
   return request<FollowUp>({
     method: 'POST',
     path: '/follow-ups',
@@ -322,7 +362,10 @@ export async function openFollowUp(token: string, payload: OpenFollowUpRequest):
   })
 }
 
-export async function getFollowUp(token: string, followUpId: string): Promise<FollowUpDetail> {
+export async function getFollowUp(
+  token: string,
+  followUpId: string,
+): Promise<FollowUpDetail> {
   return request<FollowUpDetail>({
     method: 'GET',
     path: `/follow-ups/${followUpId}`,

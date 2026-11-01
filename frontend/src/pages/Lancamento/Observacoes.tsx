@@ -8,7 +8,13 @@ import {
   type Classroom,
   type Student,
 } from '../../api/client'
-import { Button, RosterRow, Section, SelectField, TextAreaField } from '../../components/ui'
+import {
+  Button,
+  RosterRow,
+  Section,
+  SelectField,
+  TextAreaField,
+} from '../../components/ui'
 import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 interface RowState {
@@ -52,7 +58,9 @@ export function Observacoes() {
     if (!token) return
     listClassrooms(token)
       .then(setClassrooms)
-      .catch(() => setClassroomsError('Não foi possível carregar as turmas agora.'))
+      .catch(() =>
+        setClassroomsError('Não foi possível carregar as turmas agora.'),
+      )
   }, [token])
 
   useEffect(() => {
@@ -72,7 +80,13 @@ export function Observacoes() {
           Object.fromEntries(
             fetched.map((student) => [
               student.id,
-              { text: '', concern: false, saving: false, message: null, isError: false } as RowState,
+              {
+                text: '',
+                concern: false,
+                saving: false,
+                message: null,
+                isError: false,
+              } as RowState,
             ]),
           ),
         )
@@ -91,7 +105,10 @@ export function Observacoes() {
   }, [token, selectedClassroomId])
 
   function updateRow(studentId: string, patch: Partial<RowState>) {
-    setRowStates((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }))
+    setRowStates((prev) => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], ...patch },
+    }))
   }
 
   async function handleSave(studentId: string) {
@@ -121,7 +138,9 @@ export function Observacoes() {
     } catch (caught) {
       if (selectedClassroomIdRef.current !== classroomIdAtSaveStart) return
       const message =
-        caught instanceof ApiError ? caught.message : 'Não foi possível salvar a observação agora.'
+        caught instanceof ApiError
+          ? caught.message
+          : 'Não foi possível salvar a observação agora.'
       updateRow(studentId, { saving: false, message, isError: true })
     }
   }
@@ -133,7 +152,11 @@ export function Observacoes() {
       contextTitle="Contexto"
       contextError={classroomsError}
       context={
-        <SelectField label="Turma" value={selectedClassroomId} onChange={(event) => setSelectedClassroomId(event.target.value)}>
+        <SelectField
+          label="Turma"
+          value={selectedClassroomId}
+          onChange={(event) => setSelectedClassroomId(event.target.value)}
+        >
           <option value="">Selecione…</option>
           {classrooms.map((classroom) => (
             <option key={classroom.id} value={classroom.id}>
@@ -144,7 +167,9 @@ export function Observacoes() {
       }
     >
       <Section id="lancamento-alunos" title="Estudantes">
-        <p className="sz-muted">Abra a linha do estudante e descreva o que foi observado.</p>
+        <p className="sz-muted">
+          Abra a linha do estudante e descreva o que foi observado.
+        </p>
         <RosterStates
           selected={Boolean(selectedClassroomId)}
           loading={studentsLoading}
@@ -158,8 +183,12 @@ export function Observacoes() {
                 key={student.id}
                 student={student}
                 rowState={rowStates[student.id]}
-                onTextChange={(text) => updateRow(student.id, { text, message: null, isError: false })}
-                onConcernChange={(concern) => updateRow(student.id, { concern })}
+                onTextChange={(text) =>
+                  updateRow(student.id, { text, message: null, isError: false })
+                }
+                onConcernChange={(concern) =>
+                  updateRow(student.id, { concern })
+                }
                 onSave={() => handleSave(student.id)}
               />
             ))}
@@ -171,11 +200,13 @@ export function Observacoes() {
         <div className="sz-guide">
           <div className="sz-guide-ok">
             <b>Escreva</b>
-            “Participou menos das discussões nas últimas duas aulas e não entregou a atividade desta semana.”
+            “Participou menos das discussões nas últimas duas aulas e não
+            entregou a atividade desta semana.”
           </div>
           <div className="sz-guide-no">
             <b>Evite</b>
-            “Está desmotivado.” · “É aluno de risco.” · “Provavelmente vai evadir.”
+            “Está desmotivado.” · “É aluno de risco.” · “Provavelmente vai
+            evadir.”
           </div>
         </div>
       </Section>
@@ -210,7 +241,14 @@ function ObservacaoRow({
         message={rowState.message}
         extra={
           open ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0 8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                padding: '4px 0 8px',
+              }}
+            >
               <TextAreaField
                 label={`Observação sobre ${student.name}`}
                 value={rowState.text}
@@ -227,10 +265,15 @@ function ObservacaoRow({
                 />
                 <span>
                   Registra uma preocupação
-                  <small>Marque quando o registro descreve algo que mudou e pede atenção. Registros de rotina ficam desmarcados.</small>
+                  <small>
+                    Marque quando o registro descreve algo que mudou e pede
+                    atenção. Registros de rotina ficam desmarcados.
+                  </small>
                 </span>
               </label>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}
+              >
                 <Button variant="secondary" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
@@ -244,7 +287,12 @@ function ObservacaoRow({
       >
         {!open && (
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="secondary" icon="observacao" onClick={() => setOpen(true)} aria-describedby={nameId}>
+            <Button
+              variant="secondary"
+              icon="observacao"
+              onClick={() => setOpen(true)}
+              aria-describedby={nameId}
+            >
               {status === 'saved' ? 'Escrever outra' : 'Escrever observação'}
             </Button>
           </div>

@@ -58,14 +58,20 @@ function plural(count: number, singular: string, pluralForm: string) {
 // based, so a row can come back twice if the list changed in between (a
 // follow-up opened, a change recomputed); appending through this keeps each
 // row once.
-function appendUnique<T>(prev: T[] | null, next: T[], key: (item: T) => string): T[] {
+function appendUnique<T>(
+  prev: T[] | null,
+  next: T[],
+  key: (item: T) => string,
+): T[] {
   const seen = new Set((prev ?? []).map(key))
   return [...(prev ?? []), ...next.filter((item) => !seen.has(key(item)))]
 }
 
-const changeKey = (change: RecentChange) => `${change.student_id}|${change.type}|${change.description}`
+const changeKey = (change: RecentChange) =>
+  `${change.student_id}|${change.type}|${change.description}`
 const followUpKey = (followUp: InProgressFollowUp) => followUp.id
-const resultKey = (result: StudentSearchResult) => `${result.id}|${result.classroom_name}`
+const resultKey = (result: StudentSearchResult) =>
+  `${result.id}|${result.classroom_name}`
 
 const LOAD_MORE_ERROR = 'Não foi possível carregar mais agora. Tente de novo.'
 
@@ -84,11 +90,21 @@ function LoadMore({
 }) {
   if (shown >= total && !error) return null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 8,
+        marginTop: 4,
+      }}
+    >
       {error && <Notice tone="attention">{LOAD_MORE_ERROR}</Notice>}
       {shown < total && (
         <Button variant="quiet" onClick={onClick} disabled={loading}>
-          {loading ? 'Carregando…' : `Ver mais (${plural(total - shown, 'restante', 'restantes')})`}
+          {loading
+            ? 'Carregando…'
+            : `Ver mais (${plural(total - shown, 'restante', 'restantes')})`}
         </Button>
       )}
     </div>
@@ -104,12 +120,16 @@ function LoadMore({
 export function Home() {
   const { token } = useAuth()
 
-  const [recentChanges, setRecentChanges] = useState<RecentChange[] | null>(null)
+  const [recentChanges, setRecentChanges] = useState<RecentChange[] | null>(
+    null,
+  )
   const [changesPage, setChangesPage] = useState(1)
   const [changesTotal, setChangesTotal] = useState(0)
   const [loadingMoreChanges, setLoadingMoreChanges] = useState(false)
   const [moreChangesError, setMoreChangesError] = useState(false)
-  const [inProgressFollowUps, setInProgressFollowUps] = useState<InProgressFollowUp[] | null>(null)
+  const [inProgressFollowUps, setInProgressFollowUps] = useState<
+    InProgressFollowUp[] | null
+  >(null)
   const [followUpsPage, setFollowUpsPage] = useState(1)
   const [followUpsTotal, setFollowUpsTotal] = useState(0)
   const [loadingMoreFollowUps, setLoadingMoreFollowUps] = useState(false)
@@ -158,7 +178,9 @@ export function Home() {
     setMoreChangesError(false)
     getHome(token, { changesPage: changesPage + 1 })
       .then((home) => {
-        setRecentChanges((prev) => appendUnique(prev, home.recent_changes, changeKey))
+        setRecentChanges((prev) =>
+          appendUnique(prev, home.recent_changes, changeKey),
+        )
         setChangesPage(home.recent_changes_page)
         setChangesTotal(home.recent_changes_total)
       })
@@ -172,7 +194,9 @@ export function Home() {
     setMoreFollowUpsError(false)
     getHome(token, { followUpsPage: followUpsPage + 1 })
       .then((home) => {
-        setInProgressFollowUps((prev) => appendUnique(prev, home.in_progress_follow_ups, followUpKey))
+        setInProgressFollowUps((prev) =>
+          appendUnique(prev, home.in_progress_follow_ups, followUpKey),
+        )
         setFollowUpsPage(home.in_progress_follow_ups_page)
         setFollowUpsTotal(home.in_progress_follow_ups_total)
       })
@@ -214,7 +238,9 @@ export function Home() {
         .catch((caught) => {
           if (ignore || queryRef.current !== queryAtStart) return
           const message =
-            caught instanceof ApiError ? caught.message : 'Não foi possível buscar estudantes agora.'
+            caught instanceof ApiError
+              ? caught.message
+              : 'Não foi possível buscar estudantes agora.'
           setSearchError(message)
         })
         .finally(() => {
@@ -253,22 +279,35 @@ export function Home() {
   return (
     <Page>
       <ScreenHead kicker="Coordenação pedagógica" title="Home">
-        {recentChanges !== null && inProgressFollowUps !== null && !loadError && (
-          <p className="sz-summary">
-            {changesTotal > 0 ? (
-              <>
-                <b>{plural(changesTotal, 'mudança', 'mudanças')}</b> para revisar
-              </>
-            ) : (
-              'Nada novo para revisar'
-            )}
-            {' · '}
-            <b>{plural(followUpsTotal, 'acompanhamento', 'acompanhamentos')}</b> em andamento
-          </p>
-        )}
+        {recentChanges !== null &&
+          inProgressFollowUps !== null &&
+          !loadError && (
+            <p className="sz-summary">
+              {changesTotal > 0 ? (
+                <>
+                  <b>{plural(changesTotal, 'mudança', 'mudanças')}</b> para
+                  revisar
+                </>
+              ) : (
+                'Nada novo para revisar'
+              )}
+              {' · '}
+              <b>
+                {plural(followUpsTotal, 'acompanhamento', 'acompanhamentos')}
+              </b>{' '}
+              em andamento
+            </p>
+          )}
       </ScreenHead>
 
-      <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div
+        style={{
+          marginTop: 32,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
         <TextField
           label="Buscar estudante por nome ou turma"
           icon="busca"
@@ -291,9 +330,14 @@ export function Home() {
 
           {searchError && <Notice tone="attention">{searchError}</Notice>}
 
-          {!searching && !searchError && results !== null && results.length === 0 && (
-            <p className="sz-muted">Nenhum estudante encontrado com esse nome/turma.</p>
-          )}
+          {!searching &&
+            !searchError &&
+            results !== null &&
+            results.length === 0 && (
+              <p className="sz-muted">
+                Nenhum estudante encontrado com esse nome/turma.
+              </p>
+            )}
 
           {results !== null && results.length > 0 && (
             <>
@@ -301,10 +345,18 @@ export function Home() {
                 {results.map((result) => (
                   <li key={resultKey(result)}>
                     <Link to={`/estudantes/${result.id}`}>
-                      <Icon name="pessoa" size={20} style={{ color: 'var(--ink-muted)' }} />
+                      <Icon
+                        name="pessoa"
+                        size={20}
+                        style={{ color: 'var(--ink-muted)' }}
+                      />
                       <span className="sz-results-name">{result.name}</span>
                       <Tag>{result.classroom_name}</Tag>
-                      <Icon name="chevron-dir" size={20} className="sz-results-chev" />
+                      <Icon
+                        name="chevron-dir"
+                        size={20}
+                        className="sz-results-chev"
+                      />
                     </Link>
                   </li>
                 ))}
@@ -323,13 +375,18 @@ export function Home() {
 
       {!showingSearch && (
         <Section id="home-mudancas" title="Mudanças recentes">
-          {recentChanges === null && !loadError && <Skeleton heights={[72, 72, 72]} />}
+          {recentChanges === null && !loadError && (
+            <Skeleton heights={[72, 72, 72]} />
+          )}
 
           {loadError && (
             <Notice
               tone="attention"
               action={
-                <Button variant="secondary" onClick={() => setLoadAttempt((n) => n + 1)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setLoadAttempt((n) => n + 1)}
+                >
                   Tentar novamente
                 </Button>
               }
@@ -338,11 +395,17 @@ export function Home() {
             </Notice>
           )}
 
-          {recentChanges !== null && !loadError && recentChanges.length === 0 && (
-            <CalmState kicker="Tudo dentro da faixa habitual" title="Nenhuma mudança a revisar hoje.">
-              Os estudantes com registros recentes seguem dentro da própria faixa habitual.
-            </CalmState>
-          )}
+          {recentChanges !== null &&
+            !loadError &&
+            recentChanges.length === 0 && (
+              <CalmState
+                kicker="Tudo dentro da faixa habitual"
+                title="Nenhuma mudança a revisar hoje."
+              >
+                Os estudantes com registros recentes seguem dentro da própria
+                faixa habitual.
+              </CalmState>
+            )}
 
           {recentChanges !== null && !loadError && recentChanges.length > 0 && (
             <ul className="sz-list">
@@ -375,10 +438,14 @@ export function Home() {
           & Constraints, UX-DR18) — the active-follow-ups count stays
           visible even while search results are showing. */}
       <Section id="home-acompanhamentos" title="Acompanhamentos em andamento">
-        {inProgressFollowUps === null && !loadError && <Skeleton heights={[64, 64]} />}
+        {inProgressFollowUps === null && !loadError && (
+          <Skeleton heights={[64, 64]} />
+        )}
 
         {inProgressFollowUps !== null && inProgressFollowUps.length === 0 && (
-          <p className="sz-muted">Nenhum acompanhamento em andamento no momento</p>
+          <p className="sz-muted">
+            Nenhum acompanhamento em andamento no momento
+          </p>
         )}
 
         {inProgressFollowUps !== null && inProgressFollowUps.length > 0 && (
@@ -386,7 +453,11 @@ export function Home() {
             <ul className="sz-list">
               {inProgressFollowUps.map((item) => (
                 <li key={item.id}>
-                  <FollowupCard to={`/acompanhamentos/${item.id}`} name={item.student_name} status={item.status} />
+                  <FollowupCard
+                    to={`/acompanhamentos/${item.id}`}
+                    name={item.student_name}
+                    status={item.status}
+                  />
                 </li>
               ))}
             </ul>

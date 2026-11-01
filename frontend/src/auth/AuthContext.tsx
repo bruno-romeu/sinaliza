@@ -64,12 +64,17 @@ function readStoredSession(): StoredSession | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<StoredSession | null>(() => readStoredSession())
+  const [session, setSession] = useState<StoredSession | null>(() =>
+    readStoredSession(),
+  )
   const [sessionExpired, setSessionExpired] = useState(false)
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await loginRequest({ email, password })
-    const next: StoredSession = { token: response.access_token, user: response.user }
+    const next: StoredSession = {
+      token: response.access_token,
+      user: response.user,
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     setSession(next)
     setSessionExpired(false)

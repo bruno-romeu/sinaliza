@@ -8,7 +8,13 @@ export function Tag({ children }: { children: ReactNode }) {
 }
 
 /** Chip que identifica a fonte de um dado (Frequência, Notas, Entregas, Observação). */
-export function IndicatorTag({ indicator, children }: { indicator: Indicator; children?: ReactNode }) {
+export function IndicatorTag({
+  indicator,
+  children,
+}: {
+  indicator: Indicator
+  children?: ReactNode
+}) {
   const info = INDICATORS[indicator]
   return (
     <span className="sz-tag sz-tag-ind">

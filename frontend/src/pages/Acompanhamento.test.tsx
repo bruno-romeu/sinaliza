@@ -48,9 +48,15 @@ function renderPage(followUpId = 'follow-up-1') {
     <MemoryRouter initialEntries={[`/acompanhamentos/${followUpId}`]}>
       <AuthProvider>
         <Routes>
-          <Route path="/acompanhamentos/:followUpId" element={<Acompanhamento />} />
+          <Route
+            path="/acompanhamentos/:followUpId"
+            element={<Acompanhamento />}
+          />
           <Route path="/home" element={<div>Home mock</div>} />
-          <Route path="/estudantes/:studentId" element={<div>Trajetória mock</div>} />
+          <Route
+            path="/estudantes/:studentId"
+            element={<div>Trajetória mock</div>}
+          />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -66,7 +72,12 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
       STORAGE_KEY,
       JSON.stringify({
         token: 'fake-token',
-        user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'COORDENACAO_PEDAGOGICA' },
+        user: {
+          id: 'u1',
+          name: 'Test User',
+          email: 'test@example.com',
+          role: 'COORDENACAO_PEDAGOGICA',
+        },
       }),
     )
   })
@@ -83,13 +94,17 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
 
     await screen.findByText('Maria Silva')
     expect(
-      within(screen.getByText('Maria Silva').closest('section') as HTMLElement).getByText(
-        'Em observação',
-      ),
+      within(
+        screen.getByText('Maria Silva').closest('section') as HTMLElement,
+      ).getByText('Em observação'),
     ).toBeInTheDocument()
-    expect(screen.getByText('Falta não justificada em 20/09/2026', { exact: false })).toBeInTheDocument()
+    expect(
+      screen.getByText('Falta não justificada em 20/09/2026', { exact: false }),
+    ).toBeInTheDocument()
 
-    const link = screen.getByRole('link', { name: 'Ver na trajetória de Maria Silva' })
+    const link = screen.getByRole('link', {
+      name: 'Ver na trajetória de Maria Silva',
+    })
     expect(link).toHaveAttribute('href', '/estudantes/student-1')
   })
 
@@ -106,7 +121,12 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
   it('shows a factual not-found message with a link back to Home for an unknown follow-up', async () => {
     fetchMock = vi.fn(async () =>
       jsonResponse(
-        { error: { code: 'follow_up_not_found', message: 'Acompanhamento não encontrado.' } },
+        {
+          error: {
+            code: 'follow_up_not_found',
+            message: 'Acompanhamento não encontrado.',
+          },
+        },
         404,
       ),
     )
@@ -115,17 +135,23 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage('unknown-follow-up')
 
     await screen.findByText('Acompanhamento não encontrado.')
-    expect(screen.getByRole('link', { name: 'Voltar para a Home' })).toHaveAttribute('href', '/home')
+    expect(
+      screen.getByRole('link', { name: 'Voltar para a Home' }),
+    ).toHaveAttribute('href', '/home')
   })
 
   it('shows a factual error message with retry on load failure', async () => {
-    fetchMock = vi.fn(async () => jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500))
+    fetchMock = vi.fn(async () =>
+      jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500),
+    )
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
 
     await screen.findByText('Não foi possível carregar os dados agora.')
-    expect(screen.getByRole('button', { name: 'Tentar novamente' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Tentar novamente' }),
+    ).toBeInTheDocument()
   })
 
   it('shows a native <select> with exactly the 4 closed status values', async () => {
@@ -161,11 +187,15 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     fireEvent.change(select, { target: { value: 'ENCERRADO' } })
 
     // Inline confirmation, never a modal or window.confirm.
-    expect(screen.getByText(/Encerrar o acompanhamento de Maria Silva\?/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Encerrar o acompanhamento de Maria Silva\?/),
+    ).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
 
-    expect(screen.queryByText(/Encerrar o acompanhamento de Maria Silva\?/)).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/Encerrar o acompanhamento de Maria Silva\?/),
+    ).not.toBeInTheDocument()
     expect(select.value).toBe('EM_OBSERVACAO')
     const statusCalls = fetchMock.mock.calls.filter(([input]) => {
       const url = typeof input === 'string' ? input : String(input)
@@ -177,10 +207,16 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
   it('selecting a non-"Encerrado" status calls the API immediately and updates the pill', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/follow-ups/follow-up-1' && (init?.method ?? 'GET') === 'GET') {
+      if (
+        url === '/api/follow-ups/follow-up-1' &&
+        (init?.method ?? 'GET') === 'GET'
+      ) {
         return jsonResponse(baseDetail())
       }
-      if (url === '/api/follow-ups/follow-up-1/status' && init?.method === 'PATCH') {
+      if (
+        url === '/api/follow-ups/follow-up-1/status' &&
+        init?.method === 'PATCH'
+      ) {
         const body = JSON.parse(String(init.body))
         return jsonResponse({
           id: 'follow-up-1',
@@ -199,9 +235,13 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     const select = screen.getByLabelText('Status atual')
     fireEvent.change(select, { target: { value: 'ACOMPANHAMENTO_ATIVO' } })
 
-    const pillSection = screen.getByText('Maria Silva').closest('section') as HTMLElement
+    const pillSection = screen
+      .getByText('Maria Silva')
+      .closest('section') as HTMLElement
     await within(pillSection).findByText('Ativo')
-    expect(within(pillSection).queryByText('Em observação')).not.toBeInTheDocument()
+    expect(
+      within(pillSection).queryByText('Em observação'),
+    ).not.toBeInTheDocument()
 
     const statusCall = fetchMock.mock.calls.find(([input]) => {
       const url = typeof input === 'string' ? input : String(input)
@@ -210,18 +250,31 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     expect(statusCall).toBeDefined()
     const [, init] = statusCall as [RequestInfo | URL, RequestInit]
     expect(init?.method).toBe('PATCH')
-    expect(JSON.parse(String(init?.body))).toEqual({ status: 'ACOMPANHAMENTO_ATIVO' })
+    expect(JSON.parse(String(init?.body))).toEqual({
+      status: 'ACOMPANHAMENTO_ATIVO',
+    })
   })
 
   it('shows an inline error and re-enables the select when the status PATCH fails', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/follow-ups/follow-up-1' && (init?.method ?? 'GET') === 'GET') {
+      if (
+        url === '/api/follow-ups/follow-up-1' &&
+        (init?.method ?? 'GET') === 'GET'
+      ) {
         return jsonResponse(baseDetail())
       }
-      if (url === '/api/follow-ups/follow-up-1/status' && init?.method === 'PATCH') {
+      if (
+        url === '/api/follow-ups/follow-up-1/status' &&
+        init?.method === 'PATCH'
+      ) {
         return jsonResponse(
-          { error: { code: 'follow_up_not_found', message: 'Acompanhamento não encontrado.' } },
+          {
+            error: {
+              code: 'follow_up_not_found',
+              message: 'Acompanhamento não encontrado.',
+            },
+          },
           404,
         )
       }
@@ -236,16 +289,22 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     fireEvent.change(select, { target: { value: 'ACOMPANHAMENTO_ATIVO' } })
 
     await screen.findByText('Acompanhamento não encontrado.')
-    expect(select).not.toBeDisabled()
+    expect(select).toBeEnabled()
   })
 
   it('selecting "Encerrado" and confirming calls the API and updates the pill', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/follow-ups/follow-up-1' && (init?.method ?? 'GET') === 'GET') {
+      if (
+        url === '/api/follow-ups/follow-up-1' &&
+        (init?.method ?? 'GET') === 'GET'
+      ) {
         return jsonResponse(baseDetail())
       }
-      if (url === '/api/follow-ups/follow-up-1/status' && init?.method === 'PATCH') {
+      if (
+        url === '/api/follow-ups/follow-up-1/status' &&
+        init?.method === 'PATCH'
+      ) {
         const body = JSON.parse(String(init.body))
         return jsonResponse({
           id: 'follow-up-1',
@@ -263,9 +322,15 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     const select = screen.getByLabelText('Status atual')
     fireEvent.change(select, { target: { value: 'ENCERRADO' } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Encerrar acompanhamento' }))
-    await screen.findByText('Acompanhamento encerrado. O histórico e as evidências continuam disponíveis.')
-    const pillSection = screen.getByText('Maria Silva').closest('section') as HTMLElement
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Encerrar acompanhamento' }),
+    )
+    await screen.findByText(
+      'Acompanhamento encerrado. O histórico e as evidências continuam disponíveis.',
+    )
+    const pillSection = screen
+      .getByText('Maria Silva')
+      .closest('section') as HTMLElement
     await within(pillSection).findByText('Encerrado')
 
     const statusCall = fetchMock.mock.calls.find(([input]) => {
@@ -288,20 +353,30 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     const saveButton = screen.getByRole('button', { name: 'Registrar ação' })
     expect(saveButton).toBeDisabled()
 
-    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), { target: { value: '   ' } })
+    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), {
+      target: { value: '   ' },
+    })
     expect(saveButton).toBeDisabled()
 
-    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), { target: { value: 'Conversei com a família.' } })
-    expect(saveButton).not.toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), {
+      target: { value: 'Conversei com a família.' },
+    })
+    expect(saveButton).toBeEnabled()
   })
 
   it('submits a new action and shows "Registro salvo." on success', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/follow-ups/follow-up-1' && (init?.method ?? 'GET') === 'GET') {
+      if (
+        url === '/api/follow-ups/follow-up-1' &&
+        (init?.method ?? 'GET') === 'GET'
+      ) {
         return jsonResponse(baseDetail())
       }
-      if (url === '/api/follow-ups/follow-up-1/actions' && init?.method === 'POST') {
+      if (
+        url === '/api/follow-ups/follow-up-1/actions' &&
+        init?.method === 'POST'
+      ) {
         const body = JSON.parse(String(init.body))
         return jsonResponse(
           {
@@ -321,7 +396,9 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), { target: { value: 'Conversei com a família.' } })
+    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), {
+      target: { value: 'Conversei com a família.' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Registrar ação' }))
 
     await screen.findByText('Registro salvo.')
@@ -333,7 +410,9 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     expect(actionCall).toBeDefined()
     const [, init] = actionCall as [RequestInfo | URL, RequestInit]
     expect(init?.method).toBe('POST')
-    expect(JSON.parse(String(init?.body))).toEqual({ description: 'Conversei com a família.' })
+    expect(JSON.parse(String(init?.body))).toEqual({
+      description: 'Conversei com a família.',
+    })
 
     // Appears in ActionHistory immediately, without a page reload
     // (epic-4-retro-item-16).
@@ -346,12 +425,23 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
   it('shows an inline error when submitting an action fails', async () => {
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url === '/api/follow-ups/follow-up-1' && (init?.method ?? 'GET') === 'GET') {
+      if (
+        url === '/api/follow-ups/follow-up-1' &&
+        (init?.method ?? 'GET') === 'GET'
+      ) {
         return jsonResponse(baseDetail())
       }
-      if (url === '/api/follow-ups/follow-up-1/actions' && init?.method === 'POST') {
+      if (
+        url === '/api/follow-ups/follow-up-1/actions' &&
+        init?.method === 'POST'
+      ) {
         return jsonResponse(
-          { error: { code: 'follow_up_not_found', message: 'Acompanhamento não encontrado.' } },
+          {
+            error: {
+              code: 'follow_up_not_found',
+              message: 'Acompanhamento não encontrado.',
+            },
+          },
           404,
         )
       }
@@ -362,7 +452,9 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), { target: { value: 'Conversei com a família.' } })
+    fireEvent.change(screen.getByLabelText('Descreva a ação tomada'), {
+      target: { value: 'Conversei com a família.' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Registrar ação' }))
 
     await screen.findByText('Acompanhamento não encontrado.')
@@ -396,9 +488,12 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    const items = screen.getAllByRole('listitem').map((item) => item.textContent ?? '')
+    const items = screen
+      .getAllByRole('listitem')
+      .map((item) => item.textContent ?? '')
     const actionItems = items.filter(
-      (text) => text.includes('Primeira ação.') || text.includes('Segunda ação.'),
+      (text) =>
+        text.includes('Primeira ação.') || text.includes('Segunda ação.'),
     )
     expect(actionItems).toHaveLength(2)
     expect(actionItems[0]).toContain('Primeira ação.')
@@ -412,7 +507,9 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
-    expect(screen.getByText('Nenhuma ação registrada até o momento.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Nenhuma ação registrada até o momento.'),
+    ).toBeInTheDocument()
   })
 
   it('renders one evidence section per trajectory-change group', async () => {
@@ -464,10 +561,16 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     expect(screen.getByText('Queda de frequência')).toBeInTheDocument() // collapsible section header
     expect(screen.getByText('Queda de notas')).toBeInTheDocument()
     // each group's EvidenceCard is titled with its own change description
-    expect(screen.getByText('Queda de frequência detectada.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Queda de frequência detectada.'),
+    ).toBeInTheDocument()
     expect(screen.getByText('Queda de notas detectada.')).toBeInTheDocument()
-    expect(screen.getByText('Falta não justificada em 01/08/2026', { exact: false })).toBeInTheDocument()
-    expect(screen.getByText('Nota abaixo da média em 01/09/2026', { exact: false })).toBeInTheDocument()
+    expect(
+      screen.getByText('Falta não justificada em 01/08/2026', { exact: false }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Nota abaixo da média em 01/09/2026', { exact: false }),
+    ).toBeInTheDocument()
   })
 
   it('toggles a section open/closed with a click, keeping focus on the header button; the header is a native <button> so Enter/Space activate it natively', async () => {
@@ -501,15 +604,17 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     // not a jsdom keyboard-event simulation that would misrepresent it.
     expect(header.tagName).toBe('BUTTON')
     expect(header).toHaveAttribute('type', 'button')
-    expect(header).not.toBeDisabled()
+    expect(header).toBeEnabled()
     expect(header).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText('Conversei com a família.')).toBeInTheDocument()
 
     header.focus()
     fireEvent.click(header)
     expect(header).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('Conversei com a família.')).not.toBeInTheDocument()
-    expect(document.activeElement).toBe(header)
+    expect(
+      screen.queryByText('Conversei com a família.'),
+    ).not.toBeInTheDocument()
+    expect(header).toHaveFocus()
 
     fireEvent.click(header)
     expect(header).toHaveAttribute('aria-expanded', 'true')

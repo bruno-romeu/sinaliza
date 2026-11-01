@@ -30,7 +30,12 @@ type FollowUpStatusValue = FollowUpDetail['status']
 type FollowUpActionItem = FollowUpDetail['actions'][number]
 type ChangeType = TrajectoryChangeEvidenceGroup['trajectory_change']['type']
 
-const STATUS_ORDER: FollowUpStatusValue[] = ['EM_OBSERVACAO', 'ACOMPANHAMENTO_ATIVO', 'AGUARDANDO_RETORNO', 'ENCERRADO']
+const STATUS_ORDER: FollowUpStatusValue[] = [
+  'EM_OBSERVACAO',
+  'ACOMPANHAMENTO_ATIVO',
+  'AGUARDANDO_RETORNO',
+  'ENCERRADO',
+]
 
 const CHANGE_TYPE_LABEL: Record<ChangeType, string> = {
   ATTENDANCE_DROP: 'Queda de frequência',
@@ -56,7 +61,10 @@ function formatDetectedBr(value: string): string {
 function formatDateTimeBr(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+  return date.toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  })
 }
 
 type LoadState =
@@ -88,7 +96,10 @@ export function Acompanhamento() {
       })
       .catch((caught) => {
         if (ignore) return
-        if (caught instanceof ApiError && caught.code === 'follow_up_not_found') {
+        if (
+          caught instanceof ApiError &&
+          caught.code === 'follow_up_not_found'
+        ) {
           setLoadState({ status: 'not_found' })
         } else {
           setLoadState({ status: 'error' })
@@ -101,7 +112,9 @@ export function Acompanhamento() {
 
   return (
     <Page>
-      {loadState.status !== 'loaded' && <ScreenHead kicker="Coordenação pedagógica" title="Acompanhamento" />}
+      {loadState.status !== 'loaded' && (
+        <ScreenHead kicker="Coordenação pedagógica" title="Acompanhamento" />
+      )}
 
       {loadState.status === 'loading' && (
         <div className="sz-section">
@@ -110,7 +123,10 @@ export function Acompanhamento() {
       )}
 
       {loadState.status === 'not_found' && (
-        <div className="sz-section" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div
+          className="sz-section"
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
           <p className="sz-muted">Acompanhamento não encontrado.</p>
           <div>
             <ButtonLink to="/home" variant="secondary" icon="voltar">
@@ -125,7 +141,10 @@ export function Acompanhamento() {
           <Notice
             tone="attention"
             action={
-              <Button variant="secondary" onClick={() => setLoadAttempt((n) => n + 1)}>
+              <Button
+                variant="secondary"
+                onClick={() => setLoadAttempt((n) => n + 1)}
+              >
                 Tentar novamente
               </Button>
             }
@@ -139,11 +158,19 @@ export function Acompanhamento() {
         <AcompanhamentoContent
           followUpId={followUpId}
           detail={loadState.detail}
-          onStatusChange={(status) => setLoadState({ status: 'loaded', detail: { ...loadState.detail, status } })}
+          onStatusChange={(status) =>
+            setLoadState({
+              status: 'loaded',
+              detail: { ...loadState.detail, status },
+            })
+          }
           onActionRegistered={(action) =>
             setLoadState({
               status: 'loaded',
-              detail: { ...loadState.detail, actions: [...loadState.detail.actions, action] },
+              detail: {
+                ...loadState.detail,
+                actions: [...loadState.detail.actions, action],
+              },
             })
           }
         />
@@ -163,20 +190,27 @@ function AcompanhamentoContent({
   onStatusChange: (status: FollowUpStatusValue) => void
   onActionRegistered: (action: FollowUpActionItem) => void
 }) {
-  const [notice, setNotice] = useState<{ tone: 'success' | 'info'; text: string } | null>(null)
+  const [notice, setNotice] = useState<{
+    tone: 'success' | 'info'
+    text: string
+  } | null>(null)
   const actionCount = detail.actions.length
 
   return (
     <>
       <section aria-label="Resumo do acompanhamento">
-        <ScreenHead kicker="Coordenação pedagógica › Acompanhamento" title={detail.student_name}>
+        <ScreenHead
+          kicker="Coordenação pedagógica › Acompanhamento"
+          title={detail.student_name}
+        >
           <div className="sz-head-row">
             <StatusPill status={detail.status} />
           </div>
           <p className="sz-summary">
             Aberto em {formatDateBr(detail.created_at)} ·{' '}
             <b>
-              {actionCount} {actionCount === 1 ? 'ação registrada' : 'ações registradas'}
+              {actionCount}{' '}
+              {actionCount === 1 ? 'ação registrada' : 'ações registradas'}
             </b>
           </p>
         </ScreenHead>
@@ -196,18 +230,30 @@ function AcompanhamentoContent({
           onStatusChange(status)
           setNotice(
             status === 'ENCERRADO'
-              ? { tone: 'success', text: 'Acompanhamento encerrado. O histórico e as evidências continuam disponíveis.' }
-              : { tone: 'info', text: `Status alterado para ${FOLLOW_UP_STATUS[status].label}.` },
+              ? {
+                  tone: 'success',
+                  text: 'Acompanhamento encerrado. O histórico e as evidências continuam disponíveis.',
+                }
+              : {
+                  tone: 'info',
+                  text: `Status alterado para ${FOLLOW_UP_STATUS[status].label}.`,
+                },
           )
         }}
       />
 
-      <ActionForm followUpId={followUpId} onActionRegistered={onActionRegistered} />
+      <ActionForm
+        followUpId={followUpId}
+        onActionRegistered={onActionRegistered}
+      />
 
       <ActionHistory actions={detail.actions} />
 
       {detail.trajectory_changes.map((group) => (
-        <Disclosure key={group.trajectory_change.id} title={CHANGE_TYPE_LABEL[group.trajectory_change.type]}>
+        <Disclosure
+          key={group.trajectory_change.id}
+          title={CHANGE_TYPE_LABEL[group.trajectory_change.type]}
+        >
           <EvidenceCard
             kicker={`Mudança detectada em ${formatDetectedBr(group.trajectory_change.detected_at)}`}
             title={group.trajectory_change.description}
@@ -277,10 +323,15 @@ function StatusSelector({
     setSaving(true)
     setError(null)
     try {
-      const updated = await changeFollowUpStatus(token, followUpId, { status: nextStatus })
+      const updated = await changeFollowUpStatus(token, followUpId, {
+        status: nextStatus,
+      })
       onStatusChange(updated.status)
     } catch (caught) {
-      const message = caught instanceof ApiError ? caught.message : 'Não foi possível atualizar o status agora.'
+      const message =
+        caught instanceof ApiError
+          ? caught.message
+          : 'Não foi possível atualizar o status agora.'
       setError(message)
     } finally {
       setSaving(false)
@@ -317,10 +368,15 @@ function StatusSelector({
         </SelectField>
       </div>
       {confirmingClose && (
-        <div className="sz-confirm" role="group" aria-labelledby="confirmar-encerramento">
+        <div
+          className="sz-confirm"
+          role="group"
+          aria-labelledby="confirmar-encerramento"
+        >
           <p id="confirmar-encerramento">
-            <b>Encerrar o acompanhamento de {studentName}?</b> O histórico de ações e as evidências continuam
-            acessíveis, e o status pode ser alterado de novo depois.
+            <b>Encerrar o acompanhamento de {studentName}?</b> O histórico de
+            ações e as evidências continuam acessíveis, e o status pode ser
+            alterado de novo depois.
           </p>
           <div className="sz-confirm-actions">
             <Button
@@ -331,7 +387,10 @@ function StatusSelector({
             >
               Encerrar acompanhamento
             </Button>
-            <Button variant="secondary" onClick={() => setConfirmingClose(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmingClose(false)}
+            >
               Cancelar
             </Button>
           </div>
@@ -367,13 +426,18 @@ function ActionForm({
     setMessage(null)
     setIsError(false)
     try {
-      const action = await registerFollowUpAction(token, followUpId, { description: text })
+      const action = await registerFollowUpAction(token, followUpId, {
+        description: text,
+      })
       onActionRegistered(action)
       setText('')
       setMessage('Registro salvo.')
       setIsError(false)
     } catch (caught) {
-      const errorMessage = caught instanceof ApiError ? caught.message : 'Não foi possível salvar o registro agora.'
+      const errorMessage =
+        caught instanceof ApiError
+          ? caught.message
+          : 'Não foi possível salvar o registro agora.'
       setMessage(errorMessage)
       setIsError(true)
     } finally {
@@ -401,7 +465,14 @@ function ActionForm({
         </Button>
       </div>
       <div aria-live="polite">
-        {message && <Notice tone={isError ? 'attention' : 'success'} role={isError ? 'alert' : 'status'}>{message}</Notice>}
+        {message && (
+          <Notice
+            tone={isError ? 'attention' : 'success'}
+            role={isError ? 'alert' : 'status'}
+          >
+            {message}
+          </Notice>
+        )}
       </div>
     </Section>
   )

@@ -33,7 +33,13 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
               <Icon name={icon} size={15} />
             </span>
             <div>
-              <p className={['sz-tl-text', quote ? 'sz-tl-quote' : null].filter(Boolean).join(' ')}>{item.text}</p>
+              <p
+                className={['sz-tl-text', quote ? 'sz-tl-quote' : null]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {item.text}
+              </p>
               {(label || item.author) && (
                 <p className="sz-tl-meta">
                   {label}

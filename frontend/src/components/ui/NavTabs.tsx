@@ -16,7 +16,10 @@ export function NavTabs({
 }) {
   return (
     <nav aria-label={label}>
-      <ul className="sz-tabs" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      <ul
+        className="sz-tabs"
+        style={{ listStyle: 'none', margin: 0, padding: 0 }}
+      >
         {items.map((item) => {
           const info = item.indicator ? INDICATORS[item.indicator] : undefined
           return (
@@ -27,11 +30,21 @@ export function NavTabs({
                 aria-selected={undefined}
                 style={({ isActive }) =>
                   isActive
-                    ? { borderColor: 'var(--action)', background: 'var(--action-tint)', boxShadow: 'inset 0 0 0 1px var(--action)' }
+                    ? {
+                        borderColor: 'var(--action)',
+                        background: 'var(--action-tint)',
+                        boxShadow: 'inset 0 0 0 1px var(--action)',
+                      }
                     : undefined
                 }
               >
-                {info && <Icon name={info.icon} size={18} style={{ color: info.color }} />}
+                {info && (
+                  <Icon
+                    name={info.icon}
+                    size={18}
+                    style={{ color: info.color }}
+                  />
+                )}
                 <span>{item.label}</span>
               </NavLink>
             </li>

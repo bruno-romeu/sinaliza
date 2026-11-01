@@ -14,7 +14,15 @@ import {
   type Classroom,
   type Student,
 } from '../../api/client'
-import { Button, ChoiceGroup, Notice, RosterRow, Section, SelectField, TextField } from '../../components/ui'
+import {
+  Button,
+  ChoiceGroup,
+  Notice,
+  RosterRow,
+  Section,
+  SelectField,
+  TextField,
+} from '../../components/ui'
 import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 type SubmissionStatusValue = AssignmentSubmissionCreateRequest['status']
@@ -64,8 +72,11 @@ export function Atividades() {
   const [periodId, setPeriodId] = useState('')
   const [dueDate, setDueDate] = useState(todayIsoDate())
   const [creatingAssignment, setCreatingAssignment] = useState(false)
-  const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null)
-  const [assignmentMessageIsError, setAssignmentMessageIsError] = useState(false)
+  const [assignmentMessage, setAssignmentMessage] = useState<string | null>(
+    null,
+  )
+  const [assignmentMessageIsError, setAssignmentMessageIsError] =
+    useState(false)
 
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null)
@@ -90,10 +101,14 @@ export function Atividades() {
     if (!token) return
     listClassrooms(token)
       .then(setClassrooms)
-      .catch(() => setClassroomsError('Não foi possível carregar as turmas agora.'))
+      .catch(() =>
+        setClassroomsError('Não foi possível carregar as turmas agora.'),
+      )
     listAcademicPeriods(token)
       .then(setPeriods)
-      .catch(() => setPeriodsError('Não foi possível carregar os períodos letivos agora.'))
+      .catch(() =>
+        setPeriodsError('Não foi possível carregar os períodos letivos agora.'),
+      )
   }, [token])
 
   function refreshAssignments(classroomId: string) {
@@ -140,7 +155,12 @@ export function Atividades() {
           Object.fromEntries(
             fetched.map((student) => [
               student.id,
-              { status: 'DELIVERED', saving: false, message: null, isError: false } as RowState,
+              {
+                status: 'DELIVERED',
+                saving: false,
+                message: null,
+                isError: false,
+              } as RowState,
             ]),
           ),
         )
@@ -159,10 +179,15 @@ export function Atividades() {
   }, [token, selectedClassroomId, selectedAssignmentId, submissionDate])
 
   function updateRow(studentId: string, patch: Partial<RowState>) {
-    setRowStates((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }))
+    setRowStates((prev) => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], ...patch },
+    }))
   }
 
-  const canCreateAssignment = Boolean(selectedClassroomId && subject.trim() && periodId && dueDate)
+  const canCreateAssignment = Boolean(
+    selectedClassroomId && subject.trim() && periodId && dueDate,
+  )
 
   async function handleCreateAssignment() {
     if (!token || !canCreateAssignment) return
@@ -189,7 +214,9 @@ export function Atividades() {
       setCreatingAssignment(false)
       if (selectedClassroomIdRef.current !== classroomIdAtStart) return
       const message =
-        caught instanceof ApiError ? caught.message : 'Não foi possível cadastrar a atividade agora.'
+        caught instanceof ApiError
+          ? caught.message
+          : 'Não foi possível cadastrar a atividade agora.'
       setAssignmentMessage(message)
       setAssignmentMessageIsError(true)
     }
@@ -217,11 +244,17 @@ export function Atividades() {
         date: submissionDateAtStart,
       })
       if (sharedContextChanged()) return
-      updateRow(studentId, { saving: false, message: 'Registro salvo.', isError: false })
+      updateRow(studentId, {
+        saving: false,
+        message: 'Registro salvo.',
+        isError: false,
+      })
     } catch (caught) {
       if (sharedContextChanged()) return
       const message =
-        caught instanceof ApiError ? caught.message : 'Não foi possível salvar o registro agora.'
+        caught instanceof ApiError
+          ? caught.message
+          : 'Não foi possível salvar o registro agora.'
       updateRow(studentId, { saving: false, message, isError: true })
     }
   }
@@ -233,7 +266,11 @@ export function Atividades() {
       contextTitle="Turma e atividade"
       contextError={classroomsError ?? periodsError}
       context={
-        <SelectField label="Turma" value={selectedClassroomId} onChange={(event) => setSelectedClassroomId(event.target.value)}>
+        <SelectField
+          label="Turma"
+          value={selectedClassroomId}
+          onChange={(event) => setSelectedClassroomId(event.target.value)}
+        >
           <option value="">Selecione…</option>
           {classrooms.map((classroom) => (
             <option key={classroom.id} value={classroom.id}>
@@ -252,7 +289,11 @@ export function Atividades() {
               onChange={(event) => setSubject(event.target.value)}
               placeholder="Ex.: Matemática"
             />
-            <SelectField label="Período letivo" value={periodId} onChange={(event) => setPeriodId(event.target.value)}>
+            <SelectField
+              label="Período letivo"
+              value={periodId}
+              onChange={(event) => setPeriodId(event.target.value)}
+            >
               <option value="">Selecione…</option>
               {periods.map((period) => (
                 <option key={period.id} value={period.id}>
@@ -260,26 +301,40 @@ export function Atividades() {
                 </option>
               ))}
             </SelectField>
-            <TextField label="Data de entrega" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+            <TextField
+              label="Data de entrega"
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+            />
             <div>
-              <Button icon="mais" onClick={handleCreateAssignment} disabled={creatingAssignment || !canCreateAssignment}>
+              <Button
+                icon="mais"
+                onClick={handleCreateAssignment}
+                disabled={creatingAssignment || !canCreateAssignment}
+              >
                 {creatingAssignment ? 'Cadastrando…' : 'Cadastrar atividade'}
               </Button>
             </div>
           </div>
           {assignmentMessage && (
-            <Notice tone={assignmentMessageIsError ? 'attention' : 'success'} role={assignmentMessageIsError ? 'alert' : 'status'}>
+            <Notice
+              tone={assignmentMessageIsError ? 'attention' : 'success'}
+              role={assignmentMessageIsError ? 'alert' : 'status'}
+            >
               {assignmentMessage}
             </Notice>
           )}
-          {assignmentsError && <Notice tone="attention">{assignmentsError}</Notice>}
+          {assignmentsError && (
+            <Notice tone="attention">{assignmentsError}</Notice>
+          )}
         </Section>
       )}
 
       {selectedClassroomId && !assignmentsError && assignments.length === 0 && (
         <p className="sz-muted sz-section">
-          Nenhuma atividade cadastrada nesta turma ainda. Cadastre uma atividade acima para registrar o status de
-          entrega.
+          Nenhuma atividade cadastrada nesta turma ainda. Cadastre uma atividade
+          acima para registrar o status de entrega.
         </p>
       )}
 
@@ -294,7 +349,8 @@ export function Atividades() {
               <option value="">Selecione…</option>
               {assignments.map((assignment) => (
                 <option key={assignment.id} value={assignment.id}>
-                  {assignment.subject} · prazo {formatDateBr(assignment.due_date)}
+                  {assignment.subject} · prazo{' '}
+                  {formatDateBr(assignment.due_date)}
                 </option>
               ))}
             </SelectField>
@@ -310,11 +366,15 @@ export function Atividades() {
               selected
               loading={studentsLoading}
               error={studentsError}
-              empty={!studentsLoading && !studentsError && students.length === 0}
+              empty={
+                !studentsLoading && !studentsError && students.length === 0
+              }
             />
           )}
           {students.length > 0 && !canSaveSubmission && (
-            <Notice tone="info">Selecione a atividade e a data para registrar o status de entrega.</Notice>
+            <Notice tone="info">
+              Selecione a atividade e a data para registrar o status de entrega.
+            </Notice>
           )}
           {students.length > 0 && (
             <ul className="sz-roster">
@@ -324,7 +384,13 @@ export function Atividades() {
                   student={student}
                   rowState={rowStates[student.id]}
                   canSave={canSaveSubmission}
-                  onStatusChange={(status) => updateRow(student.id, { status, message: null, isError: false })}
+                  onStatusChange={(status) =>
+                    updateRow(student.id, {
+                      status,
+                      message: null,
+                      isError: false,
+                    })
+                  }
                   onSave={() => handleSaveSubmission(student.id)}
                 />
               ))}
