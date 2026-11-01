@@ -8,6 +8,15 @@ filter itself lives in `SqlAlchemyPedagogicalObservationRepository
 .get_by_ids`, never inline here (AD-11); this service only threads the
 caller's identity through.
 
+Além disso, a leitura inteira é escopada ao `FollowUp.responsible_user_id`,
+exatamente como `RegisterFollowUpActionService`/`ChangeFollowUpStatusService`
+já escopam as escritas (RF-22, epic-4-retro-item-18): sem isso, qualquer
+usuário autenticado que soubesse um `follow_up_id` lia nome do estudante,
+status e o texto integral de todas as `FollowUpAction` — a redação de texto
+da Story 4.4 cobre só a observação pedagógica, não o resto do corpo. A
+checagem vem depois da de inexistência, então um não-responsável recebe 404
+para um id inexistente em vez de ter sua existência revelada pelo 403.
+
 Story 4.3 groups evidence per linked `TrajectoryChange` instead of returning
 a single flat list: `list_evidence_by_follow_up` already orders its rows by
 the linked change's `detected_at` (repository layer), so iterating it in
@@ -26,7 +35,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from app.application.followups.errors import FollowUpNotFoundError
+from app.application.followups.errors import FollowUpAccessDeniedError, FollowUpNotFoundError
 from app.application.followups.ports import (
     AssignmentSubmissionRepositoryPort,
     AttendanceRepositoryPort,
@@ -83,6 +92,8 @@ class GetFollowUpService:
         follow_up = self._follow_up_repository.get_by_id(follow_up_id)
         if follow_up is None:
             raise FollowUpNotFoundError()
+        if follow_up.responsible_user_id != requesting_user_id:
+            raise FollowUpAccessDeniedError()
 
         student = self._student_repository.get_by_id(follow_up.student_id)
         student_name = student.name if student is not None else ""
