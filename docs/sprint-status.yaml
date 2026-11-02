@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 10-21-2026 11:00
+last_updated: 11-01-2026 00:00
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -112,8 +112,8 @@ action_items:
       for the 3 pre-existing native enums (user_role, dataset_split, attendance_status),
       matching the pattern needed for assignment_submission_status."
     owner: "dev"
-    status: open
-    ref: "docs/epic-1-retro-2026-09-26.md"
+    status: done
+    ref: "docs/epic-1-retro-2026-09-26.md; closed by PR #39 (test_migrations.py now asserts to_regtype(...) IS NULL after downgrade, for every native enum)"
   - id: "epic-1-retro-item-5-auth-dependencies-layering"
     epic: 1
     action: "[defer] Route backend/app/presentation/auth/dependencies.py's JWT decode
@@ -164,7 +164,7 @@ action_items:
       on its next alembic upgrade head."
     owner: "dev"
     status: done
-    ref: "docs/epic-2-retro-2026-10-08.md"
+    ref: "docs/epic-2-retro-2026-10-08.md; closed by backend/alembic/versions/0010_synthetic_profile_self_heal_falling_grades.py"
   - id: "epic-2-retro-item-2-never-amend-applied-migration"
     epic: 2
     action: "[defer] Process lesson: never amend an already-applied Alembic migration
@@ -284,8 +284,8 @@ action_items:
       has no as_of() filter - same leak class Story 5.4 fixed for list_recent, one
       method away. Already logged in docs/deferred-work.md."
     owner: "dev"
-    status: open
-    ref: "docs/epic-5-retro-2026-10-20.md"
+    status: done
+    ref: "docs/epic-5-retro-2026-10-20.md; closed by sqlalchemy_trajectory_change_repository.get_by_id applying filter_as_of, same pattern as list_recent"
   - id: "epic-5-retro-item-3-escalate-merge-before-done-gate"
     epic: 5
     action: "[process-lesson][escalate] epic-3-retro-item-3 (merge-before-done gate)
