@@ -25,6 +25,7 @@ from app.application.grades.errors import (
     StudentNotEnrolledError,
 )
 from app.application.grades.ports import GradeRepositoryPort
+from app.application.integrity import translating_repository_integrity_errors
 from app.domain.grade import Grade
 
 
@@ -59,11 +60,12 @@ class RegisterGradeService:
         if self._academic_period_repository.get_by_id(period_id) is None:
             raise AcademicPeriodNotFoundError()
 
-        return self._grade_repository.save(
-            student_id=student_id,
-            classroom_id=classroom_id,
-            subject=subject,
-            period_id=period_id,
-            date_=date_,
-            value=value,
-        )
+        with translating_repository_integrity_errors():
+            return self._grade_repository.save(
+                student_id=student_id,
+                classroom_id=classroom_id,
+                subject=subject,
+                period_id=period_id,
+                date_=date_,
+                value=value,
+            )
