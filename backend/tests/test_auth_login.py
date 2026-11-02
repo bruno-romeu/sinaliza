@@ -10,6 +10,7 @@ import jwt
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -120,6 +121,76 @@ def test_get_current_user_rejects_expired_token(test_settings: Settings) -> None
         "exp": now - timedelta(hours=1),
     }
     token = jwt.encode(expired_payload, test_settings.jwt_secret, algorithm="HS256")
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+
+    with pytest.raises(AppError) as exc_info:
+        get_current_user(credentials=credentials, token_issuer=JwtTokenIssuer(test_settings))
+
+    assert exc_info.value.status_code == 401
+
+
+def test_a_jwt_secret_shorter_than_the_hmac_key_minimum_fails_at_startup() -> None:
+    """Uma chave HMAC curta é o único jeito realista de forjar um bearer
+    aqui — o PyJWT já avisa abaixo de 32 bytes (RFC 7518 §3.2). O start
+    falha em vez de subir e emitir tokens com chave fraca."""
+    with pytest.raises(ValidationError):
+        Settings(
+            database_url="postgresql+psycopg://x:x@localhost:5432/x",
+            jwt_secret="curto-demais",
+        )
+
+
+def test_get_current_user_rejects_a_token_signed_with_another_key(
+    test_settings: Settings,
+) -> None:
+    """Assinatura é o que separa um bearer legítimo de um forjado: um token
+    perfeitamente formado, dentro da validade, assinado com outro segredo
+    não autentica ninguém."""
+    payload = {
+        "sub": str(uuid.uuid4()),
+        "name": "Fulano",
+        "role": "COORDENACAO_PEDAGOGICA",
+        "exp": datetime.now(UTC) + timedelta(hours=1),
+    }
+    token = jwt.encode(payload, "outro-segredo-igualmente-longo-32", algorithm="HS256")
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+
+    with pytest.raises(AppError) as exc_info:
+        get_current_user(credentials=credentials, token_issuer=JwtTokenIssuer(test_settings))
+
+    assert exc_info.value.status_code == 401
+
+
+def test_get_current_user_rejects_an_unsigned_alg_none_token(test_settings: Settings) -> None:
+    """Confusão de algoritmo: `jwt.decode(..., algorithms=["HS256"])` recusa
+    um token que se declara `alg: none` em vez de aceitá-lo sem verificar
+    assinatura alguma."""
+    payload = {
+        "sub": str(uuid.uuid4()),
+        "name": "Fulano",
+        "role": "COORDENACAO_PEDAGOGICA",
+        "exp": datetime.now(UTC) + timedelta(hours=1),
+    }
+    token = jwt.encode(payload, key="", algorithm="none")
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+
+    with pytest.raises(AppError) as exc_info:
+        get_current_user(credentials=credentials, token_issuer=JwtTokenIssuer(test_settings))
+
+    assert exc_info.value.status_code == 401
+
+
+def test_get_current_user_rejects_a_correctly_signed_token_without_exp(
+    test_settings: Settings,
+) -> None:
+    """Sem `exp`, PyJWT não tem o que validar e o token valeria para sempre.
+    Todo bearer precisa declarar quando deixa de valer."""
+    payload = {
+        "sub": str(uuid.uuid4()),
+        "name": "Fulano",
+        "role": "COORDENACAO_PEDAGOGICA",
+    }
+    token = jwt.encode(payload, test_settings.jwt_secret, algorithm="HS256")
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
     with pytest.raises(AppError) as exc_info:

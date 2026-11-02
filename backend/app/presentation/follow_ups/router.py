@@ -108,6 +108,12 @@ def get_follow_up(
             code="follow_up_not_found",
             message="Acompanhamento não encontrado.",
         ) from exc
+    except FollowUpAccessDeniedError as exc:
+        raise AppError(
+            status_code=403,
+            code="follow_up_access_denied",
+            message="Você não tem permissão para ver este acompanhamento.",
+        ) from exc
 
     return FollowUpDetailOut(
         id=result.follow_up.id,

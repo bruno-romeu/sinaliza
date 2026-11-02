@@ -17,7 +17,13 @@ class Settings(BaseSettings):
     # Required — no defaults, so a missing value fails fast at startup rather
     # than silently running with an insecure/incorrect configuration.
     database_url: str
-    jwt_secret: str
+
+    # HS256 assina com o segredo cru, então o segredo *é* a chave HMAC. O
+    # próprio PyJWT 2.15 avisa (`InsecureKeyLengthWarning`, RFC 7518 §3.2) ao
+    # assinar com menos de 32 bytes; `min_length=32` transforma esse aviso em
+    # falha no start — quando ainda dá para corrigir — em vez de um app no ar
+    # emitindo tokens com chave fraca.
+    jwt_secret: str = Field(min_length=32)
 
     # gt=0 so a misconfigured 0/negative value fails fast instead of quietly
     # issuing tokens that are already expired the moment they're minted.
