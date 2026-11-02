@@ -1,8 +1,17 @@
 # Deferred Work
 
+Cada entrada tem `source_spec`, `summary` e `evidence`. Uma entrada fechada
+ganha um campo `resolved:` dizendo **onde** foi fechada e **como foi
+verificado** — a entrada nunca é apagada, porque o raciocínio de por que algo
+foi adiado continua sendo evidência (AGENTS.md, "Evidência": nunca descartar
+a fonte original).
+
+Para ler só o que continua aberto: entradas **sem** campo `resolved:`.
+
 - source_spec: `docs/spec-6-1-empacotamento-containerizado-dos-tres-servicos.md`
   summary: `backend/Dockerfile` and `frontend/Dockerfile` run all processes as the default root user — no `USER` directive drops privileges in either custom image.
   evidence: Real defense-in-depth gap (confirmed by review: no `USER` instruction in either Dockerfile). Not fixed in this story because the correct treatment differs per image — the custom `backend` image can trivially add a non-root `USER`, but `nginx:alpine`'s master process running as root is that image's own standard, expected design (needed to bind port 80); reconciling both correctly is more than a one-line correction, and no multi-tenant/untrusted-input threat model was stated for this story's single-author VM target. Revisit if the deployment threat model changes.
+  resolved: **parcial**, PR #45. O `backend/Dockerfile` passou a rodar como `app` (uid 10001) — verificado com `docker compose exec backend id` na stack real, não só no build. A metade do `frontend/Dockerfile` foi **fechada como decisão, não como dívida**: o master do `nginx:alpine` rodar como root é o design do próprio imagem (precisa do bind na 80) e os workers já largam privilégio; a razão está escrita no arquivo. Não há remanescente a fazer aqui.
 
 - source_spec: `docs/spec-epic-4-retro-item-17-rf22-timeline-redaction.md`
   summary: `tests/test_synthetic_dataset_split.py`'s 4 tests that call `run_generation` (`test_exactly_two_dataset_split_values_exist_on_a_generated_base`, `test_generated_train_students_never_appear_in_list_enrolled_for_any_classroom`, `test_generated_train_students_fail_exists_enrollment_for_their_real_classroom`, `test_generated_train_facts_exist_in_the_database_but_never_via_the_student_repository`) fail with `MissingAuthorUserError` because the file never seeds the `DEV_SEED_EMAIL` coordination user before calling `run_generation`, unlike `test_synthetic_facts_generation.py` which does this explicitly per-test.
@@ -10,14 +19,17 @@
 
 - source_spec: `docs/spec-4-1-abertura-de-acompanhamento-vinculado-a-evidencias.md`
   summary: `GET /follow-ups/{id}` lets any authenticated user read a cited `PedagogicalObservation`'s full text via the evidence list, with no `responsible_user_id` visibility scoping yet.
+  resolved: PR #45. `GetFollowUpService` levanta `FollowUpAccessDeniedError` quando `responsible_user_id` difere do usuário requisitante, **depois** da checagem de não-encontrado (para não transformar o 403 em oráculo de existência). Ver o item novo sobre `GET /home` abaixo: o escopo de *leitura* fechou, o de *listagem* não.
   evidence: Real exposure window — `GetFollowUpService` reuses Story 3.4's unfiltered `resolve_evidence` as the frozen Boundaries & Constraints require ("Never filter `PedagogicalObservation` visibility here — Story 4.4 scope"). Story 4.4 closes this by adding the `responsible_user_id`-scoped read filter at the repository-base level (AD-8/AD-11). Until then, any authenticated user who knows/guesses a `follow_up_id` can read observation text cited as its evidence.
 
 - source_spec: `docs/spec-1-1-autenticacao-coordenacao-pedagogica.md`
   summary: `POST /auth/login` has no rate limiting or lockout, so the single seeded account is open to unlimited password-guessing attempts.
+  resolved: PR #43. Janela deslizante, 10 tentativas / 300s, chave derivada só do cliente (nunca do e-mail, para não virar oráculo de enumeração) e contada antes do dispatch. O lockout de conta continua **deliberadamente não implementado**: com uma conta só, viraria autoDoS da própria banca (AGENTS.md: "não implementar security theater").
   evidence: Confirmed no rate-limiting/backoff middleware anywhere in `backend/app/presentation/auth/router.py` or `app/main.py`. Not required by any RF/RNF captured so far (RNF-05 only mandates hashed storage); real but not needed for this story's scope. Revisit if the product moves toward real deployment beyond the TCC demo.
 
 - source_spec: `docs/spec-1-1-autenticacao-coordenacao-pedagogica.md`
   summary: No lint/formatting tooling is configured for either the backend (ruff/black) or the frontend (eslint/prettier).
+  resolved: Ruff 0.17.3 (E/W/F/I/UP/B, line-length 100) no backend e ESLint 9 flat config + Prettier no frontend, ambos rodando como gate no CI (`.github/workflows/ci.yml`).
   evidence: `backend/pyproject.toml` and `frontend/package.json` have no lint/format scripts or dependencies. General project hygiene, not specific to the auth vertical slice; nothing in the epics/architecture docs calls it out as a Story 1.1 requirement.
 
 - source_spec: `docs/spec-1-1-autenticacao-coordenacao-pedagogica.md`
@@ -42,10 +54,12 @@
 
 - source_spec: `docs/spec-1-4-cadastro-de-atividades-e-registro-de-status-de-entrega.md`
   summary: `test_migrations.py`'s upgrade/downgrade/upgrade cycle only asserts the new tables exist after re-upgrading; it never asserts the `assignment_submission_status` (or any of the 3 prior) native enum type is actually dropped by `downgrade()`, and `checkfirst=True` on both `create()`/`drop()` would silently mask a failed drop.
+  resolved: PR #39. `test_migrations.py` passou a afirmar sobre o catálogo (`to_regtype`) depois do `downgrade()`, não só sobre a existência das tabelas.
   evidence: Confirmed via direct read of `backend/tests/test_migrations.py` — only `to_regclass` table-existence checks are made, no `pg_type` lookup for any of the 4 native enums (`user_role`, `dataset_split`, `attendance_status`, `assignment_submission_status`). Identical, unaddressed pattern present since migration `0001` (Story 1.1), never flagged in Stories 1.1–1.3's own reviews. A follow-up would assert `to_regtype('assignment_submission_status') IS NULL` after `downgrade()`, before the second `upgrade()`.
 
 - source_spec: `docs/spec-1-5-registro-de-observacao-pedagogica-em-texto-livre.md`
   summary: `pedagogical_observations.student_id`/`author_user_id` FKs have no `ondelete` clause, and `SqlAlchemyPedagogicalObservationRepository.save()` never translates an `IntegrityError` into a domain error, so deleting a referenced student/user later would surface as an unhandled 500 instead of a controlled `AppError`.
+  resolved: PRs #39, #40, #44 e #46. O #39 classificou as 24 FKs do schema (migration 0014) com teste que prova cada regra contra DELETE real; o #40 traduziu `IntegrityError` em erro tipado por SQLSTATE no repositório; o #44 levou essa tradução até o HTTP (409/422); o #46 removeu a herança transitória de `sqlalchemy.exc.IntegrityError`. Fechado ponta a ponta.
   evidence: Confirmed every existing FK in `backend/app/infrastructure/db/models.py` (attendance, grades, assignments, assignment_submissions) also omits `ondelete`, and `sqlalchemy_grade_repository.py`/`sqlalchemy_assignment_repository.py`/`sqlalchemy_assignment_submission_repository.py` all carry the identical "`save` never needs to translate an `IntegrityError`" docstring. This story faithfully reproduces an established, unaddressed codebase-wide pattern (present since Story 1.2), not a new defect. Revisit if/when a user- or student-deletion flow is ever added.
 - source_spec: `docs/spec-1-2-registro-de-presenca-falta-por-turma-e-data.md`
   summary: In `Presenca.tsx`, `handleSave`'s stale-write guard only checks whether the selected classroom changed while a save is in flight, not whether the selected date changed. Changing the date (with the classroom unchanged) while a save request is still pending can attach a misleading "Registro salvo." confirmation to a row the user now sees for the new date, even though the record was actually written against the previous date.
@@ -60,12 +74,14 @@
 
 - source_spec: `docs/spec-3-2-deteccao-de-mudanca-relevante-por-convergencia-de-sinais.md`
   summary: `trajectory_changes`/`trajectory_change_sources`' FKs (`student_id`, `period_id`, `trajectory_change_id`) carry no `ondelete` clause, so deleting a referenced student/period/change later would surface as an unhandled error instead of a controlled response.
+  resolved: PR #39 (migration 0014), junto com a entrada da Story 1.5 acima.
   evidence: Confirmed every existing FK in `backend/app/infrastructure/db/models.py` (attendance, grades, assignments, assignment_submissions, pedagogical_observations) already omits `ondelete` — already documented as a codebase-wide gap in this file's Story 1.5 entry. This story's two new tables faithfully extend that same established, unaddressed pattern rather than introducing a new one. Revisit alongside that Story 1.5 entry if/when a student- or period-deletion flow is ever added.
 
 ## Deferred from: code review of story-3.2 (2026-10-13)
 
 - source_spec: `docs/spec-3-2-deteccao-de-mudanca-relevante-por-convergencia-de-sinais.md`
   summary: `SqlAlchemyPedagogicalObservationRepository.list_by_student_in_range` buckets `created_at` (a `timestamptz` column) into period-local dates via `cast(created_at, Date)`; this cast's day boundary depends on the Postgres session/connection's `timezone` setting, unlike the native `Date` columns used elsewhere (e.g. `AttendanceRecordModel.date`).
+  resolved: **Era real, não falso-positivo.** O `cast` dependente do GUC `timezone` foi substituído por `base.utc_date_of`, que ancora explicitamente em UTC — mesma forma que `SqlAlchemyAttendanceRepository.list_by_student_in_range` já usava. Verificado por leitura direta do método.
   evidence: maybe-false — could not verify the actual deployment's Postgres session/server `timezone` GUC from the diff or this worktree. Every other date-sensitive computation in this codebase assumes UTC (`as_of()`, `detected_at` derivation), so if the Postgres session timezone is also UTC there is no bug; if it is not, a `PedagogicalObservation` created near a day boundary could bucket into the wrong período day, silently skewing the PEDAGOGICAL_OBSERVATION convergence signal. Settle by confirming the deployment's `timezone` GUC/connection default, or close proactively with an explicit `created_at AT TIME ZONE 'UTC'` in the cast.
 
 - source_spec: `docs/spec-4-2-registro-de-acoes-e-mudanca-de-status.md`
@@ -76,6 +92,7 @@
 
 - source_spec: none
   summary: epic-4-retro-item-20 — write a corrective Alembic migration that idempotently adds any missing `synthetic_profile` enum labels (`ALTER TYPE synthetic_profile ADD VALUE IF NOT EXISTS FALLING_GRADES`) so a database that ran the original 3-member version of migration 0006 self-heals on its next `alembic upgrade head`. Escalated from Epic 2's retro; recommended before Epic 5 since Epic 5's ML pipeline reads from the same `synthetic_profile`-bearing tables.
+  resolved: Migration `0010_synthetic_profile_self_heal_falling_grades.py`. O `sprint-status.yaml` ainda listava `epic-2-retro-item-1-migration-enum-self-heal` como aberto; corrigido junto com esta entrada.
   evidence: Split from the fix-now security item (epic-4-retro-item-17) because each is an independently shippable deliverable. Ref: `docs/epic-4-retro-2026-10-14.md`, `docs/epic-2-retro-2026-10-08.md`.
 
 - source_spec: `docs/spec-4-2-registro-de-acoes-e-mudanca-de-status.md`
@@ -90,6 +107,7 @@
 
 - source_spec: `docs/spec-6-2-provisionamento-da-vm-sempre-ativa-plano-a-b.md`
   summary: Building/running `docker compose up --build` from a Windows checkout can fail on `backend/docker-entrypoint.sh` (`exec ./docker-entrypoint.sh: no such file or directory`) because the repo has no `.gitattributes` forcing LF for shell scripts, so a Windows clone with `core.autocrlf=true` (a common Git-for-Windows default) checks the file out with CRLF line endings, which Docker's `COPY`+`exec` does not tolerate. This does **not** affect the real Oracle Cloud VM target (Ubuntu/Linux clones keep LF by default — confirmed the committed git blob itself is clean LF, `git cat-file -p HEAD:backend/docker-entrypoint.sh | grep -c $'\r'` = 0); it only affects local Docker builds/testing on Windows.
+  resolved: `.gitattributes` na raiz com `* text=auto eol=lf` e `*.sh text eol=lf`.
   evidence: Confirmed via `file backend/docker-entrypoint.sh` in this worktree reporting CRLF terminators, a real local `docker compose up --build` run failing the `backend` container on exactly that exec error, and `git config core.autocrlf` = `true` in this environment, while the committed blob (`git cat-file -p HEAD:...`) has zero `\r` bytes — so the defect is checkout-time (Windows-local), not a repo-content defect, and does not block the Linux-hosted VM deployment this story's runbook targets. Out of Story 6.2's scope (boundaries forbid `backend/` changes) and not introduced by this story's diff — pre-existing since Story 6.1. Fix (low priority, convenience only): add a `.gitattributes` with `*.sh text eol=lf` so Windows-based local Docker testing works without each developer manually configuring `core.autocrlf=input`.
 
 ## Deferred from: code review of story-6.2 (2026-10-20)
@@ -102,4 +120,23 @@
 
 - source_spec: `docs/spec-5-4-demonstracao-ao-vivo-truncada-em-hoje-sem-vazamento-de-futuro.md`
   summary: `SqlAlchemyTrajectoryChangeRepository.get_by_id` (the only read behind `GET /follow-ups/{id}` and `POST /follow-ups`) applies no `as_of()`/`filter_as_of` truncation — the identical "demo rewind leaks a later-dated row" bug class this story just fixed for `list_recent`, one method away in the same file.
+  resolved: `get_by_id` passou a aplicar o mesmo `filter_as_of` do `list_recent` e responde `None` para uma mudança posterior ao `as_of()`. Verificado por leitura direta (`sqlalchemy_trajectory_change_repository.py`). Fecha também `epic-5-retro-item-2`.
   evidence: Confirmed by direct read — `get_by_id` does a plain `self._session.get(TrajectoryChangeModel, change_id)` with no date filter at all, unlike `list_recent` (now fixed in this story to call `filter_as_of`). A demo rehearsal that persists a `TrajectoryChange` under a later `SINALIZA_DEMO_AS_OF`, then rewinds to an earlier date, could still open or act on that follow-up by id even though the change itself would no longer surface in Home/Trajectory. Out of this story's scope (follow-ups aren't one of the Home/Trajectory/Trajectory-Detail live-demo surfaces this story targets) and not introduced by this diff — pre-existing since Story 4.1. Fix: apply the same `cast(TrajectoryChangeModel.detected_at, SA_Date)` + `filter_as_of` pattern to `get_by_id`'s query, or explicitly document why follow-up access is exempt from the truncation invariant.
+
+## Deferred from: onda de hardening backend — PRs #39..#46 (2026-11-01)
+
+- source_spec: none
+  summary: `GET /home` lista acompanhamentos via `FollowUpRepository.list_active`, que filtra apenas por `status != ENCERRADO` — não há filtro por `responsible_user_id`. Com o escopo de leitura que o PR #45 adicionou ao `GET /follow-ups/{id}`, num cenário com 2+ usuários a Home mostraria cards de acompanhamentos alheios que respondem **403 ao serem abertos**.
+  evidence: Confirmado por leitura direta de `sqlalchemy_follow_up_repository.py:123-136` — o `select` tem uma única cláusula `where`, sobre `status`. Não é exploração de dados: o card da Home carrega nome do estudante e status, não o texto da observação citada como evidência (esse caminho é o que o #45 fechou). Hoje é inofensivo porque existe **um único usuário semeado** (verificado: `SELECT count(DISTINCT responsible_user_id) FROM follow_ups` = 1), então a inconsistência não é alcançável. Não foi corrigido porque **não é um bug, é uma decisão de produto ainda não tomada**: ou "a coordenação enxerga todos os acompanhamentos da escola" (e então é o 403 do `GET /follow-ups/{id}` que está errado para o papel COORDENACAO_PEDAGOGICA), ou "cada responsável enxerga os seus" (e então `list_active` precisa do mesmo filtro). Escolher no código sem decidir no produto só esconderia a pergunta. Resolver antes de qualquer história que introduza um segundo usuário.
+
+- source_spec: none
+  summary: Nenhuma CSP com `script-src` real pode ser aplicada enquanto `frontend/index.html` carregar o bootstrap de tema como `<script>` inline. O PR #45 entregou uma CSP parcial (`frame-ancestors`, `base-uri`, `object-src`, `form-action`), deliberadamente sem `script-src`/`style-src`.
+  evidence: O bootstrap inline existe para aplicar o tema antes do primeiro paint (evita o flash de tema claro). A única CSP que subiria sem quebrar a tela seria `script-src 'self' 'unsafe-inline'`, que **não impede XSS nenhum** — seria security theater, explicitamente vedado pelo AGENTS.md. Fechar de verdade exige mover o bootstrap para um `.js` servido (ou dar-lhe um nonce por resposta, o que o Nginx servindo estáticos não gera), e aí estender a CSP com `script-src 'self'`. `style-src` tem o obstáculo adicional do estilo inline que o React aplica. Trabalho de frontend, não de infraestrutura — candidato natural à onda de frontend.
+
+- source_spec: `docs/spec-5-1-treinamento-do-modelo-experimental.md`
+  summary: `MLModelVersionModel` persiste apenas `version`, `artifact_path`, `trained_at` e `created_at`. Faltam `training_dataset_version`, `feature_schema_version` e `metrics` — três dos seis campos que o AGENTS.md §"Versionamento de modelo" exige persistir. As métricas de avaliação existem, mas só são **impressas no stdout** por `app/ml/evaluate.py`; nada as grava.
+  evidence: Confirmado por leitura de `models.py:480-496` (as quatro colunas) e por busca em `app/ml/train.py`, que não menciona `metrics`, `dataset_version` nem `feature_schema` em lugar nenhum; `evaluate.py` termina em `print(_format_report(report))`. Consequência concreta: dado um `MLModelVersion` no banco, **não há como responder qual dataset o treinou nem como ele se saiu** — a métrica vive apenas no terminal de quem rodou o comando. Isso é relevante além da higiene: o TCC defende reprodutibilidade do experimento, e hoje o próprio banco não sustenta essa afirmação. Fechar exige migration adicionando as três colunas (`metrics` como `JSONB`), `train.py` gravando o fingerprint do dataset que leu, e `evaluate.py` persistindo o relatório além de imprimi-lo. Não foi feito nesta onda porque é mudança de schema + pipeline de ML, fora do escopo de hardening de backend, e porque o formato de `metrics` merece uma decisão registrada em `docs/decisions/`.
+
+- source_spec: none
+  summary: Três índices são prefixos à esquerda de índices UNIQUE na mesma tabela, então nunca são escolhidos pelo planner — o índice UNIQUE já atende qualquer busca por `student_id`. Ocupam 728 kB e são escrita duplicada em todo INSERT.
+  evidence: Medido no banco de dev real (`sinaliza-postgres-1`), comparando `indkey` de cada índice não-único com o prefixo do `indkey` de cada índice único da mesma tabela: `ix_enrollments_student_id` (32 kB) coberto por `uq_enrollment_student_classroom`; `ix_attendance_records_student_id` (680 kB) coberto por `uq_attendance_student_classroom_date`; `ix_trajectory_changes_student_id` (16 kB) coberto por `uq_trajectory_change_student_type_period`. Em todos os três o índice único começa exatamente por `student_id`, que é a condição para a cobertura valer. Não removido nesta onda porque exige migration e porque o ganho (728 kB e três escritas de índice por INSERT num dataset de ~200 estudantes sintéticos) não justifica tocar no schema no meio de uma onda de segurança — mas é remoção segura e de baixo risco quando houver outra migration passando pela área.
