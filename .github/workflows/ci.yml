@@ -145,3 +145,87 @@ jobs:
 
       - name: vitest
         run: npm test
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    # Depende do job de frontend: nao faz sentido pagar o build das imagens se
+    # o tsc ou o vitest ja reprovaram.
+    needs: frontend
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # O docker-compose.yml exige JWT_SECRET (`:?` falha sem ele) e le este
+      # arquivo do diretorio do projeto. As DEV_SEED_* alimentam o comando de
+      # seed abaixo. Identidade ficticia, igual a backend/.env.example — o
+      # AGENTS.md proibe dado real em qualquer ambiente.
+      - name: Criar .env para o docker compose
+        run: |
+          cat > .env <<'ENVFILE'
+          JWT_SECRET=ci-only-secret-do-not-use-in-prod
+          DEV_SEED_NAME=Coordenacao Pedagogica
+          DEV_SEED_EMAIL=coordenacao@sinaliza.dev
+          DEV_SEED_PASSWORD=change-me
+          ENVFILE
+
+      # As imagens se bastam a partir de um clone limpo: o Dockerfile do
+      # frontend gera openapi.json e schema.d.ts em estagios proprios.
+      - name: Subir a stack
+        run: docker compose up -d --build
+
+      # Esperar o Nginx responder NAO basta: ele serve os estaticos assim que
+      # sobe, enquanto o backend ainda roda `alembic upgrade head`. A primeira
+      # versao disto semeava o usuario cedo demais e morria com
+      # `relation "users" does not exist`.
+      #
+      # Sondar o backend resolve, porque docker-entrypoint.sh faz
+      # `set -e; alembic upgrade head; exec uvicorn` — se ele responde HTTP, a
+      # migration ja terminou com sucesso. A requisicao passa pelo Nginx, entao
+      # tambem prova o proxy /api.
+      #
+      # Usa /openapi.json de proposito, NAO /auth/login: o login e limitado por
+      # taxa, e um loop de sondagem queimaria a cota antes do smoke test rodar.
+      - name: Esperar o backend responder
+        run: timeout 180 bash -c 'until curl -sf http://localhost/api/openapi.json > /dev/null; do sleep 2; done'
+
+      # Banco recem-criado nao tem usuario. Sem isto o smoke test de login
+      # falha por ausencia de dado, nao por defeito da aplicacao.
+      - name: Semear o usuario de desenvolvimento
+        run: docker compose exec -T backend python -m app.infrastructure.db.seed_dev_user
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+        working-directory: frontend
+
+      # `--with-deps` instala as bibliotecas de sistema que o Chromium precisa
+      # no runner Ubuntu. So Chromium: isto e um smoke test de stack viva, nao
+      # uma matriz de compatibilidade entre navegadores.
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Playwright
+        run: npm run test:e2e
+        working-directory: frontend
+
+      # Em falha, o que explica a causa: o relatorio com trace/screenshot e os
+      # logs dos tres servicos.
+      - name: Publicar relatório do Playwright
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Logs dos serviços
+        if: failure()
+        run: docker compose logs --no-color --tail 200
