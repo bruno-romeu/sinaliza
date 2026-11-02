@@ -27,5 +27,18 @@ COPY backend/alembic.ini ./alembic.ini
 COPY backend/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
+# deferred-work (spec-6-1): o processo não precisa de root. Ele escuta na
+# 8000 (porta alta, não privilegiada), não instala nada em runtime e só
+# escreve em `ml_artifact_dir` — criado aqui já pertencente ao usuário para
+# que `docker compose exec backend python -m app.ml.train` continue
+# funcionando. O código em /app fica pertencendo ao root e apenas legível
+# pelo `app`: um comprometimento do processo não reescreve a própria
+# aplicação. Isto é defesa em profundidade, não a fronteira de segurança —
+# a fronteira é o Nginx não publicar esta porta (ver docker-compose.yml).
+RUN useradd --create-home --uid 10001 app \
+    && mkdir -p /app/ml_artifacts \
+    && chown app:app /app/ml_artifacts
+USER app
+
 EXPOSE 8000
 ENTRYPOINT ["./docker-entrypoint.sh"]
