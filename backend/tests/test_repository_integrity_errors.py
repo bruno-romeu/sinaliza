@@ -15,10 +15,13 @@ actually wrong, and this file covers both:
    transaction" state and *every later statement on it* raised
    `PendingRollbackError` — one bad write poisoned the whole session.
 
-The HTTP contract is deliberately unchanged by all of this: these errors
-still subclass `sqlalchemy.exc.IntegrityError`, so `RegisterAttendanceService`
-keeps answering 409 for a duplicate attendance exactly as before (proven by
-`test_attendance.py`'s existing duplicate tests, untouched).
+These errors used to subclass `sqlalchemy.exc.IntegrityError` so that
+`RegisterAttendanceService`, which caught the driver type, kept answering
+409 for a duplicate attendance while the application layer had not caught
+up. PR #44 removed that last consumer (the service now catches
+`DuplicateRecordError`), so the inheritance is gone and these are plain
+exceptions — asserted below, since the whole point of removing it is that
+no `except IntegrityError` anywhere can swallow one by accident.
 """
 
 from __future__ import annotations
@@ -71,22 +74,32 @@ def test_duplicate_attendance_raises_unique_violation_naming_the_constraint(
     assert isinstance(error.__cause__, IntegrityError)
 
 
-def test_unique_violation_is_still_an_integrity_error_so_the_409_path_is_unchanged(
+def test_repository_errors_are_not_sqlalchemy_integrity_errors(
     db_session: Session,
     seeded_classroom: ClassroomModel,
     seeded_enrolled_student: StudentModel,
 ) -> None:
-    """`RegisterAttendanceService` catches `sqlalchemy.exc.IntegrityError` to
-    raise `DuplicateAttendanceError`. Translating at the repository must not
-    silently break that — hence the deliberate subclassing documented in
-    `repositories/errors.py`."""
+    """The inverse of the test this replaces. While `RepositoryIntegrityError`
+    subclassed the driver exception, any `except IntegrityError` in the
+    codebase would catch an already-translated, already-rolled-back error and
+    re-handle it as a fresh driver failure. Nothing depends on the old
+    inheritance any more (`RegisterAttendanceService` catches
+    `DuplicateRecordError`), so this pins the boundary open.
+
+    The repository layer still *accepts* a driver `IntegrityError` as input —
+    what it must never do is hand one back out."""
     repository = SqlAlchemyAttendanceRepository(db_session)
     repository.save(seeded_enrolled_student.id, seeded_classroom.id, DAY, AttendanceStatus.PRESENT)
 
-    with pytest.raises(IntegrityError):
+    with pytest.raises(UniqueViolationError) as excinfo:
         repository.save(
             seeded_enrolled_student.id, seeded_classroom.id, DAY, AttendanceStatus.PRESENT
         )
+
+    assert not isinstance(excinfo.value, IntegrityError)
+    # The evidence trail the base class used to carry survives the re-parenting.
+    assert isinstance(excinfo.value.orig, BaseException)
+    assert excinfo.value.statement is not None
 
 
 def test_grade_save_against_unknown_classroom_raises_foreign_key_violation(
