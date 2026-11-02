@@ -26,17 +26,26 @@ constraint/table name reported by Postgres and chaining the original
 exception (`__cause__`) — the source is never discarded (AGENTS.md,
 "Evidência": nunca descartar a fonte original).
 
-Why these subclass `IntegrityError`
------------------------------------
-Deliberate, and transitional. `RegisterAttendanceService` (application
-layer) already catches `sqlalchemy.exc.IntegrityError` to raise
-`DuplicateAttendanceError`; keeping these as subclasses means standardising
-the repository layer changes *no* HTTP behaviour anywhere — the duplicate
-attendance path still answers 409 through exactly the same code. Once the
-application layer catches `UniqueViolationError`/`ForeignKeyViolationError`
-directly (an `application/` + `presentation/` change, out of this change's
-scope), `RepositoryIntegrityError` can be re-parented onto a plain
-`Exception` without touching any repository.
+Why these no longer subclass `IntegrityError`
+--------------------------------------------
+They used to, transitionally: `RegisterAttendanceService` caught
+`sqlalchemy.exc.IntegrityError` to raise `DuplicateAttendanceError`, so
+subclassing meant translating at the repository changed no HTTP behaviour
+while the application layer had not caught up yet.
+
+PR #44 removed that last consumer — the service now catches
+`DuplicateRecordError` (`application/integrity.py`), and every write path
+is wrapped in `translating_repository_integrity_errors`. With no caller
+depending on the driver type, these are plain exceptions again.
+
+That matters beyond tidiness: while the inheritance stood, any
+`except IntegrityError` anywhere would silently swallow an already-typed
+repository error and re-wrap a rolled-back session's failure as if it were
+a fresh driver exception. Tests that assert on a *raw* driver violation
+(`test_attendance.py`, `test_grades.py`, `test_auth_login.py`,
+`test_migrations.py`) go through `session.commit()`/`connection.execute()`
+directly, never a repository, so they still observe the real
+`sqlalchemy.exc.IntegrityError` and are unaffected.
 """
 
 from __future__ import annotations
@@ -55,12 +64,17 @@ _CHECK_VIOLATION = "23514"
 _EXCLUSION_VIOLATION = "23P01"
 
 
-class RepositoryIntegrityError(IntegrityError):
+class RepositoryIntegrityError(Exception):
     """A database integrity violation, translated at the repository boundary.
 
     `constraint_name`/`table_name` are whatever Postgres reported in the
     error's diagnostics (both may be `None` for a driver or error that does
     not carry them); `__cause__` is always the original `IntegrityError`.
+
+    `statement`/`params`/`orig` are kept as plain attributes rather than
+    dropped with the base class: they are the evidence trail back to the
+    exact write that failed (AGENTS.md, "Evidência": nunca descartar a
+    fonte original).
     """
 
     def __init__(
@@ -71,7 +85,10 @@ class RepositoryIntegrityError(IntegrityError):
         constraint_name: str | None = None,
         table_name: str | None = None,
     ) -> None:
-        super().__init__(statement, params, orig)  # type: ignore[arg-type]
+        super().__init__(statement)
+        self.statement = statement
+        self.params = params
+        self.orig = orig
         self.constraint_name = constraint_name
         self.table_name = table_name
 
