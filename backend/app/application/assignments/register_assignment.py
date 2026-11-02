@@ -19,6 +19,7 @@ from app.application.academic_periods.ports import AcademicPeriodRepositoryPort
 from app.application.assignments.errors import AcademicPeriodNotFoundError, ClassroomNotFoundError
 from app.application.assignments.ports import AssignmentRepositoryPort
 from app.application.attendance.ports import ClassroomRepositoryPort
+from app.application.integrity import translating_repository_integrity_errors
 from app.domain.assignment import Assignment
 
 
@@ -46,9 +47,10 @@ class RegisterAssignmentService:
         if self._academic_period_repository.get_by_id(period_id) is None:
             raise AcademicPeriodNotFoundError()
 
-        return self._assignment_repository.save(
-            classroom_id=classroom_id,
-            subject=subject,
-            period_id=period_id,
-            due_date=due_date,
-        )
+        with translating_repository_integrity_errors():
+            return self._assignment_repository.save(
+                classroom_id=classroom_id,
+                subject=subject,
+                period_id=period_id,
+                due_date=due_date,
+            )
