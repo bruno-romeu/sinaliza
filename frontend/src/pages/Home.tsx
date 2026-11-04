@@ -23,6 +23,7 @@ import {
   TextField,
   type Indicator,
 } from '../components/ui'
+import { useDocumentTitle } from '../useDocumentTitle'
 import { Link } from 'react-router-dom'
 
 type ChangeType = RecentChange['type']
@@ -119,6 +120,7 @@ function LoadMore({
  */
 export function Home() {
   const { token } = useAuth()
+  useDocumentTitle('Home')
 
   const [recentChanges, setRecentChanges] = useState<RecentChange[] | null>(
     null,
@@ -318,6 +320,30 @@ export function Home() {
         />
       </div>
 
+      {/* O `GET /home` alimenta as DUAS listas abaixo, então a falha dele fica
+          acima das duas. Dentro da seção "Mudanças recentes" o aviso sumia
+          junto com a seção enquanto a busca estava ativa, e a seção de
+          acompanhamentos renderizava vazia — sem skeleton, sem mensagem, sem
+          erro — porque as duas ramificações dela exigem `!== null`. */}
+      {loadError && (
+        <div style={{ marginTop: 24 }}>
+          <Notice
+            tone="attention"
+            action={
+              <Button
+                variant="secondary"
+                onClick={() => setLoadAttempt((n) => n + 1)}
+              >
+                Tentar novamente
+              </Button>
+            }
+          >
+            Não foi possível carregar as mudanças recentes e os acompanhamentos
+            agora.
+          </Notice>
+        </div>
+      )}
+
       {showingSearch && (
         <Section id="home-busca" title="Resultados da busca">
           <p role="status" aria-live="polite" className="sz-muted">
@@ -380,19 +406,9 @@ export function Home() {
           )}
 
           {loadError && (
-            <Notice
-              tone="attention"
-              action={
-                <Button
-                  variant="secondary"
-                  onClick={() => setLoadAttempt((n) => n + 1)}
-                >
-                  Tentar novamente
-                </Button>
-              }
-            >
-              Não foi possível carregar os dados agora.
-            </Notice>
+            <p className="sz-muted">
+              Lista indisponível enquanto o carregamento falhar.
+            </p>
           )}
 
           {recentChanges !== null &&
@@ -442,34 +458,44 @@ export function Home() {
           <Skeleton heights={[64, 64]} />
         )}
 
-        {inProgressFollowUps !== null && inProgressFollowUps.length === 0 && (
+        {loadError && (
           <p className="sz-muted">
-            Nenhum acompanhamento em andamento no momento
+            Lista indisponível enquanto o carregamento falhar.
           </p>
         )}
 
-        {inProgressFollowUps !== null && inProgressFollowUps.length > 0 && (
-          <>
-            <ul className="sz-list">
-              {inProgressFollowUps.map((item) => (
-                <li key={item.id}>
-                  <FollowupCard
-                    to={`/acompanhamentos/${item.id}`}
-                    name={item.student_name}
-                    status={item.status}
-                  />
-                </li>
-              ))}
-            </ul>
-            <LoadMore
-              shown={inProgressFollowUps.length}
-              total={followUpsTotal}
-              loading={loadingMoreFollowUps}
-              error={moreFollowUpsError}
-              onClick={handleLoadMoreFollowUps}
-            />
-          </>
-        )}
+        {!loadError &&
+          inProgressFollowUps !== null &&
+          inProgressFollowUps.length === 0 && (
+            <p className="sz-muted">
+              Nenhum acompanhamento em andamento no momento
+            </p>
+          )}
+
+        {!loadError &&
+          inProgressFollowUps !== null &&
+          inProgressFollowUps.length > 0 && (
+            <>
+              <ul className="sz-list">
+                {inProgressFollowUps.map((item) => (
+                  <li key={item.id}>
+                    <FollowupCard
+                      to={`/acompanhamentos/${item.id}`}
+                      name={item.student_name}
+                      status={item.status}
+                    />
+                  </li>
+                ))}
+              </ul>
+              <LoadMore
+                shown={inProgressFollowUps.length}
+                total={followUpsTotal}
+                loading={loadingMoreFollowUps}
+                error={moreFollowUpsError}
+                onClick={handleLoadMoreFollowUps}
+              />
+            </>
+          )}
       </Section>
     </Page>
   )
