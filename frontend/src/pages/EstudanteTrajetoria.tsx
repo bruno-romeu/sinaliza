@@ -23,6 +23,7 @@ import {
   TrajectoryChart,
   type Indicator,
 } from '../components/ui'
+import { useDocumentTitle } from '../useDocumentTitle'
 
 type ChartIndicator = TrajectoryDetail['chart_indicator']
 type ChangeType = NonNullable<TrajectoryDetail['trajectory_change']>['type']
@@ -119,6 +120,10 @@ export function EstudanteTrajetoria() {
   const student =
     loadState.status === 'loaded' ? loadState.detail.student : null
 
+  useDocumentTitle(
+    student ? `Trajetória de ${student.name}` : 'Trajetória do estudante',
+  )
+
   return (
     <Page>
       {/* spec-ui-1: the detail endpoint carries the student's name and
@@ -193,6 +198,8 @@ export function EstudanteTrajetoria() {
     </Page>
   )
 }
+
+const FOLLOW_UP_REASON_ID = 'abrir-acompanhamento-motivo'
 
 type OpenFollowUpState =
   { status: 'idle' } | { status: 'submitting' } | { status: 'error' }
@@ -354,6 +361,17 @@ function TrajectoryDetailContent({
         className="sz-actions"
         style={{ flexDirection: 'column', alignItems: 'flex-end' }}
       >
+        {/* O motivo de "Abrir acompanhamento" estar indisponível vivia num
+            `title=` do próprio botão desabilitado — que não recebe foco, não
+            recebe hover de teclado e não é lido por leitor de tela. Agora é
+            texto na tela, ligado ao botão por `aria-describedby`. */}
+        {!detail.open_follow_up_id && !hasChange && (
+          <p className="sz-muted" id={FOLLOW_UP_REASON_ID}>
+            Abrir acompanhamento vincula evidências a um processo da equipe.
+            Enquanto não houver mudança detectada nesta trajetória, não há
+            evidência a vincular.
+          </p>
+        )}
         <div
           style={{
             display: 'flex',
@@ -381,11 +399,7 @@ function TrajectoryDetailContent({
               icon="mais"
               disabled={!hasChange || openFollowUpState.status === 'submitting'}
               onClick={handleOpenFollowUp}
-              title={
-                hasChange
-                  ? undefined
-                  : 'Acompanhamento vinculado a evidências requer uma mudança detectada.'
-              }
+              aria-describedby={hasChange ? undefined : FOLLOW_UP_REASON_ID}
             >
               {openFollowUpState.status === 'submitting'
                 ? 'Abrindo…'
