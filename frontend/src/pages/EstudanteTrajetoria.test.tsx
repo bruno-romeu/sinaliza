@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../auth/AuthContext'
@@ -104,10 +104,18 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
     expect(screen.queryByText('Fator preocupante')).not.toBeInTheDocument()
     expect(screen.queryByText('Trajetória estável')).not.toBeInTheDocument()
 
-    const changePointButton = screen.getByRole('button', {
-      name: /Mudança detectada em 3º Bimestre/,
+    // O caminho de teclado até a evidência é um `<button>` real FORA da svg.
+    // Dentro de um `<svg role="img">` ele era a violação `nested-interactive`
+    // do axe: o leitor de tela anuncia a svg como uma imagem só, e o controle
+    // interno fica inalcançável.
+    const evidenceButton = screen.getByRole('button', {
+      name: /Ver a evidência da mudança em 3º Bimestre/,
     })
-    expect(changePointButton).toBeInTheDocument()
+    expect(evidenceButton).toBeInTheDocument()
+    const chart = screen.getByRole('img', {
+      name: /Gráfico de frequência por bimestre/,
+    })
+    expect(within(chart).queryByRole('button')).not.toBeInTheDocument()
 
     // WCAG 1.1.1 text-table alternative to the SVG chart.
     const table = screen.getByRole('table')
@@ -138,6 +146,15 @@ describe('EstudanteTrajetoria — trajetória do estudante (Story 3.4)', () => {
 
     await screen.findByText('Trajetória estável')
     expect(screen.queryByText('Fator preocupante')).not.toBeInTheDocument()
+
+    // Sem mudança detectada, "Abrir acompanhamento" fica desabilitado. O
+    // motivo vivia num `title=` do próprio botão — que não recebe foco, não
+    // recebe hover de teclado e não é lido por leitor de tela. Agora é texto
+    // na tela, ligado ao botão por `aria-describedby`.
+    const abrir = screen.getByRole('button', { name: 'Abrir acompanhamento' })
+    expect(abrir).toBeDisabled()
+    expect(abrir).not.toHaveAttribute('title')
+    expect(abrir).toHaveAccessibleDescription(/não há evidência a vincular/)
   })
 
   it('renders the chart without a habitual-range band when fewer than 2 history points exist', async () => {

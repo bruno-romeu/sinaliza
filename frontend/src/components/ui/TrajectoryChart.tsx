@@ -17,9 +17,14 @@ const PAD = { left: 52, right: 24, top: 28, bottom: 36 }
  * Trajetória real do aluno contra a faixa habitual do próprio histórico
  * dele, nunca contra a turma. Faixa em `band-fill` com contorno tracejado,
  * linha em `trajectory-line`, ponto de mudança em `attention` com halo e
- * rótulo. O ponto de mudança é focável e ativa com Enter/Espaço. A tabela
- * equivalente está sempre no DOM (visível com "Ver como tabela", oculta para
- * leitor de tela caso contrário).
+ * rótulo. A tabela equivalente está sempre no DOM (visível com "Ver como
+ * tabela", oculta para leitor de tela caso contrário).
+ *
+ * O ponto de mudança é clicável, mas **não** é focável: um controle focável
+ * dentro de um `<svg role="img">` é a violação `nested-interactive` do axe —
+ * o leitor de tela anuncia a svg como uma imagem só e o controle interno
+ * fica inalcançável. O caminho de teclado equivalente é o botão "Ver a
+ * evidência…" logo abaixo do gráfico, que chama o mesmo `onChangePoint`.
  */
 export function TrajectoryChart({
   summary,
@@ -165,19 +170,7 @@ export function TrajectoryChart({
             </text>
           ))}
           {change && change.value !== null && changeIndex !== undefined && (
-            <g
-              className="cp"
-              tabIndex={0}
-              role="button"
-              aria-label={`Mudança detectada em ${change.label}: ${format(change.value)}${changeDescription ? `. ${changeDescription}` : ''}. Ver evidência.`}
-              onClick={onChangePoint}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  onChangePoint?.()
-                }
-              }}
-            >
+            <g className="cp" onClick={onChangePoint}>
               <circle
                 className="cp-hit"
                 cx={x(changeIndex)}
@@ -222,6 +215,24 @@ export function TrajectoryChart({
           )}
         </svg>
       )}
+      {/* Caminho de teclado para a evidência, fora da svg — o equivalente
+          alcançável do ponto de mudança clicável. Só aparece quando há
+          mudança e quem usa o gráfico quis ligar o destino. */}
+      {!showTable &&
+        change &&
+        change.value !== null &&
+        onChangePoint !== undefined && (
+          <div>
+            <Button variant="quiet" icon="sinal" onClick={onChangePoint}>
+              Ver a evidência da mudança em {change.label}
+              <span className="sz-sr">
+                {' '}
+                ({format(change.value)}
+                {changeDescription ? `. ${changeDescription}` : ''})
+              </span>
+            </Button>
+          </div>
+        )}
       <table className={showTable ? 'sz-table' : 'sz-sr'}>
         <caption className="sz-sr">{summary}</caption>
         <thead>
