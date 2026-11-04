@@ -8,10 +8,16 @@ process or a scheduler. Loads the single most recently trained
 `as_of()` truncation), and prints a precision/recall/F1/confusion-matrix/
 ROC-AUC/PR-AUC report to stdout.
 
-This is a pure stdout-reporting CLI — no persistence, matching the
-`train`/`predict` precedent (spec Never). Every printed report states,
-verbatim, that it measures "ability to recognize simulated patterns in the
-synthetic dataset," never real-world predictive validity.
+O relatório é impresso **e** gravado em `ml_model_version.metrics` (JSONB) da
+versão avaliada. Era só stdout até a migration 0015: a métrica vivia apenas no
+terminal de quem rodou o comando, e o `AGENTS.md` §Versionamento de modelo
+exige `metrics` entre os campos persistidos. Nenhuma outra linha é criada —
+`run_evaluation` atualiza a `MLModelVersion` que avaliou, e nada mais.
+
+Every printed report states, verbatim, that it measures "ability to recognize
+simulated patterns in the synthetic dataset," never real-world predictive
+validity — e o mesmo texto vai dentro do JSON gravado, para que o número nunca
+seja lido sem a ressalva.
 """
 
 from __future__ import annotations
@@ -19,6 +25,8 @@ from __future__ import annotations
 import argparse
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
 import joblib
 import numpy as np
@@ -37,6 +45,14 @@ from app.domain.student import SyntheticProfile
 from app.infrastructure.db.base import SessionLocal
 from app.infrastructure.db.models import MLModelVersionModel
 from app.ml.evaluation_repository import EvaluationRepository
+from app.ml.feature_aggregation import (
+    FEATURE_COLUMNS,
+    FEATURE_SCHEMA_VERSION,
+    FeatureSchemaMismatchError,
+    feature_vector,
+    require_matching_feature_schema,
+)
+from app.synthetic.fingerprint import population_fingerprint
 
 #: The fixed label set for precision/recall/F1/confusion-matrix — every
 #: `SyntheticProfile` member, in a stable order, so an absent class shows as
@@ -53,6 +69,13 @@ DISCLAIMER = (
 )
 
 _NOT_COMPUTABLE = "not computable (fewer than 2 classes present in the evaluation labels)"
+
+#: Versão do formato do JSON gravado em `ml_model_version.metrics`. Explícita
+#: desde a primeira versão para que um relatório guardado hoje continue
+#: interpretável quando o conteúdo mudar (por exemplo, se métricas por classe
+#: forem acrescentadas às macro de hoje) — mesmo papel de
+#: `synthetic.generate.GENERATOR_VERSION`.
+METRICS_SCHEMA_VERSION = 1
 
 
 class NoModelVersionError(RuntimeError):
@@ -83,6 +106,41 @@ class EvaluationReport:
     missing_facts_count: int
     sample_count: int
     disclaimer: str = DISCLAIMER
+    #: Preenchidos ao persistir; não participam do texto impresso.
+    evaluated_at: datetime | None = None
+    evaluation_dataset_version: str | None = None
+
+    def as_metrics_payload(self) -> dict[str, Any]:
+        """O relatório no formato gravado em `ml_model_version.metrics`.
+
+        Carrega o `disclaimer` **verbatim** dentro do próprio JSON de
+        propósito: a métrica passa a existir fora do terminal de quem rodou o
+        comando, e `AGENTS.md` exige que ela nunca seja lida como "precisão em
+        prever evasão escolar". A ressalva viaja colada ao número em vez de
+        depender de quem consulta lembrar dela.
+
+        Registra também sobre o quê a métrica foi medida — corte, rótulos,
+        esquema de features e fingerprint do dataset de avaliação — porque uma
+        métrica sem o dataset a que se refere não é procedência."""
+        return {
+            "metrics_schema_version": METRICS_SCHEMA_VERSION,
+            "evaluated_at": self.evaluated_at.isoformat() if self.evaluated_at else None,
+            "dataset_split": "EVAL_DEMO",
+            "evaluation_dataset_version": self.evaluation_dataset_version,
+            "feature_schema_version": FEATURE_SCHEMA_VERSION,
+            "feature_columns": list(FEATURE_COLUMNS),
+            "labels": list(_ALL_LABELS),
+            "averaging": "macro",
+            "sample_count": self.sample_count,
+            "missing_facts_count": self.missing_facts_count,
+            "precision": self.precision,
+            "recall": self.recall,
+            "f1": self.f1,
+            "roc_auc": self.roc_auc,
+            "pr_auc": self.pr_auc,
+            "confusion_matrix": self.confusion_matrix,
+            "disclaimer": self.disclaimer,
+        }
 
 
 def run_evaluation(session: Session) -> EvaluationReport:
@@ -92,7 +150,8 @@ def run_evaluation(session: Session) -> EvaluationReport:
     drive it inside its own rolled-back transaction, mirroring
     `app.ml.predict.run_prediction`'s precedent. Never refits the pipeline —
     `joblib.load`s the artifact verbatim and only calls `.predict`/
-    `.predict_proba`."""
+    `.predict_proba`. Ao final, grava o relatório em `metrics` da própria
+    `MLModelVersion` avaliada (nenhuma linha nova é criada)."""
     model_version_row = session.execute(
         select(MLModelVersionModel)
         .order_by(MLModelVersionModel.trained_at.desc(), MLModelVersionModel.id.desc())
@@ -111,17 +170,13 @@ def run_evaluation(session: Session) -> EvaluationReport:
             "Run `python -m app.synthetic.generate` first."
         )
 
+    require_matching_feature_schema(
+        model_version_row.version, model_version_row.feature_schema_version
+    )
+
     pipeline = joblib.load(model_version_row.artifact_path)
 
-    feature_matrix = [
-        [
-            row.attendance_rate,
-            row.grade_average,
-            row.assignment_completion_rate,
-            row.observation_count,
-        ]
-        for row in evaluation_rows
-    ]
+    feature_matrix = [feature_vector(row) for row in evaluation_rows]
     y_true = [row.label.value for row in evaluation_rows]
 
     y_pred = pipeline.predict(feature_matrix)
@@ -181,7 +236,7 @@ def run_evaluation(session: Session) -> EvaluationReport:
         or row.assignment_completion_rate is None
     )
 
-    return EvaluationReport(
+    report = EvaluationReport(
         precision=float(precision),
         recall=float(recall),
         f1=float(f1),
@@ -190,7 +245,19 @@ def run_evaluation(session: Session) -> EvaluationReport:
         pr_auc=pr_auc,
         missing_facts_count=missing_facts_count,
         sample_count=len(evaluation_rows),
+        evaluated_at=datetime.now(UTC),
+        evaluation_dataset_version=population_fingerprint(session),
     )
+
+    # O relatório deixa de viver só no stdout: fica na própria
+    # `MLModelVersion` avaliada (`AGENTS.md` §Versionamento de modelo exige
+    # `metrics` entre os campos persistidos). Reavaliar a mesma versão
+    # sobrescreve — `evaluation_dataset_version` dentro do JSON diz sobre qual
+    # dataset a métrica guardada vale, então o valor nunca é ambíguo.
+    model_version_row.metrics = report.as_metrics_payload()
+    session.commit()
+
+    return report
 
 
 def _format_report(report: EvaluationReport) -> str:
@@ -227,7 +294,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "evaluation report (precision/recall/F1/confusion-matrix/"
             "ROC-AUC/PR-AUC). Measures ability to recognize simulated "
             "patterns in the synthetic dataset, not real-world predictive "
-            "validity. Pure stdout reporting — nothing is persisted."
+            "validity. The report is printed and also stored on the evaluated "
+            "MLModelVersion's metrics column."
         ),
     )
 
@@ -243,7 +311,7 @@ def main(argv: list[str] | None = None) -> None:
     with SessionLocal() as session:
         try:
             report = run_evaluation(session)
-        except (NoModelVersionError, NoEvaluationDataError) as exc:
+        except (NoModelVersionError, NoEvaluationDataError, FeatureSchemaMismatchError) as exc:
             print(str(exc), file=sys.stderr)
             sys.exit(1)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -22,6 +23,7 @@ from sqlalchemy import (
     false,
 )
 from sqlalchemy import Enum as SAEnum
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -482,7 +484,16 @@ class MLModelVersionModel(Base):
     — never written by the web process (AD-3). `version` is `UNIQUE` so a
     re-run can never collide with or overwrite a prior row/artifact file
     (spec Never). `artifact_path` points at the single serialized sklearn
-    `Pipeline` file Story 5.2's inference loader will later `joblib.load`."""
+    `Pipeline` file Story 5.2's inference loader will later `joblib.load`.
+
+    `training_dataset_version`, `feature_schema_version` e `metrics`
+    (migration 0015) completam os seis campos exigidos pelo `AGENTS.md`
+    §Versionamento de modelo. Os três são `NULL`-áveis e sem backfill: uma
+    linha treinada antes da migration não tem como saber qual dataset a
+    treinou, e preencher um valor plausível seria procedência fabricada.
+    `metrics` é escrito por `python -m app.ml.evaluate`, nunca pelo treino —
+    treinar e avaliar no mesmo conjunto é proibido, então a métrica só existe
+    depois de uma avaliação sobre o corte `EVAL_DEMO`."""
 
     __tablename__ = "ml_model_version"
     __table_args__ = (UniqueConstraint("version", name="uq_ml_model_version_version"),)
@@ -494,6 +505,11 @@ class MLModelVersionModel(Base):
     artifact_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     trained_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    training_dataset_version: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    feature_schema_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: `JSONB`, não `JSON`: o relatório precisa ser consultável por campo
+    #: (`metrics->>'f1'`) sem reparsear texto.
+    metrics: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
 class MLPredictionModel(Base):
