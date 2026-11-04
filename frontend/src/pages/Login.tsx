@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { Icon, Notice, TextField } from '../components/ui'
+import { useDocumentTitle } from '../useDocumentTitle'
 
 /**
  * Login (RF-01). Visual: design system `TelaLogin`. Marca à esquerda (os
@@ -11,6 +12,7 @@ import { Icon, Notice, TextField } from '../components/ui'
 export function Login() {
   const { login, sessionExpired } = useAuth()
   const navigate = useNavigate()
+  useDocumentTitle('Entrar')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
