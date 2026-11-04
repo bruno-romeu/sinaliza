@@ -25,6 +25,7 @@ import {
   TextAreaField,
   Timeline,
 } from '../components/ui'
+import { useDocumentTitle } from '../useDocumentTitle'
 
 type FollowUpStatusValue = FollowUpDetail['status']
 type FollowUpActionItem = FollowUpDetail['actions'][number]
@@ -71,6 +72,8 @@ type LoadState =
   | { status: 'loading' }
   | { status: 'loaded'; detail: FollowUpDetail }
   | { status: 'not_found' }
+  /** 403: o acompanhamento existe, mas não é desta conta. */
+  | { status: 'forbidden' }
   | { status: 'error' }
 
 /**
@@ -84,6 +87,12 @@ export function Acompanhamento() {
   const { token } = useAuth()
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
   const [loadAttempt, setLoadAttempt] = useState(0)
+
+  useDocumentTitle(
+    loadState.status === 'loaded'
+      ? `Acompanhamento de ${loadState.detail.student_name}`
+      : 'Acompanhamento',
+  )
 
   useEffect(() => {
     if (!token || !followUpId) return
@@ -101,6 +110,11 @@ export function Acompanhamento() {
           caught.code === 'follow_up_not_found'
         ) {
           setLoadState({ status: 'not_found' })
+        } else if (caught instanceof ApiError && caught.status === 403) {
+          // Oferecer "Tentar novamente" aqui seria oferecer um botão que
+          // nunca pode dar certo: o 403 não é falha transitória, é escopo de
+          // leitura (`docs/deferred-work.md`, `GET /home` × `list_active`).
+          setLoadState({ status: 'forbidden' })
         } else {
           setLoadState({ status: 'error' })
         }
@@ -128,6 +142,22 @@ export function Acompanhamento() {
           style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
         >
           <p className="sz-muted">Acompanhamento não encontrado.</p>
+          <div>
+            <ButtonLink to="/home" variant="secondary" icon="voltar">
+              Voltar para a Home
+            </ButtonLink>
+          </div>
+        </div>
+      )}
+
+      {loadState.status === 'forbidden' && (
+        <div
+          className="sz-section"
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
+          <p className="sz-muted">
+            Este acompanhamento não está disponível para a sua conta.
+          </p>
           <div>
             <ButtonLink to="/home" variant="secondary" icon="voltar">
               Voltar para a Home

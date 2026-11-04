@@ -93,6 +93,8 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     renderPage()
 
     await screen.findByText('Maria Silva')
+    // WCAG 2.4.2: o título do documento nomeia a tela, não a aplicação.
+    expect(document.title).toBe('Acompanhamento de Maria Silva · Sinaliza')
     expect(
       within(
         screen.getByText('Maria Silva').closest('section') as HTMLElement,
@@ -138,6 +140,39 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
     expect(
       screen.getByRole('link', { name: 'Voltar para a Home' }),
     ).toHaveAttribute('href', '/home')
+  })
+
+  it('trata 403 como escopo, não como falha transitória — sem retry impossível', async () => {
+    // Cenário descrito em `docs/deferred-work.md`: a Home lista
+    // acompanhamentos via `list_active`, que não filtra por responsável, e o
+    // `GET /follow-ups/{id}` responde 403 quando o responsável é outro. Antes
+    // isso caía no erro genérico e oferecia um "Tentar novamente" que nunca
+    // poderia dar certo. A decisão de produto sobre o escopo da listagem
+    // continua em aberto — aqui só o tratamento do erro mudou.
+    fetchMock = vi.fn(async () =>
+      jsonResponse(
+        {
+          error: {
+            code: 'follow_up_access_denied',
+            message: 'Acesso negado.',
+          },
+        },
+        403,
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage('alheio')
+
+    await screen.findByText(
+      'Este acompanhamento não está disponível para a sua conta.',
+    )
+    expect(
+      screen.getByRole('link', { name: 'Voltar para a Home' }),
+    ).toHaveAttribute('href', '/home')
+    expect(
+      screen.queryByRole('button', { name: 'Tentar novamente' }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows a factual error message with retry on load failure', async () => {
