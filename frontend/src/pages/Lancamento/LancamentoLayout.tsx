@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useDocumentTitle } from '../../useDocumentTitle'
 import {
   NavTabs,
   Notice,
@@ -47,6 +48,9 @@ export function LancamentoLayout({
   contextError?: ReactNode
   children: ReactNode
 }) {
+  // As 4 telas de Lançamento são rotas irmãs com o mesmo cabeçalho; o título
+  // do documento é o que as distingue no histórico e para o leitor de tela.
+  useDocumentTitle(`Lançar ${title.toLowerCase()}`)
   return (
     <Page>
       <ScreenHead kicker="Lançar registro" title={title}>
