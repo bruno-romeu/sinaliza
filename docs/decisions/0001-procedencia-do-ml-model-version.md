@@ -2,7 +2,7 @@
 
 - **Data:** 2026-11-04
 - **Status:** aceita
-- **Contexto no repositório:** `docs/specs/spec-ml-model-provenance/SPEC.md`, `docs/deferred-work.md` (entrada da onda de hardening sobre `MLModelVersionModel`), `epic-5-retro-item-1`
+- **Contexto no repositório:** `docs/spec-ml-model-provenance.md`, `docs/deferred-work.md` (entrada da onda de hardening sobre `MLModelVersionModel`), `epic-5-retro-item-1`
 
 ## Contexto
 
