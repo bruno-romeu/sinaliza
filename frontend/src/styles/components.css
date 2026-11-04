@@ -276,6 +276,9 @@
   text-decoration: none;
   color: inherit;
   min-height: var(--size-hit);
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
 }
 .sz-row:hover {
   background: var(--action-tint);
@@ -334,6 +337,41 @@
 .sz-row-chev {
   color: var(--ink-muted);
   align-self: center;
+}
+/* Medido em 360px: .sz-row-side e `white-space: nowrap` e nao encolhe, entao
+   consumia a linha inteira e .sz-row-body (com `min-width: 0`) era espremido
+   a 24px — o nome do estudante passava por cima do rotulo "MUDANCA RECENTE" e
+   a descricao da mudanca quebrava uma palavra por linha. Ou seja: justamente
+   a frase que diz o que mudou era a parte ilegivel.
+   Abaixo de 560px a lateral desce para uma segunda linha e a descricao fica
+   com a largura inteira. O chevron sai do fluxo para nao cair sozinho numa
+   terceira linha, mas continua visivel: e ele que indica que a linha toda e
+   um link. O limite de 560px vem da conta de largura: a lateral pede ~150px
+   fixos, e abaixo disso sobra menos de 230px para a descricao. */
+@media (max-width: 560px) {
+  .sz-row {
+    flex-wrap: wrap;
+    position: relative;
+    padding-right: calc(var(--space-5) + var(--space-5));
+  }
+  .sz-row-body {
+    flex: 1 1 0;
+  }
+  .sz-row-side {
+    flex: 1 1 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    white-space: normal;
+    padding-left: calc(32px + var(--space-4));
+  }
+  .sz-row-chev {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    align-self: flex-start;
+  }
 }
 
 /* ---------- EvidenceCard ---------- */
@@ -569,6 +607,28 @@
   font-weight: 700;
   fill: var(--attention-ink);
 }
+/* Medido em 360px: o viewBox do grafico (640x240) era reduzido para 262px de
+   largura — escala 0,41 — e o texto do eixo saia com 7px de altura de caixa,
+   ilegivel. O grafico e o elemento cuja funcao e tornar a mudanca de
+   trajetoria perceptivel, entao precisa ser lido, nao apenas caber.
+   O viewBox vive no .tsx e nao pode ser mudado daqui; o que pode e o
+   font-size, porque dentro de um SVG com viewBox ele e expresso em unidades
+   de usuario e escala junto. Aumentar a tipografia do grafico recupera a
+   legibilidade sem scroll horizontal e sem markup novo. Os 21px foram
+   escolhidos por medicao: a 24px os rotulos do 3o e do 4o bimestre ja se
+   sobrepunham 2px. */
+@media (max-width: 720px) {
+  .sz-chart {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  .sz-chart .axis {
+    font-size: 21px;
+  }
+  .sz-chart .cp-label {
+    font-size: 21px;
+  }
+}
 .sz-legend {
   display: flex;
   flex-wrap: wrap;
@@ -773,6 +833,29 @@
   align-items: center;
   gap: var(--space-2);
 }
+/* Medido em 360px: os cinco controles do topo quebravam em quatro linhas
+   ragged e o cabecalho ocupava 241px — quase um terco da tela util antes de
+   qualquer conteudo aparecer. Encurtar o espacamento horizontal, sem tocar em
+   min-height (que e o alvo de toque de 44px), faz "Voltar a Home" e "Lancar
+   registro" caberem na mesma linha.
+   Nao reagrupamos com `order`: mudaria a ordem visual sem mudar a ordem de
+   foco, e teclado e leitor de tela passariam a divergir do que se ve.
+   Estas regras ficam aqui, e nao em base.css, porque .sz-header-nav e
+   definido neste arquivo e components.css e importado por ultimo: a mesma
+   media query em base.css seria sobrescrita (era o caso da antiga regra de
+   gap, que nunca chegou a valer). */
+@media (max-width: 640px) {
+  .sz-header {
+    padding: var(--space-3) 0;
+    gap: var(--space-2) var(--space-3);
+  }
+  .sz-header-nav {
+    gap: var(--space-2);
+  }
+  .sz-header-nav .sz-btn {
+    padding: 0 var(--space-3);
+  }
+}
 .sz-avatar {
   width: 32px;
   height: 32px;
@@ -810,6 +893,9 @@
   line-height: 20px;
   color: var(--ink);
   text-decoration: none;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
 }
 .sz-tab:hover {
   background: var(--action-tint);
@@ -879,6 +965,11 @@
   cursor: pointer;
   white-space: nowrap;
 }
+.sz-choice-opt span {
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
 .sz-choice-opt input:checked + span {
   background: var(--action);
   color: var(--on-action);
@@ -912,6 +1003,11 @@
   gap: var(--space-4);
   padding: var(--space-3) var(--space-5);
   min-height: 64px;
+  /* A linha ficando verde e a confirmacao de que o lancamento foi gravado.
+     Sem transicao ela troca de cor de um quadro para o outro e passa
+     despercebida quando o professor ja esta olhando a linha seguinte; 180ms
+     tornam a troca perceptivel sem atrasar a proxima acao. */
+  transition: background-color 0.18s ease;
 }
 .sz-rrow[data-status="saved"] {
   background: var(--success-tint);
@@ -994,6 +1090,43 @@
   .sz-rrow-act {
     grid-column: 2;
     justify-self: start;
+  }
+  /* Medido em 360px: .sz-rrow-act mantinha min-width 132px com o conteudo
+     alinhado a direita, entao o "Salvar" nascia 36px a direita da coluna do
+     nome — um recuo morto que fazia a linha parecer desalinhada. Em telas
+     largas o alinhamento a direita e o que mantem a coluna de acoes; na
+     coluna unica do telefone ele nao tem mais o que alinhar. */
+  .sz-rrow-act {
+    min-width: 0;
+    justify-content: flex-start;
+  }
+}
+/* Em telefone o controle segmentado quebrava dentro da propria borda: a
+   terceira opcao caia para uma segunda linha sem divisor e deixava um vazio
+   a direita da primeira. Empilhar e a leitura honesta do espaco disponivel e
+   da de quebra alvos de toque de 44px, que e o gesto real da chamada feita
+   no telefone.
+   O limite de 500px vem da medicao, nao de um breakpoint redondo: o controle
+   em linha mede ~373px e a coluna que o hospeda vale aproximadamente
+   (viewport - 128px), entao ele passa a quebrar por volta de 501px. Acima
+   disso ele cabe inteiro em uma linha e empilhar seria uma piora. */
+@media (max-width: 500px) {
+  .sz-choice-opts {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  .sz-choice-opt + .sz-choice-opt {
+    border-left: 0;
+    border-top: 1.5px solid var(--line-strong);
+  }
+  .sz-choice-opt,
+  .sz-choice-opt span {
+    width: 100%;
+  }
+  .sz-choice-opt span {
+    min-height: var(--size-hit);
+    white-space: normal;
   }
 }
 .sz-field-box input:focus-visible,
