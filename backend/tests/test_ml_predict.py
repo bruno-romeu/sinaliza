@@ -33,6 +33,8 @@ from app.infrastructure.db.models import (
     UserModel,
 )
 from app.ml import predict as predict_module
+from app.ml.feature_aggregation import FeatureSchemaMismatchError
+from app.ml.model_version_selection import ModelVersionNotFoundError
 from app.ml.pipeline import build_pipeline
 from app.ml.predict import NoModelVersionError, NoScoringDataError, run_prediction
 from app.ml.train import run_training
@@ -553,3 +555,193 @@ def test_main_exits_zero_and_prints_summary_on_success(
     assert "Scored 2 EVAL_DEMO student(s)" in captured.out
     assert "(1 with missing facts imputed)" in captured.out
     assert db_session.query(MLPredictionModel).count() == 2
+
+
+# ---------------------------------------------------------------------------
+# `--model-version`: explicit MLModelVersion selection
+# ---------------------------------------------------------------------------
+
+
+def test_run_prediction_scores_with_the_explicitly_named_model_version(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+) -> None:
+    """A versão pedida pelo nome vence a mais recente. É o que torna "pontue
+    com este modelo" um comando, agora que a procedência de cada versão está
+    gravada."""
+    older_version = _seed_model_version(
+        db_session, tmp_path, "older", datetime(2020, 1, 1, tzinfo=UTC)
+    )
+    newer_version = _seed_model_version(
+        db_session, tmp_path, "newer", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    _seed_eval_demo_student(
+        db_session,
+        seeded_classroom,
+        with_facts=True,
+        period_id=seeded_academic_period.id,
+        assignment=seeded_assignment,
+        author_user_id=seeded_user.id,
+    )
+
+    predictions = run_prediction(db_session, tmp_path, "older")
+
+    assert len(predictions) == 1
+    assert predictions[0].model_version_id == older_version.id
+    assert predictions[0].model_version_id != newer_version.id
+
+
+def test_run_prediction_without_the_argument_still_uses_the_most_recent(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+) -> None:
+    """O padrão não mudou: `model_version=None` explícito seleciona a mesma
+    linha que a chamada sem o argumento."""
+    _seed_model_version(db_session, tmp_path, "older", datetime(2020, 1, 1, tzinfo=UTC))
+    newer_version = _seed_model_version(
+        db_session, tmp_path, "newer", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    _seed_eval_demo_student(
+        db_session,
+        seeded_classroom,
+        with_facts=True,
+        period_id=seeded_academic_period.id,
+        assignment=seeded_assignment,
+        author_user_id=seeded_user.id,
+    )
+
+    predictions = run_prediction(db_session, tmp_path, None)
+
+    assert predictions[0].model_version_id == newer_version.id
+
+
+def test_run_prediction_raises_and_writes_nothing_for_an_unknown_version(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+) -> None:
+    """Versão inexistente falha em vez de cair no silêncio do "mais recente" —
+    pontuar com outro modelo que não o pedido seria pior que não pontuar."""
+    _seed_model_version(db_session, tmp_path, "existente", datetime(2026, 1, 1, tzinfo=UTC))
+    _seed_eval_demo_student(
+        db_session,
+        seeded_classroom,
+        with_facts=True,
+        period_id=seeded_academic_period.id,
+        assignment=seeded_assignment,
+        author_user_id=seeded_user.id,
+    )
+
+    with pytest.raises(ModelVersionNotFoundError):
+        run_prediction(db_session, tmp_path, "inexistente")
+
+    assert db_session.query(MLPredictionModel).count() == 0
+
+
+def test_explicit_version_does_not_bypass_the_feature_schema_guard(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+) -> None:
+    """Escolher a versão diz *qual* artefato usar, nunca *apesar de quê*:
+    `require_matching_feature_schema` continua recusando um artefato ajustado
+    sob outra ordem de colunas, mesmo pedido pelo nome."""
+    model_version = _seed_model_version(
+        db_session, tmp_path, "esquema-antigo", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    model_version.feature_schema_version = "sha256:outroesquema"
+    db_session.commit()
+    _seed_eval_demo_student(
+        db_session,
+        seeded_classroom,
+        with_facts=True,
+        period_id=seeded_academic_period.id,
+        assignment=seeded_assignment,
+        author_user_id=seeded_user.id,
+    )
+
+    with pytest.raises(FeatureSchemaMismatchError):
+        run_prediction(db_session, tmp_path, "esquema-antigo")
+
+    assert db_session.query(MLPredictionModel).count() == 0
+
+
+def test_main_scores_with_the_version_passed_on_the_command_line(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    older_version = _seed_model_version(
+        db_session, tmp_path, "older", datetime(2020, 1, 1, tzinfo=UTC)
+    )
+    _seed_model_version(db_session, tmp_path, "newer", datetime(2026, 1, 1, tzinfo=UTC))
+    _seed_eval_demo_student(
+        db_session,
+        seeded_classroom,
+        with_facts=True,
+        period_id=seeded_academic_period.id,
+        assignment=seeded_assignment,
+        author_user_id=seeded_user.id,
+    )
+    monkeypatch.setattr(predict_module, "SessionLocal", lambda: _SessionContext(db_session))
+    monkeypatch.setattr(
+        predict_module, "get_settings", lambda: SimpleNamespace(ml_artifact_dir=str(tmp_path))
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        predict_module.main(["--model-version", "older"])
+
+    assert exc_info.value.code == 0
+    assert f"model_version_id={older_version.id}" in capsys.readouterr().out
+
+
+def test_main_exits_nonzero_and_names_the_unknown_version_on_stderr(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _seed_model_version(db_session, tmp_path, "existente", datetime(2026, 1, 1, tzinfo=UTC))
+    _seed_eval_demo_student(
+        db_session,
+        seeded_classroom,
+        with_facts=True,
+        period_id=seeded_academic_period.id,
+        assignment=seeded_assignment,
+        author_user_id=seeded_user.id,
+    )
+    monkeypatch.setattr(predict_module, "SessionLocal", lambda: _SessionContext(db_session))
+    monkeypatch.setattr(
+        predict_module, "get_settings", lambda: SimpleNamespace(ml_artifact_dir=str(tmp_path))
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        predict_module.main(["--model-version", "inexistente"])
+
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert "inexistente" in captured.err
+    assert db_session.query(MLPredictionModel).count() == 0
