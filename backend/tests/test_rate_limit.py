@@ -19,6 +19,7 @@ from app.config import Settings, get_settings
 from app.infrastructure.db.base import get_db
 from app.infrastructure.db.models import UserModel
 from app.main import create_app
+from app.presentation.rate_limit import _SlidingWindowCounter
 
 RATE_LIMITED_BODY = {
     "error": {
@@ -214,3 +215,26 @@ def test_zero_trusted_proxy_hops_is_a_valid_configuration(test_settings: Setting
     settings = _settings(test_settings, rate_limit_trusted_proxy_hops=0)
 
     assert settings.rate_limit_trusted_proxy_hops == 0
+
+
+def test_reset_never_exceeds_the_window_at_realistic_clock_values() -> None:
+    """Fixa o invariante que o CI viu quebrado: `RateLimit-Reset` anunciou
+    121 numa janela de 120s, de forma intermitente.
+
+    Este teste NAO reproduz aquela falha -- a causa raiz nao foi
+    identificada (ver o comentario em `rate_limit.hit`). Ele fixa a
+    propriedade que importa para quem consome o cabecalho: o limitador
+    nunca anuncia um tempo de reset maior que a janela que ele honra.
+
+    Varre varios instantes em vez de confiar no relogio, para nao virar um
+    teste que passa por sorte.
+    """
+    window = 120
+    counter = _SlidingWindowCounter(max_events=3, window_seconds=window, max_keys=8)
+
+    for step in range(2000):
+        now = 1_700_000_000.0 + step * 0.4999
+        decision = counter.hit(f"chave-{step}", now)
+        assert 0 < decision.reset_seconds <= window, (
+            f"reset_seconds={decision.reset_seconds} para now={now!r}"
+        )

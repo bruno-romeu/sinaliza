@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.student import DatasetSplit, SyntheticProfile
 from app.infrastructure.db.models import StudentModel
-from app.ml.feature_aggregation import fetch_feature_rows
+from app.ml.feature_aggregation import fetch_feature_rows, require_feature_fields
 
 
 @dataclass(frozen=True)
@@ -38,6 +38,11 @@ class EvaluationRow:
     assignment_completion_rate: float | None
     observation_count: int
     label: SyntheticProfile
+
+
+#: Same structural guard as `training_repository`/`prediction_repository`:
+#: `app/ml/evaluate.py` reads these fields by `FEATURE_COLUMNS` name.
+require_feature_fields(EvaluationRow)
 
 
 class EvaluationRepository:

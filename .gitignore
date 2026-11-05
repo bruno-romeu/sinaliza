@@ -29,3 +29,6 @@ frontend/playwright-report/
 frontend/blob-report/
 frontend/.playwright/
 frontend/playwright/.cache/
+
+# Rascunho de trabalho das skills de spec; as decisoes ficam em docs/decisions/.
+.memlog.md
