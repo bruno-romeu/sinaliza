@@ -348,6 +348,50 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
     assert constraint_def == "CHECK (((value >= (0)::numeric) AND (value <= (10)::numeric)))"
 
 
+def test_0015_provenance_columns_survive_upgrade_downgrade_upgrade(
+    migration_engine: Engine,
+) -> None:
+    """Migration 0015 (`AGENTS.md` §Versionamento de modelo). `downgrade("base")`
+    derruba a tabela inteira, o que não prova nada sobre um `add_column`/
+    `drop_column` — este teste desce apenas até 0014, onde a tabela continua
+    existindo e as três colunas têm de ter sumido, e volta a subir."""
+    cfg = _alembic_config()
+    expected = {
+        "training_dataset_version": ("character varying", "YES"),
+        "feature_schema_version": ("character varying", "YES"),
+        "metrics": ("jsonb", "YES"),
+    }
+
+    def provenance_columns() -> dict[str, tuple[str, str]]:
+        with migration_engine.connect() as connection:
+            return {
+                name: (data_type, is_nullable)
+                for name, data_type, is_nullable in connection.execute(
+                    text(
+                        "SELECT column_name, data_type, is_nullable "
+                        "FROM information_schema.columns "
+                        "WHERE table_name = 'ml_model_version' "
+                        "AND column_name IN "
+                        "('training_dataset_version', 'feature_schema_version', 'metrics')"
+                    )
+                ).all()
+            }
+
+    command.upgrade(cfg, "head")
+    assert provenance_columns() == expected
+
+    command.downgrade(cfg, "0014")
+    with migration_engine.connect() as connection:
+        table_still_there = connection.execute(
+            text("SELECT to_regclass('public.ml_model_version') IS NOT NULL")
+        ).scalar_one()
+    assert table_still_there is True
+    assert provenance_columns() == {}
+
+    command.upgrade(cfg, "head")
+    assert provenance_columns() == expected
+
+
 def test_every_foreign_key_declares_its_ondelete(migration_engine: Engine) -> None:
     """Migration 0014. Until it landed, every FK fell through to Postgres'
     implicit `NO ACTION` — a default, never a domain decision
