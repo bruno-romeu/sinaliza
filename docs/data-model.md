@@ -136,3 +136,9 @@ Não existe estado `HIGH_RISK` nem substituto — acompanhamento é processo hum
 ExtractedSignal, SignalReview   -- Etapa 5 (NLP, derivado de PedagogicalObservation)
 MLModelVersion, MLPrediction     -- Etapa 4 (ML)
 ```
+
+`MLModelVersion`/`MLPrediction` já foram implementadas na Etapa 4 (migrations
+0011, 0012 e 0015) e permanecem fora **deste rascunho**, que cobre as Etapas
+1–3. A procedência que `MLModelVersion` persiste — `training_dataset_version`,
+`feature_schema_version` e `metrics` — está registrada em
+`docs/decisions/0001-procedencia-do-ml-model-version.md`.
