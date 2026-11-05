@@ -140,3 +140,29 @@ Para ler só o que continua aberto: entradas **sem** campo `resolved:`.
 - source_spec: none
   summary: Três índices são prefixos à esquerda de índices UNIQUE na mesma tabela, então nunca são escolhidos pelo planner — o índice UNIQUE já atende qualquer busca por `student_id`. Ocupam 728 kB e são escrita duplicada em todo INSERT.
   evidence: Medido no banco de dev real (`sinaliza-postgres-1`), comparando `indkey` de cada índice não-único com o prefixo do `indkey` de cada índice único da mesma tabela: `ix_enrollments_student_id` (32 kB) coberto por `uq_enrollment_student_classroom`; `ix_attendance_records_student_id` (680 kB) coberto por `uq_attendance_student_classroom_date`; `ix_trajectory_changes_student_id` (16 kB) coberto por `uq_trajectory_change_student_type_period`. Em todos os três o índice único começa exatamente por `student_id`, que é a condição para a cobertura valer. Não removido nesta onda porque exige migration e porque o ganho (728 kB e três escritas de índice por INSERT num dataset de ~200 estudantes sintéticos) não justifica tocar no schema no meio de uma onda de segurança — mas é remoção segura e de baixo risco quando houver outra migration passando pela área.
+
+## Deferred from: onda de ML + frontend — PRs #49..#52 (2026-11-05)
+
+- source_spec: `docs/spec-ml-model-provenance.md`
+  summary: `app/ml/predict.py` e `app/ml/evaluate.py` selecionam o `MLModelVersion` "mais recente" por `trained_at desc`. Não há como avaliar ou pontuar com uma versão específica — falta um `--model-version`.
+  evidence: Reportado pelo agente de ML durante o PR #49 e deixado fora de escopo por ele. Relevante para o TCC além da conveniência: a defesa afirma reprodutibilidade do experimento, e agora que a procedência está persistida (`training_dataset_version`, `feature_schema_version`, `metrics`), a pergunta natural da banca — "mostre este modelo específico sendo reavaliado" — não tem comando que a responda. Fechar é acrescentar o argumento aos dois CLIs e um teste de seleção; não exige mudança de schema, porque a coluna `version` já é `UNIQUE`.
+
+- source_spec: `docs/spec-ml-model-provenance.md`
+  summary: `run_prediction(session, artifact_dir)` aceita `artifact_dir` e o ignora, mantido apenas por paridade de assinatura com `run_training`.
+  evidence: Parâmetro morto, documentado como tal pelo agente que o encontrou no PR #49. Não removido ali para não espalhar a mudança por call sites fora do escopo daquele PR. Remoção segura quando outra mudança passar pela área.
+
+- source_spec: none
+  summary: `docs/model-evaluation.md` **não existe**, apesar de o `AGENTS.md` §Documentação listá-lo entre os documentos a manter atualizados.
+  evidence: Confirmado por `ls docs/`. Gap pré-existente, anterior a esta onda. Ficou mais visível agora que o PR #49 passou a persistir métricas: existe resultado experimental registrado no banco e nenhum documento que explique a estratégia de avaliação, os limites do dataset sintético e a ressalva que o `AGENTS.md` exige ("desempenho sobre o dataset sintético utilizado", nunca "precisão em prever evasão escolar"). Escrever o documento é trabalho próprio, não apêndice de uma correção; as decisões já tomadas estão em `docs/decisions/0001` e `0002`.
+
+- source_spec: none
+  summary: A regra `@media (max-width: 640px) { .sz-header-nav { gap: var(--space-2) } }` em `frontend/src/styles/base.css` **nunca teve efeito**: `components.css` define o mesmo seletor com a mesma especificidade e `main.tsx` o importa depois, então a regra base sempre perdia a cascata.
+  evidence: Encontrado e corrigido pontualmente no PR #50 (as regras de cabeçalho estreito migraram para `components.css`, com comentário em `base.css` explicando o porquê). O que fica aberto é a **varredura**: ninguém conferiu se há outras media queries em `base.css` mirando seletores que `components.css` também define. Cada uma seria CSS morto silencioso — não quebra nada, mas significa que um ajuste responsivo escrito ali não produz efeito e a pessoa conclui que o valor não resolveu.
+
+- source_spec: none
+  summary: Na tela de trajetória, a seção intitulada "Em observação" aparece justamente quando o estudante **não** tem acompanhamento aberto — e o texto é idêntico ao estado `EM_OBSERVACAO` de `FollowUp`, que o `AGENTS.md` define como processo humano.
+  evidence: Levantado pelo agente de UX no PR #51, que deliberadamente não renomeou por ser decisão de produto. A colisão é conceitual, não cosmética: o `AGENTS.md` §Acompanhamento é explícito que os estados de `FollowUp` representam processo, e proíbe criar estado que substitua acompanhamento. Um título que diz "Em observação" sem que exista observação formal pode ser lido como **status atribuído ao estudante** — exatamente o que o projeto recusa. Resolver é escolher outro rótulo para a seção (ou para o estado), com a decisão registrada.
+
+- source_spec: none
+  summary: O contraste dos rótulos de eixo (`<text class="axis">`) dentro do `<svg>` do gráfico de trajetória **nunca foi verificado por ferramenta nenhuma**, nos dois temas.
+  evidence: Medido no PR #51 com axe-core 4.10.2 contra o build do `master`: 8 nós voltam como `incomplete` (não "aprovado"), porque a regra `color-contrast` do axe não consegue avaliar texto dentro de SVG. É um ponto cego real, não um falso positivo — o restante da interface tem **0 violações de AA** nos dois temas, então este é o único lugar onde o contraste é desconhecido em vez de verificado. Fechar exige medição manual da cor computada do `<text>` contra o fundo do cartão, nos dois temas. Nota: o PR #50 aumentou a fonte desses rótulos (de ~7px efetivos para 12px em 360px), o que muda o limiar aplicável de AA — texto grande exige 3:1 em vez de 4.5:1 —, mas tamanho não substitui a medição de cor.
