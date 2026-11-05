@@ -2,9 +2,10 @@
 
 Mirrors `app/ml/train.py`'s shape (spec Code Map): opens its own
 `SessionLocal()` directly, never wired into `composition.py`/FastAPI
-`Depends`, never invoked by the web process or a scheduler. Loads the single
-most recently trained `MLModelVersion`'s artifact via `joblib.load` (never
-refits or reimplements preprocessing), scores every `EVAL_DEMO` student read
+`Depends`, never invoked by the web process or a scheduler. Loads a
+`MLModelVersion`'s artifact via `joblib.load` (never refits or reimplements
+preprocessing) — a `--model-version` nomeada, ou a mais recente quando o
+argumento é omitido —, scores every `EVAL_DEMO` student read
 through `PredictionRepository`, and inserts one `MLPrediction` row per
 student with the probability the model associates with a non-`STABLE`
 profile.
@@ -22,18 +23,22 @@ import uuid
 from datetime import UTC, datetime
 
 import joblib
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.domain.ml_prediction import MLPrediction
 from app.domain.student import SyntheticProfile
 from app.infrastructure.db.base import SessionLocal
-from app.infrastructure.db.models import MLModelVersionModel, MLPredictionModel
+from app.infrastructure.db.models import MLPredictionModel
 from app.ml.feature_aggregation import (
     FeatureSchemaMismatchError,
     feature_vector,
     require_matching_feature_schema,
+)
+from app.ml.model_version_selection import (
+    ModelVersionNotFoundError,
+    model_version_not_found_message,
+    select_model_version,
 )
 from app.ml.prediction_repository import PredictionRepository
 
@@ -51,21 +56,26 @@ class NoScoringDataError(RuntimeError):
     non-zero, writing no `MLPrediction` rows."""
 
 
-def run_prediction(session: Session, artifact_dir: object = None) -> list[MLPrediction]:
-    """Scores every `EVAL_DEMO` student with the latest `MLModelVersion`'s
-    fitted `Pipeline` and persists one `MLPrediction` row each. Takes a
+def run_prediction(
+    session: Session,
+    artifact_dir: object = None,
+    model_version: str | None = None,
+) -> list[MLPrediction]:
+    """Scores every `EVAL_DEMO` student with a `MLModelVersion`'s fitted
+    `Pipeline` and persists one `MLPrediction` row each. Takes a
     `Session` (not `SessionLocal` directly) so the test suite can drive it
     inside its own rolled-back transaction, mirroring
     `app.ml.train.run_training`'s precedent. `artifact_dir` is accepted only
     for call-shape parity with `run_training` (spec Code Map) but unused —
     the artifact path to load comes from the selected `MLModelVersionModel`
-    row itself, never from a directory the caller passes in."""
-    model_version_row = session.execute(
-        select(MLModelVersionModel)
-        .order_by(MLModelVersionModel.trained_at.desc(), MLModelVersionModel.id.desc())
-        .limit(1)
-    ).scalar_one_or_none()
+    row itself, never from a directory the caller passes in.
+
+    `model_version` nomeia a `version` a usar; `None` (o padrão) mantém o
+    comportamento anterior — a mais recente por `trained_at`."""
+    model_version_row = select_model_version(session, model_version)
     if model_version_row is None:
+        if model_version is not None:
+            raise ModelVersionNotFoundError(model_version_not_found_message(model_version))
         raise NoModelVersionError(
             "No MLModelVersion rows were found — nothing to score with. "
             "Run `python -m app.ml.train` first."
@@ -119,23 +129,40 @@ def run_prediction(session: Session, artifact_dir: object = None) -> list[MLPred
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    return argparse.ArgumentParser(
+    parser = argparse.ArgumentParser(
         prog="python -m app.ml.predict",
         description=(
-            "Score every EVAL_DEMO student with the most recently trained "
-            "MLModelVersion's artifact and persist one MLPrediction row each."
+            "Score every EVAL_DEMO student with a trained MLModelVersion's "
+            "artifact and persist one MLPrediction row each."
         ),
     )
+    parser.add_argument(
+        "--model-version",
+        metavar="VERSION",
+        default=None,
+        help=(
+            "Score with this MLModelVersion.version specifically (the value "
+            "`python -m app.ml.train` prints). Omit to use the most recently "
+            "trained one. An artifact fitted under a different feature schema "
+            "is refused either way."
+        ),
+    )
+    return parser
 
 
 def main(argv: list[str] | None = None) -> None:
-    _build_arg_parser().parse_args(argv)
+    args = _build_arg_parser().parse_args(argv)
     settings = get_settings()
 
     with SessionLocal() as session:
         try:
-            predictions = run_prediction(session, settings.ml_artifact_dir)
-        except (NoModelVersionError, NoScoringDataError, FeatureSchemaMismatchError) as exc:
+            predictions = run_prediction(session, settings.ml_artifact_dir, args.model_version)
+        except (
+            NoModelVersionError,
+            ModelVersionNotFoundError,
+            NoScoringDataError,
+            FeatureSchemaMismatchError,
+        ) as exc:
             print(str(exc), file=sys.stderr)
             sys.exit(1)
 
