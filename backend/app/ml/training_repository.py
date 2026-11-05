@@ -31,7 +31,11 @@ from sqlalchemy.orm import Session
 
 from app.domain.student import DatasetSplit, SyntheticProfile
 from app.infrastructure.db.models import StudentModel
-from app.ml.feature_aggregation import FEATURE_COLUMNS, fetch_feature_rows
+from app.ml.feature_aggregation import (
+    FEATURE_COLUMNS,
+    fetch_feature_rows,
+    require_feature_fields,
+)
 
 #: Re-exported from `feature_aggregation` (the module that now owns the
 #: definition) so existing imports (`app.ml.pipeline`,
@@ -53,6 +57,12 @@ class TrainingRow:
     assignment_completion_rate: float | None
     observation_count: int
     label: SyntheticProfile
+
+
+#: Same structural guard as `prediction_repository`/`evaluation_repository`:
+#: every `FEATURE_COLUMNS` entry must exist as a field here, because
+#: `app/ml/train.py` builds its matrix by reading them off this row by name.
+require_feature_fields(TrainingRow)
 
 
 class TrainingRepository:
