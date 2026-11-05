@@ -28,14 +28,14 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.domain.student import DatasetSplit
-from app.ml.feature_aggregation import fetch_feature_rows
+from app.ml.feature_aggregation import fetch_feature_rows, require_feature_fields
 
 #: Reused directly from training (not redefined here) so scoring's feature
 #: vectors line up with what the pipeline was fit on (spec Code Map).
-# `app/ml/predict.py` imports this from `training_repository` directly; this
-# module's own `ScoringRow` field order below is manually kept identical to
-# it, asserted at import time just below.
+# `app/ml/predict.py` imports this from `training_repository` directly.
 from app.ml.training_repository import FEATURE_COLUMNS
+
+__all__ = ["FEATURE_COLUMNS", "PredictionRepository", "ScoringRow"]
 
 
 @dataclass(frozen=True)
@@ -53,22 +53,15 @@ class ScoringRow:
     observation_count: int
 
 
-#: Guards against `ScoringRow`'s field order silently drifting from
-#: `FEATURE_COLUMNS` — both must list the same four features in the same
-#: order so `app/ml/predict.py`'s feature matrix lines up with the fitted
-#: pipeline's expected column positions. An `if`/`raise` rather than a bare
-#: `assert` so the check still runs under `python -O` (assertions are
-#: stripped in optimized mode and would silently defeat this guard).
-if tuple(FEATURE_COLUMNS) != (
-    "attendance_rate",
-    "grade_average",
-    "assignment_completion_rate",
-    "observation_count",
-):
-    raise RuntimeError(
-        "training_repository.FEATURE_COLUMNS has drifted from the feature "
-        "order ScoringRow/app.ml.predict assume — update both in lockstep."
-    )
+#: `ScoringRow`'s field *order* no longer has to match `FEATURE_COLUMNS`:
+#: `app/ml/predict.py` builds its matrix through `feature_vector()`, which
+#: reads the columns by name in `FEATURE_COLUMNS` order, so a reorder there
+#: reorders the matrix with it. What still has to hold is that every declared
+#: feature exists as a field here — a rename on one side only would otherwise
+#: surface as an `AttributeError` deep inside matrix construction. The
+#: previous hardcoded tuple comparison was replaced by this structural check
+#: because it also forbade ever adding a fifth feature (epic-5-retro-item-1).
+require_feature_fields(ScoringRow)
 
 
 class PredictionRepository:

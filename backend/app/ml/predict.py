@@ -30,6 +30,11 @@ from app.domain.ml_prediction import MLPrediction
 from app.domain.student import SyntheticProfile
 from app.infrastructure.db.base import SessionLocal
 from app.infrastructure.db.models import MLModelVersionModel, MLPredictionModel
+from app.ml.feature_aggregation import (
+    FeatureSchemaMismatchError,
+    feature_vector,
+    require_matching_feature_schema,
+)
 from app.ml.prediction_repository import PredictionRepository
 
 
@@ -73,19 +78,18 @@ def run_prediction(session: Session, artifact_dir: object = None) -> list[MLPred
             "Run `python -m app.synthetic.generate` first."
         )
 
+    # Antes de carregar: o artefato foi ajustado sob o mesmo esquema de
+    # features que este código declara? Se não, recusar é a única resposta
+    # honesta — as colunas não significam mais o que o pipeline espera.
+    require_matching_feature_schema(
+        model_version_row.version, model_version_row.feature_schema_version
+    )
+
     pipeline = joblib.load(model_version_row.artifact_path)
     classes = pipeline.classes_.tolist()
     stable_index = classes.index(SyntheticProfile.STABLE.value)
 
-    feature_matrix = [
-        [
-            row.attendance_rate,
-            row.grade_average,
-            row.assignment_completion_rate,
-            row.observation_count,
-        ]
-        for row in scoring_rows
-    ]
+    feature_matrix = [feature_vector(row) for row in scoring_rows]
     probabilities = pipeline.predict_proba(feature_matrix)
 
     now = datetime.now(UTC)
@@ -131,7 +135,7 @@ def main(argv: list[str] | None = None) -> None:
     with SessionLocal() as session:
         try:
             predictions = run_prediction(session, settings.ml_artifact_dir)
-        except (NoModelVersionError, NoScoringDataError) as exc:
+        except (NoModelVersionError, NoScoringDataError, FeatureSchemaMismatchError) as exc:
             print(str(exc), file=sys.stderr)
             sys.exit(1)
 
