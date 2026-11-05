@@ -2,8 +2,9 @@
 
 Mirrors `app/ml/predict.py`'s shape: opens its own `SessionLocal()` directly,
 never wired into `composition.py`/FastAPI `Depends`, never invoked by the web
-process or a scheduler. Loads the single most recently trained
-`MLModelVersion`'s artifact via `joblib.load` (never refits), scores the full
+process or a scheduler. Loads a `MLModelVersion`'s artifact via `joblib.load`
+(never refits) — a `--model-version` nomeada, ou a mais recente quando o
+argumento é omitido —, scores the full
 `EVAL_DEMO` cut read through `EvaluationRepository` (ground-truth labels, no
 `as_of()` truncation), and prints a precision/recall/F1/confusion-matrix/
 ROC-AUC/PR-AUC report to stdout.
@@ -37,13 +38,11 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.preprocessing import label_binarize
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.domain.student import SyntheticProfile
 from app.infrastructure.db.base import SessionLocal
-from app.infrastructure.db.models import MLModelVersionModel
 from app.ml.evaluation_repository import EvaluationRepository
 from app.ml.feature_aggregation import (
     FEATURE_COLUMNS,
@@ -51,6 +50,11 @@ from app.ml.feature_aggregation import (
     FeatureSchemaMismatchError,
     feature_vector,
     require_matching_feature_schema,
+)
+from app.ml.model_version_selection import (
+    ModelVersionNotFoundError,
+    model_version_not_found_message,
+    select_model_version,
 )
 from app.synthetic.fingerprint import population_fingerprint
 
@@ -143,21 +147,24 @@ class EvaluationReport:
         }
 
 
-def run_evaluation(session: Session) -> EvaluationReport:
-    """Scores the full labeled `EVAL_DEMO` cut with the latest
-    `MLModelVersion`'s fitted `Pipeline` and computes the evaluation report.
-    Takes a `Session` (not `SessionLocal` directly) so the test suite can
-    drive it inside its own rolled-back transaction, mirroring
-    `app.ml.predict.run_prediction`'s precedent. Never refits the pipeline —
-    `joblib.load`s the artifact verbatim and only calls `.predict`/
-    `.predict_proba`. Ao final, grava o relatório em `metrics` da própria
-    `MLModelVersion` avaliada (nenhuma linha nova é criada)."""
-    model_version_row = session.execute(
-        select(MLModelVersionModel)
-        .order_by(MLModelVersionModel.trained_at.desc(), MLModelVersionModel.id.desc())
-        .limit(1)
-    ).scalar_one_or_none()
+def run_evaluation(session: Session, model_version: str | None = None) -> EvaluationReport:
+    """Scores the full labeled `EVAL_DEMO` cut with a `MLModelVersion`'s fitted
+    `Pipeline` and computes the evaluation report. Takes a `Session` (not
+    `SessionLocal` directly) so the test suite can drive it inside its own
+    rolled-back transaction, mirroring `app.ml.predict.run_prediction`'s
+    precedent. Never refits the pipeline — `joblib.load`s the artifact verbatim
+    and only calls `.predict`/`.predict_proba`. Ao final, grava o relatório em
+    `metrics` da própria `MLModelVersion` avaliada (nenhuma linha nova é
+    criada).
+
+    `model_version` nomeia a `version` a avaliar; `None` (o padrão) mantém o
+    comportamento anterior — a mais recente por `trained_at`. Poder apontar uma
+    versão específica é o que torna "reavalie este modelo" um comando, agora que
+    a procedência de cada versão está no banco."""
+    model_version_row = select_model_version(session, model_version)
     if model_version_row is None:
+        if model_version is not None:
+            raise ModelVersionNotFoundError(model_version_not_found_message(model_version))
         raise NoModelVersionError(
             "No MLModelVersion rows were found — nothing to evaluate. "
             "Run `python -m app.ml.train` first."
@@ -286,11 +293,11 @@ def _format_report(report: EvaluationReport) -> str:
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    return argparse.ArgumentParser(
+    parser = argparse.ArgumentParser(
         prog="python -m app.ml.evaluate",
         description=(
-            "Score the full labeled EVAL_DEMO cut with the most recently "
-            "trained MLModelVersion's artifact and print a leakage-free "
+            "Score the full labeled EVAL_DEMO cut with a trained "
+            "MLModelVersion's artifact and print a leakage-free "
             "evaluation report (precision/recall/F1/confusion-matrix/"
             "ROC-AUC/PR-AUC). Measures ability to recognize simulated "
             "patterns in the synthetic dataset, not real-world predictive "
@@ -298,10 +305,22 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "MLModelVersion's metrics column."
         ),
     )
+    parser.add_argument(
+        "--model-version",
+        metavar="VERSION",
+        default=None,
+        help=(
+            "Evaluate this MLModelVersion.version specifically (the value "
+            "`python -m app.ml.train` prints). Omit to evaluate the most "
+            "recently trained one. An artifact fitted under a different "
+            "feature schema is refused either way."
+        ),
+    )
+    return parser
 
 
 def main(argv: list[str] | None = None) -> None:
-    _build_arg_parser().parse_args(argv)
+    args = _build_arg_parser().parse_args(argv)
     # Return value unused (evaluate reads the artifact path off the selected
     # MLModelVersion row, not settings.ml_artifact_dir like train.py/predict.py
     # do) — called anyway as a fail-fast config/env validation step, mirroring
@@ -310,8 +329,13 @@ def main(argv: list[str] | None = None) -> None:
 
     with SessionLocal() as session:
         try:
-            report = run_evaluation(session)
-        except (NoModelVersionError, NoEvaluationDataError, FeatureSchemaMismatchError) as exc:
+            report = run_evaluation(session, args.model_version)
+        except (
+            NoModelVersionError,
+            ModelVersionNotFoundError,
+            NoEvaluationDataError,
+            FeatureSchemaMismatchError,
+        ) as exc:
             print(str(exc), file=sys.stderr)
             sys.exit(1)
 

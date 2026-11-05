@@ -37,6 +37,8 @@ from app.ml.evaluate import (
     NoModelVersionError,
     run_evaluation,
 )
+from app.ml.feature_aggregation import FeatureSchemaMismatchError
+from app.ml.model_version_selection import ModelVersionNotFoundError
 from app.ml.pipeline import build_pipeline
 from app.ml.train import run_training
 
@@ -609,3 +611,203 @@ def test_main_exits_zero_and_prints_report_on_success(
     assert "PR-AUC" in captured.out
     assert "ability to recognize simulated patterns in the synthetic dataset" in captured.out
     assert "accurate predictor of dropout" not in captured.out
+
+
+# ---------------------------------------------------------------------------
+# `--model-version`: explicit MLModelVersion selection
+# ---------------------------------------------------------------------------
+
+
+def test_run_evaluation_evaluates_the_explicitly_named_model_version(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+) -> None:
+    """Reavaliar uma versão específica passa a ter comando: o `metrics` gravado
+    é o da versão pedida, não o da mais recente."""
+    older_version = _seed_model_version_trained_on_subset_of_labels(
+        db_session, tmp_path, "older", datetime(2020, 1, 1, tzinfo=UTC)
+    )
+    newer_version = _seed_model_version_trained_on_subset_of_labels(
+        db_session, tmp_path, "newer", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    for profile in (SyntheticProfile.STABLE, SyntheticProfile.FALLING_ATTENDANCE):
+        _seed_eval_demo_student(
+            db_session,
+            seeded_classroom,
+            profile=profile,
+            with_facts=True,
+            period_id=seeded_academic_period.id,
+            assignment=seeded_assignment,
+            author_user_id=seeded_user.id,
+        )
+
+    run_evaluation(db_session, "older")
+
+    assert db_session.get(MLModelVersionModel, older_version.id).metrics is not None
+    assert db_session.get(MLModelVersionModel, newer_version.id).metrics is None
+
+
+def test_run_evaluation_without_the_argument_still_uses_the_most_recent(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+) -> None:
+    older_version = _seed_model_version_trained_on_subset_of_labels(
+        db_session, tmp_path, "older", datetime(2020, 1, 1, tzinfo=UTC)
+    )
+    newer_version = _seed_model_version_trained_on_subset_of_labels(
+        db_session, tmp_path, "newer", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    for profile in (SyntheticProfile.STABLE, SyntheticProfile.FALLING_ATTENDANCE):
+        _seed_eval_demo_student(
+            db_session,
+            seeded_classroom,
+            profile=profile,
+            with_facts=True,
+            period_id=seeded_academic_period.id,
+            assignment=seeded_assignment,
+            author_user_id=seeded_user.id,
+        )
+
+    run_evaluation(db_session, None)
+
+    assert db_session.get(MLModelVersionModel, newer_version.id).metrics is not None
+    assert db_session.get(MLModelVersionModel, older_version.id).metrics is None
+
+
+def test_run_evaluation_raises_and_writes_no_metrics_for_an_unknown_version(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+) -> None:
+    """Falhar é a única resposta honesta: avaliar a mais recente no lugar da
+    pedida gravaria `metrics` numa versão que ninguém mandou avaliar."""
+    existing_version = _seed_model_version_trained_on_subset_of_labels(
+        db_session, tmp_path, "existente", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    _seed_eval_demo_student(
+        db_session,
+        seeded_classroom,
+        profile=SyntheticProfile.STABLE,
+        with_facts=True,
+        period_id=seeded_academic_period.id,
+        assignment=seeded_assignment,
+        author_user_id=seeded_user.id,
+    )
+
+    with pytest.raises(ModelVersionNotFoundError):
+        run_evaluation(db_session, "inexistente")
+
+    assert db_session.get(MLModelVersionModel, existing_version.id).metrics is None
+
+
+def test_explicit_version_does_not_bypass_the_feature_schema_guard(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+) -> None:
+    """Pedir a versão pelo nome não é permissão para pontuar com colunas
+    trocadas — `require_matching_feature_schema` continua valendo."""
+    model_version = _seed_model_version_trained_on_subset_of_labels(
+        db_session, tmp_path, "esquema-antigo", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    model_version.feature_schema_version = "sha256:outroesquema"
+    db_session.commit()
+    _seed_eval_demo_student(
+        db_session,
+        seeded_classroom,
+        profile=SyntheticProfile.STABLE,
+        with_facts=True,
+        period_id=seeded_academic_period.id,
+        assignment=seeded_assignment,
+        author_user_id=seeded_user.id,
+    )
+
+    with pytest.raises(FeatureSchemaMismatchError):
+        run_evaluation(db_session, "esquema-antigo")
+
+    assert db_session.get(MLModelVersionModel, model_version.id).metrics is None
+
+
+def test_main_evaluates_the_version_passed_on_the_command_line(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    older_version = _seed_model_version_trained_on_subset_of_labels(
+        db_session, tmp_path, "older", datetime(2020, 1, 1, tzinfo=UTC)
+    )
+    newer_version = _seed_model_version_trained_on_subset_of_labels(
+        db_session, tmp_path, "newer", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    for profile in (SyntheticProfile.STABLE, SyntheticProfile.FALLING_ATTENDANCE):
+        _seed_eval_demo_student(
+            db_session,
+            seeded_classroom,
+            profile=profile,
+            with_facts=True,
+            period_id=seeded_academic_period.id,
+            assignment=seeded_assignment,
+            author_user_id=seeded_user.id,
+        )
+    monkeypatch.setattr(evaluate_module, "SessionLocal", lambda: _SessionContext(db_session))
+    monkeypatch.setattr(evaluate_module, "get_settings", lambda: SimpleNamespace())
+
+    with pytest.raises(SystemExit) as exc_info:
+        evaluate_module.main(["--model-version", "older"])
+
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    assert "ability to recognize simulated patterns in the synthetic dataset" in captured.out
+    assert db_session.get(MLModelVersionModel, older_version.id).metrics is not None
+    assert db_session.get(MLModelVersionModel, newer_version.id).metrics is None
+
+
+def test_main_exits_nonzero_and_names_the_unknown_version_on_stderr(
+    db_session: Session,
+    seeded_classroom: ClassroomModel,
+    seeded_academic_period,
+    seeded_assignment: AssignmentModel,
+    seeded_user: UserModel,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _seed_model_version_trained_on_subset_of_labels(
+        db_session, tmp_path, "existente", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    _seed_eval_demo_student(
+        db_session,
+        seeded_classroom,
+        profile=SyntheticProfile.STABLE,
+        with_facts=True,
+        period_id=seeded_academic_period.id,
+        assignment=seeded_assignment,
+        author_user_id=seeded_user.id,
+    )
+    monkeypatch.setattr(evaluate_module, "SessionLocal", lambda: _SessionContext(db_session))
+    monkeypatch.setattr(evaluate_module, "get_settings", lambda: SimpleNamespace())
+
+    with pytest.raises(SystemExit) as exc_info:
+        evaluate_module.main(["--model-version", "inexistente"])
+
+    assert exc_info.value.code == 1
+    assert "inexistente" in capsys.readouterr().err
