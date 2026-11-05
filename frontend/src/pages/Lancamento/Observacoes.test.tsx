@@ -73,6 +73,20 @@ describe('Observacoes — Lançamento de observações (Story 1.5)', () => {
     vi.unstubAllGlobals()
   })
 
+  it('põe a orientação "Como escrever" antes da lista da turma', async () => {
+    // AGENTS.md, "Observações pedagógicas": a interface pede fato observável
+    // e não induz juízo. Essa orientação estava DEPOIS da turma inteira, ou
+    // seja, quem escreve só a encontrava depois de já ter escrito.
+    renderObservacoes()
+
+    const guia = await screen.findByText('Como escrever')
+    const estudantes = screen.getByText('Estudantes')
+    expect(
+      guia.compareDocumentPosition(estudantes) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
   it('keeps the save button disabled while the observation textarea is empty (UX-DR13)', async () => {
     renderObservacoes()
 

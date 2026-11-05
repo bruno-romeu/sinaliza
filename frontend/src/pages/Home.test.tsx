@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../auth/AuthContext'
@@ -98,6 +98,20 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
     await screen.findByText('Nenhuma mudança a revisar hoje.')
   })
 
+  it('dá à rota um título de documento próprio (WCAG 2.4.2)', async () => {
+    fetchMock = vi.fn(async () =>
+      jsonResponse({ recent_changes: [], in_progress_follow_ups: [] }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderHome()
+
+    // Antes, `document.title` era "Sinaliza" nas oito rotas: quem navega por
+    // leitor de tela não tinha como saber em que tela estava.
+    await screen.findByText('Nenhuma mudança a revisar hoje.')
+    expect(document.title).toBe('Home · Sinaliza')
+  })
+
   it('shows a factual error message with a retry action on load failure', async () => {
     fetchMock = vi.fn(async () =>
       jsonResponse({ error: { code: 'server_error', message: 'boom' } }, 500),
@@ -106,9 +120,23 @@ describe('Home — mudanças recentes e busca de estudantes (Story 3.3)', () => 
 
     renderHome()
 
-    await screen.findByText('Não foi possível carregar os dados agora.')
+    await screen.findByText(
+      /Não foi possível carregar as mudanças recentes e os acompanhamentos agora\./,
+    )
     expect(
       screen.getByRole('button', { name: 'Tentar novamente' }),
+    ).toBeInTheDocument()
+
+    // O `GET /home` alimenta as duas listas, então a falha precisa ser visível
+    // nas duas: antes, a seção de acompanhamentos renderizava completamente
+    // vazia — sem skeleton, sem mensagem, sem erro.
+    const acompanhamentos = screen.getByRole('region', {
+      name: 'Acompanhamentos em andamento',
+    })
+    expect(
+      within(acompanhamentos).getByText(
+        'Lista indisponível enquanto o carregamento falhar.',
+      ),
     ).toBeInTheDocument()
   })
 

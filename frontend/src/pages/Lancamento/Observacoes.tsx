@@ -166,6 +166,26 @@ export function Observacoes() {
         </SelectField>
       }
     >
+      {/* A orientação vem ANTES da lista: ela estava depois da turma inteira,
+          então quem escreve só a encontrava depois de já ter escrito. É a
+          única peça de interface que carrega a regra do AGENTS.md sobre o que
+          pedir ao professor — fato observável, nunca juízo sobre o estudante
+          — e ela só funciona se for lida primeiro. */}
+      <Section id="lancamento-guia" title="Como escrever">
+        <div className="sz-guide">
+          <div className="sz-guide-ok">
+            <b>Escreva</b>
+            “Participou menos das discussões nas últimas duas aulas e não
+            entregou a atividade desta semana.”
+          </div>
+          <div className="sz-guide-no">
+            <b>Evite</b>
+            “Está desmotivado.” · “É aluno de risco.” · “Provavelmente vai
+            evadir.”
+          </div>
+        </div>
+      </Section>
+
       <Section id="lancamento-alunos" title="Estudantes">
         <p className="sz-muted">
           Abra a linha do estudante e descreva o que foi observado.
@@ -194,21 +214,6 @@ export function Observacoes() {
             ))}
           </ul>
         )}
-      </Section>
-
-      <Section id="lancamento-guia" title="Como escrever">
-        <div className="sz-guide">
-          <div className="sz-guide-ok">
-            <b>Escreva</b>
-            “Participou menos das discussões nas últimas duas aulas e não
-            entregou a atividade desta semana.”
-          </div>
-          <div className="sz-guide-no">
-            <b>Evite</b>
-            “Está desmotivado.” · “É aluno de risco.” · “Provavelmente vai
-            evadir.”
-          </div>
-        </div>
       </Section>
     </LancamentoLayout>
   )
