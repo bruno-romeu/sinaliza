@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 11-01-2026 00:00
+last_updated: 11-05-2026 00:00
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -276,8 +276,8 @@ action_items:
       or better, have all three CLIs iterate FEATURE_COLUMNS directly instead of hardcoding
       the feature-vector field order."
     owner: "dev"
-    status: open
-    ref: "docs/epic-5-retro-2026-10-20.md"
+    status: done
+    ref: "docs/epic-5-retro-2026-10-20.md; closed by PR #49 (os tres CLIs montam a matriz via feature_vector(), require_feature_fields() substitui a guarda literal e require_matching_feature_schema() recusa artefato serializado sob outro esquema)"
   - id: "epic-5-retro-item-2-defer-get-by-id-as-of-filter"
     epic: 5
     action: "[defer] SqlAlchemyTrajectoryChangeRepository.get_by_id (GET/POST follow-ups)
