@@ -118,8 +118,26 @@ class _SlidingWindowCounter:
             bucket.append(now)
 
         # Quando a vaga mais antiga sai da janela.
+        #
+        # O `min` com a janela e um invariante, nao um band-aid: o tempo ate
+        # a vaga mais antiga sair da janela nunca pode ser maior que a
+        # propria janela. Sem ele, `RateLimit-Reset` pode anunciar um valor
+        # que o proprio limitador nao honra.
+        #
+        # Ele foi acrescentado depois de o CI observar
+        # `RateLimit-Reset: 121` numa janela de 120s
+        # (test_allowed_responses_carry_the_ratelimit_headers), de forma
+        # intermitente. A causa raiz NAO foi identificada: o arquivo passa
+        # isolado e falha so com a suite inteira; `monotonic()` descarta a
+        # hipotese de erro de ponto flutuante (foi medida e refutada, 0 em
+        # 2000 instantes), e cada `make_client` monta app e contador
+        # proprios, o que descarta estado compartilhado.
+        #
+        # O clamp e correto independentemente da causa, mas nao a explica --
+        # se o sintoma voltar em outro cabecalho, procure antes de supor que
+        # esta linha resolveu.
         reset_seconds = (
-            max(1, math.ceil(bucket[0] + self._window_seconds - now))
+            min(self._window_seconds, max(1, math.ceil(bucket[0] + self._window_seconds - now)))
             if bucket
             else self._window_seconds
         )
