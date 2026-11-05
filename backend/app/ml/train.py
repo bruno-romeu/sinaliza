@@ -7,6 +7,13 @@ exclusively through `TrainingRepository` (AD-11), fits the single
 `build_pipeline()` `Pipeline` (RNF-03), serializes it under
 `settings.ml_artifact_dir`, and inserts exactly one `MLModelVersion` row per
 successful run (RF-17) — never overwriting a prior row or artifact file.
+
+Essa linha carrega a procedência do treino: `training_dataset_version` (o
+`population_fingerprint` do banco no momento da leitura) e
+`feature_schema_version` (derivado de `FEATURE_COLUMNS`), de modo que a
+pergunta "qual dataset treinou este modelo, sob qual esquema de features"
+tenha resposta no próprio banco, e não só no terminal de quem rodou o comando
+(`AGENTS.md` §Versionamento de modelo).
 """
 
 from __future__ import annotations
@@ -24,8 +31,10 @@ from app.config import get_settings
 from app.domain.ml_model_version import MLModelVersion
 from app.infrastructure.db.base import SessionLocal
 from app.infrastructure.db.models import MLModelVersionModel
+from app.ml.feature_aggregation import FEATURE_SCHEMA_VERSION, feature_vector
 from app.ml.pipeline import build_pipeline
 from app.ml.training_repository import TrainingRepository
+from app.synthetic.fingerprint import population_fingerprint
 
 
 class NoTrainingDataError(RuntimeError):
@@ -59,15 +68,10 @@ def run_training(session: Session, artifact_dir: Path | str) -> MLModelVersion:
             "nothing to train on. Run `python -m app.synthetic.generate` first."
         )
 
-    feature_matrix = [
-        [
-            row.attendance_rate,
-            row.grade_average,
-            row.assignment_completion_rate,
-            row.observation_count,
-        ]
-        for row in rows
-    ]
+    # Ordem lida de `FEATURE_COLUMNS`, nunca escrita à mão aqui: reordenar a
+    # declaração reordena esta matriz junto, em vez de treinar silenciosamente
+    # com colunas trocadas (epic-5-retro-item-1).
+    feature_matrix = [feature_vector(row) for row in rows]
     labels = [row.label.value for row in rows]
 
     pipeline = build_pipeline()
@@ -83,12 +87,20 @@ def run_training(session: Session, artifact_dir: Path | str) -> MLModelVersion:
     artifact_path = resolved_artifact_dir / f"model-{version}.joblib"
     joblib.dump(pipeline, artifact_path)
 
+    # Procedência exigida pelo `AGENTS.md` §Versionamento de modelo. O
+    # fingerprint é calculado agora, depois da leitura: é o conteúdo do banco
+    # que este treino efetivamente viu, não a intenção registrada em
+    # `synthetic_generation_runs` (que não muda se alguém editar um fato
+    # depois da geração). `metrics` fica `None` — quem a escreve é
+    # `python -m app.ml.evaluate`, sobre o corte `EVAL_DEMO`.
     model_version = MLModelVersion(
         id=uuid.uuid4(),
         version=version,
         artifact_path=str(artifact_path),
         trained_at=now,
         created_at=now,
+        training_dataset_version=population_fingerprint(session),
+        feature_schema_version=FEATURE_SCHEMA_VERSION,
     )
     session.add(
         MLModelVersionModel(
@@ -97,6 +109,8 @@ def run_training(session: Session, artifact_dir: Path | str) -> MLModelVersion:
             artifact_path=model_version.artifact_path,
             trained_at=model_version.trained_at,
             created_at=model_version.created_at,
+            training_dataset_version=model_version.training_dataset_version,
+            feature_schema_version=model_version.feature_schema_version,
         )
     )
     session.commit()
@@ -127,7 +141,9 @@ def main(argv: list[str] | None = None) -> None:
 
         summary = (
             f"Trained model version={model_version.version} "
-            f"artifact_path={model_version.artifact_path}"
+            f"artifact_path={model_version.artifact_path} "
+            f"training_dataset_version={model_version.training_dataset_version} "
+            f"feature_schema_version={model_version.feature_schema_version}"
         )
 
     print(summary)
