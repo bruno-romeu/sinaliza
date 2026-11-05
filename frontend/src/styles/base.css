@@ -26,6 +26,21 @@ a {
   outline-offset: 2px;
 }
 
+/* Acessibilidade: quem pede menos movimento nao recebe nenhum. Vale para tudo
+   que a camada visual anima (hover de linha, linha salva, chevron que gira),
+   porque o movimento aqui so reforca uma mudanca de estado que o texto ja
+   comunica — remove-lo nao tira informacao de ninguem. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ---------- Página ---------- */
 .sz-page {
   max-width: var(--size-content);
@@ -145,6 +160,7 @@ a {
   min-height: var(--size-hit);
   color: var(--ink);
   text-decoration: none;
+  transition: background-color 0.12s ease;
 }
 .sz-results li + li a {
   border-top: 1px solid var(--line);
@@ -165,6 +181,16 @@ a {
 @media (max-width: 720px) {
   .sz-page {
     padding: 0 var(--space-4) var(--space-7);
+  }
+  /* O respiro de 40px acima do titulo foi desenhado para desktop; no telefone
+     ele empurra o titulo e o resumo da mudanca para fora do primeiro quadro. */
+  .sz-screen-head {
+    padding: var(--space-5) 0 var(--space-2);
+  }
+  /* 48px entre secoes vira quase um quadro inteiro de telefone: aproxima as
+     secoes o suficiente para que a proxima seja antecipada ao rolar. */
+  .sz-section {
+    margin-top: var(--space-6);
   }
 }
 
@@ -261,8 +287,25 @@ a {
   .sz-login {
     grid-template-columns: 1fr;
   }
+  /* Medido em 360px: a arte da marca tem 520x420 fixos e o painel so 324px de
+     altura, entao ela passava por tras da frase e do subtitulo — o texto que
+     explica o que o sistema faz ficava ilegivel sobre as formas coloridas.
+     Reduzida a um acento de canto, com o painel reservando a altura dela
+     acima do texto, a arte continua presente e a frase volta a ser lida. */
   .sz-login-brand {
-    min-height: 220px;
+    min-height: 0;
+    padding: 164px var(--space-4) var(--space-5);
+  }
+  .sz-login-brand svg {
+    width: 180px;
+    height: auto;
+  }
+  .sz-login-tag {
+    font-size: 24px;
+    line-height: 31px;
+  }
+  .sz-login-side {
+    padding: var(--space-6) var(--space-4);
   }
 }
 
@@ -307,10 +350,11 @@ a {
 .sz-header-nav .sz-btn {
   white-space: nowrap;
 }
+/* O ajuste de densidade do cabecalho em telas estreitas vive em
+   components.css, junto da definicao de .sz-header/.sz-header-nav: as regras
+   tem a mesma especificidade e components.css e importado depois, entao uma
+   media query escrita aqui seria sobrescrita pela regra base de la. */
 @media (max-width: 640px) {
-  .sz-header-nav {
-    gap: var(--space-2);
-  }
   .sz-header-name {
     position: absolute;
     width: 1px;
