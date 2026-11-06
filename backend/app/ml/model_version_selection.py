@@ -25,6 +25,21 @@ from sqlalchemy.orm import Session
 from app.infrastructure.db.models import MLModelVersionModel
 
 
+class NoModelVersionError(RuntimeError):
+    """Levantada quando `ml_model_version` está vazia — não há artefato
+    treinado nenhum com que pontuar ou avaliar (I/O Matrix "No MLModelVersion
+    exists", specs 5-2 e 5-3). Cada CLI a captura, imprime em stderr e sai com
+    código não-zero, sem escrever linha alguma.
+
+    Mora aqui, e não dentro de cada CLI, porque até esta onda de higiene
+    `predict.py` e `evaluate.py` definiam **duas classes homônimas e
+    independentes** para este mesmo fato. Nome igual com identidade diferente
+    é armadilha de captura: um `except NoModelVersionError` importado do
+    módulo errado não captura nada e não avisa. A mensagem continua diferente
+    entre pontuar e avaliar porque ela é passada no `raise`, nunca embutida na
+    classe."""
+
+
 class ModelVersionNotFoundError(RuntimeError):
     """Levantada quando `--model-version` nomeia uma `version` que não existe.
     Distinta de `NoModelVersionError` (tabela vazia) de propósito: "você pediu
