@@ -247,7 +247,6 @@ def _build_assignments(
 
 
 def _build_assignment_submissions(
-    population: GeneratedPopulation,
     assignments: tuple[GeneratedAssignment, ...],
     students_by_classroom: dict[uuid.UUID, tuple[uuid.UUID, ...]],
     profile_by_student: dict[uuid.UUID, SyntheticProfile],
@@ -311,7 +310,6 @@ def build_facts(
     grades = _build_grades(population, classroom_by_student, periods, seed)
     assignments = _build_assignments(population, periods, seed)
     assignment_submissions = _build_assignment_submissions(
-        population,
         assignments,
         students_by_classroom,
         profile_by_student,
