@@ -342,28 +342,19 @@ a {
   }
 }
 
-/* ---------- Cabeçalho em telas estreitas ---------- */
-.sz-header-nav {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-.sz-header-nav .sz-btn {
-  white-space: nowrap;
-}
-/* O ajuste de densidade do cabecalho em telas estreitas vive em
-   components.css, junto da definicao de .sz-header/.sz-header-nav: as regras
-   tem a mesma especificidade e components.css e importado depois, entao uma
-   media query escrita aqui seria sobrescrita pela regra base de la. */
-@media (max-width: 640px) {
-  .sz-header-name {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-}
+/* Invariante deste arquivo, apurada na varredura de 2026-11-05: nenhum
+   seletor definido em components.css e declarado aqui. A razao e de cascata,
+   nao de arrumacao — main.tsx importa components.css depois, entao uma regra
+   escrita aqui sobre um seletor de la perde com especificidade igual e morre
+   em silencio: nao quebra nada, e quem escreveu conclui que o valor estava
+   errado em vez de perceber que a regra nunca rodou. Foi o que aconteceu com
+   `.sz-header-nav { gap }` (PR #50). O resto das regras do cabecalho, que
+   ainda viviam aqui, foi para components.css junto da definicao do seletor.
+   A varredura cobriu as 224 declaracoes deste arquivo — postcss para comparar
+   seletor e especificidade, CSSOM no navegador para resolver o vencedor real
+   por elemento em 8 rotas e 9 larguras — e nao achou nenhuma outra perda. */
+
+/* ---------- Fontes da evidência ---------- */
 .sz-sources-more {
   margin-top: var(--space-2);
   padding-left: 0;
