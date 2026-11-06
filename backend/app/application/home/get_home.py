@@ -38,6 +38,11 @@ from app.application.home.ports import (
 from app.domain.follow_up import FollowUp
 from app.domain.trajectory_change import TrajectoryChange
 
+#: Tamanho de página padrão e teto aceito. Os dois `MAX_*` são o `le=` dos
+#: `Query(...)` em `app/presentation/home/router.py`, que os importa daqui em
+#: vez de repetir o literal `100` — era o que fazia até esta onda de higiene,
+#: e o resultado era o número existir em dois lugares com só um deles dizendo
+#: o que ele significa.
 DEFAULT_CHANGES_PAGE_SIZE = 5
 MAX_CHANGES_PAGE_SIZE = 100
 DEFAULT_FOLLOW_UPS_PAGE_SIZE = 5

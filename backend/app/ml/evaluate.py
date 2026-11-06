@@ -53,6 +53,7 @@ from app.ml.feature_aggregation import (
 )
 from app.ml.model_version_selection import (
     ModelVersionNotFoundError,
+    NoModelVersionError,
     model_version_not_found_message,
     select_model_version,
 )
@@ -80,12 +81,6 @@ _NOT_COMPUTABLE = "not computable (fewer than 2 classes present in the evaluatio
 #: forem acrescentadas às macro de hoje) — mesmo papel de
 #: `synthetic.generate.GENERATOR_VERSION`.
 METRICS_SCHEMA_VERSION = 1
-
-
-class NoModelVersionError(RuntimeError):
-    """Raised when `ml_model_version` is empty — there is no trained artifact
-    to evaluate with (spec I/O Matrix "No MLModelVersion exists"). The CLI
-    catches this, prints to stderr and exits non-zero."""
 
 
 class NoEvaluationDataError(RuntimeError):

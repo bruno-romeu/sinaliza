@@ -21,9 +21,15 @@ from fastapi import APIRouter, Depends, Query
 from app.application.home.get_home import (
     DEFAULT_CHANGES_PAGE_SIZE,
     DEFAULT_FOLLOW_UPS_PAGE_SIZE,
+    MAX_CHANGES_PAGE_SIZE,
+    MAX_FOLLOW_UPS_PAGE_SIZE,
     GetHomeService,
 )
-from app.application.home.search_students import DEFAULT_PAGE_SIZE, SearchStudentsService
+from app.application.home.search_students import (
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
+    SearchStudentsService,
+)
 from app.composition import get_get_home_service, get_search_students_service
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.schemas.home import (
@@ -40,9 +46,13 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 @router.get("/home", response_model=HomeOut)
 def get_home(
     follow_ups_page: int = Query(default=1, ge=1),
-    follow_ups_page_size: int = Query(default=DEFAULT_FOLLOW_UPS_PAGE_SIZE, ge=1, le=100),
+    follow_ups_page_size: int = Query(
+        default=DEFAULT_FOLLOW_UPS_PAGE_SIZE, ge=1, le=MAX_FOLLOW_UPS_PAGE_SIZE
+    ),
     changes_page: int = Query(default=1, ge=1),
-    changes_page_size: int = Query(default=DEFAULT_CHANGES_PAGE_SIZE, ge=1, le=100),
+    changes_page_size: int = Query(
+        default=DEFAULT_CHANGES_PAGE_SIZE, ge=1, le=MAX_CHANGES_PAGE_SIZE
+    ),
     service: GetHomeService = Depends(get_get_home_service),
 ) -> HomeOut:
     result = service.execute(follow_ups_page, follow_ups_page_size, changes_page, changes_page_size)
@@ -79,7 +89,7 @@ def get_home(
 def search_students(
     q: str = Query(default=""),
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=100),
+    page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     service: SearchStudentsService = Depends(get_search_students_service),
 ) -> StudentSearchOut:
     page_result = service.execute(q, page, page_size)
