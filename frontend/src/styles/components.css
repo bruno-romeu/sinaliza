@@ -827,6 +827,13 @@
   gap: var(--space-4);
   font-size: 14px;
   color: var(--ink-muted);
+  /* Vindas de base.css: declarar sobre .sz-header-nav de la e o arranjo que
+     matou a antiga regra de gap, porque components.css e importado depois. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.sz-header-nav .sz-btn {
+  white-space: nowrap;
 }
 .sz-header-user {
   display: flex;
@@ -854,6 +861,17 @@
   }
   .sz-header-nav .sz-btn {
     padding: 0 var(--space-3);
+  }
+  /* O nome de quem esta logado sai da linha visual mas continua no fluxo de
+     leitura: e a unica confirmacao de sessao da tela, e esconde-la de leitor
+     de tela tiraria informacao que o visual nao devolve. */
+  .sz-header-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 }
 .sz-avatar {
