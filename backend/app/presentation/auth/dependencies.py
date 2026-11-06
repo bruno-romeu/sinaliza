@@ -1,8 +1,15 @@
-"""`get_current_user` — scaffolded in this story for Stories 1.2+ to reuse.
+"""`get_current_user` — a dependência de autenticação que todo router de
+produto aplica.
 
-Not applied to any route yet: this story protects nothing besides issuing the
-token at `/auth/login` (spec Boundaries & Constraints — "protecting any
-backend route besides `/auth/login`" is explicitly out of scope here).
+Nasceu na Story 1.1 sem rota nenhuma por trás — aquela story só emitia o token
+em `/auth/login`, e proteger qualquer outra rota estava explicitamente fora do
+escopo dela —, e esta docstring dizia exatamente isso. A frase envelheceu:
+hoje a dependência está no `APIRouter` de `assignments`, `attendance`,
+`follow_ups`, `grades`, `home`, `observations` e `trajectory`, e também por
+rota naquelas que precisam da identidade do chamador (`CurrentUser`). Quem
+impede uma rota nova de escapar disso é `tests/test_api_exposure_contract.py`:
+um router registrado sem `Depends(get_current_user)` quebra lá, não em
+produção (`epic-1-retro-item-6`).
 
 Reads `sub`/`name`/`role` straight out of the validated JWT claims — no DB
 round-trip (spec Design Notes, mirrors the stateless-bearer design of AD-8).

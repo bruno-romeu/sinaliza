@@ -484,7 +484,9 @@ class MLModelVersionModel(Base):
     — never written by the web process (AD-3). `version` is `UNIQUE` so a
     re-run can never collide with or overwrite a prior row/artifact file
     (spec Never). `artifact_path` points at the single serialized sklearn
-    `Pipeline` file Story 5.2's inference loader will later `joblib.load`.
+    `Pipeline` file que `app/ml/predict.py` e `app/ml/evaluate.py` carregam com
+    `joblib.load` — era "Story 5.2's inference loader will later `joblib.load`"
+    enquanto nenhuma das duas existia.
 
     `training_dataset_version`, `feature_schema_version` e `metrics`
     (migration 0015) completam os seis campos exigidos pelo `AGENTS.md`
