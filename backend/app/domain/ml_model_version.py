@@ -4,8 +4,10 @@
 One row per successful `python -m app.ml.train` run (spec-5-1, RF-17):
 `version` is a unique, human-identifiable string and `artifact_path` points
 at the single serialized sklearn `Pipeline` file (preprocessing fused with
-the classifier, RNF-03) Story 5.2's inference loader will later read back
-with `joblib.load`.
+the classifier, RNF-03) que `app/ml/predict.py` e `app/ml/evaluate.py` leem de
+volta com `joblib.load` — nunca refazendo o preprocessing. Estava no futuro
+("Story 5.2's inference loader will later read back") desde a spec-5-1; as duas
+leitoras existem desde a 5.2 e a 5.3.
 """
 
 from __future__ import annotations

@@ -1,5 +1,7 @@
 """Covers every row of the spec's I/O & Edge-Case Matrix for `POST
-/auth/login` and the scaffolded `get_current_user` dependency."""
+/auth/login` and the `get_current_user` dependency (chamada aqui diretamente,
+para cobrir as rejeições de token; que ela esteja aplicada em todo router de
+produto é o que `test_api_exposure_contract.py` verifica)."""
 
 from __future__ import annotations
 
