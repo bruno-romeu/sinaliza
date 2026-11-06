@@ -1,6 +1,6 @@
 """DB-backed tests covering every row of spec-5-2's I/O & Edge-Case Matrix.
 
-Calls `run_prediction(db_session, tmp_path)` directly against the
+Calls `run_prediction(db_session)` directly against the
 `db_session` fixture (never subprocess), mirroring `test_ml_train.py`'s
 precedent of seeding rows directly and driving the real `Session`-taking
 function.
@@ -34,9 +34,9 @@ from app.infrastructure.db.models import (
 )
 from app.ml import predict as predict_module
 from app.ml.feature_aggregation import FeatureSchemaMismatchError
-from app.ml.model_version_selection import ModelVersionNotFoundError
+from app.ml.model_version_selection import ModelVersionNotFoundError, NoModelVersionError
 from app.ml.pipeline import build_pipeline
-from app.ml.predict import NoModelVersionError, NoScoringDataError, run_prediction
+from app.ml.predict import NoScoringDataError, run_prediction
 from app.ml.train import run_training
 
 
@@ -271,7 +271,7 @@ def test_run_prediction_uses_the_most_recently_trained_model_version(
         author_user_id=seeded_user.id,
     )
 
-    predictions = run_prediction(db_session, tmp_path)
+    predictions = run_prediction(db_session)
 
     assert len(predictions) == 1
     assert predictions[0].student_id == student.id
@@ -313,7 +313,7 @@ def test_happy_path_scores_every_eval_demo_student(
         for _ in range(3)
     ]
 
-    predictions = run_prediction(db_session, tmp_path)
+    predictions = run_prediction(db_session)
 
     assert len(predictions) == len(eval_students)
     assert db_session.query(MLPredictionModel).count() == len(eval_students)
@@ -333,14 +333,13 @@ def test_no_model_version_raises_and_writes_nothing(
     db_session: Session,
     seeded_classroom: ClassroomModel,
     seeded_academic_period,
-    tmp_path: Path,
 ) -> None:
     _seed_eval_demo_student(
         db_session, seeded_classroom, with_facts=False, period_id=seeded_academic_period.id
     )
 
     with pytest.raises(NoModelVersionError):
-        run_prediction(db_session, tmp_path)
+        run_prediction(db_session)
 
     assert db_session.query(MLPredictionModel).count() == 0
 
@@ -368,7 +367,7 @@ def test_no_eval_demo_rows_raises_and_writes_nothing(
     )
 
     with pytest.raises(NoScoringDataError):
-        run_prediction(db_session, tmp_path)
+        run_prediction(db_session)
 
     assert db_session.query(MLPredictionModel).count() == 0
 
@@ -398,7 +397,7 @@ def test_eval_demo_student_missing_facts_is_scored_not_skipped(
         db_session, seeded_classroom, with_facts=False, period_id=seeded_academic_period.id
     )
 
-    predictions = run_prediction(db_session, tmp_path)
+    predictions = run_prediction(db_session)
 
     assert len(predictions) == 1
     assert predictions[0].student_id == student.id
@@ -435,8 +434,8 @@ def test_two_runs_produce_two_rows_per_student_same_model_version(
         author_user_id=seeded_user.id,
     )
 
-    first = run_prediction(db_session, tmp_path)
-    second = run_prediction(db_session, tmp_path)
+    first = run_prediction(db_session)
+    second = run_prediction(db_session)
 
     assert len(first) == 1
     assert len(second) == 1
@@ -588,7 +587,7 @@ def test_run_prediction_scores_with_the_explicitly_named_model_version(
         author_user_id=seeded_user.id,
     )
 
-    predictions = run_prediction(db_session, tmp_path, "older")
+    predictions = run_prediction(db_session, "older")
 
     assert len(predictions) == 1
     assert predictions[0].model_version_id == older_version.id
@@ -618,7 +617,7 @@ def test_run_prediction_without_the_argument_still_uses_the_most_recent(
         author_user_id=seeded_user.id,
     )
 
-    predictions = run_prediction(db_session, tmp_path, None)
+    predictions = run_prediction(db_session, None)
 
     assert predictions[0].model_version_id == newer_version.id
 
@@ -644,7 +643,7 @@ def test_run_prediction_raises_and_writes_nothing_for_an_unknown_version(
     )
 
     with pytest.raises(ModelVersionNotFoundError):
-        run_prediction(db_session, tmp_path, "inexistente")
+        run_prediction(db_session, "inexistente")
 
     assert db_session.query(MLPredictionModel).count() == 0
 
@@ -675,7 +674,7 @@ def test_explicit_version_does_not_bypass_the_feature_schema_guard(
     )
 
     with pytest.raises(FeatureSchemaMismatchError):
-        run_prediction(db_session, tmp_path, "esquema-antigo")
+        run_prediction(db_session, "esquema-antigo")
 
     assert db_session.query(MLPredictionModel).count() == 0
 
