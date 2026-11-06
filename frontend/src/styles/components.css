@@ -570,6 +570,34 @@
   stroke: var(--line);
   stroke-width: 1;
 }
+/* Contraste medido a mao em 2026-11-05, porque nenhuma ferramenta mede isto:
+   a regra color-contrast do axe-core devolve os 8 nos de <text> deste grafico
+   como `incomplete`, nao como aprovados — ela nao avalia texto dentro de SVG.
+   Era o unico ponto da interface com contraste desconhecido em vez de
+   verificado (o resto tem 0 violacoes de AA nos dois temas).
+
+   Metodo: cor computada por getComputedStyle, fundo efetivo subindo a arvore
+   ate o primeiro background opaco, razao pela formula do WCAG 2.x.
+
+                                         claro     escuro
+   .axis            sobre --surface       8.15      11.00
+   .axis-hot/.cp-label sobre --surface    6.65       9.36
+   .axis            sobre --band-fill     6.96       8.90
+   .axis-hot/.cp-label sobre --band-fill  5.68       7.58
+
+   --band-fill entra na conta porque .cp-label de fato cai sobre a faixa
+   (verificado por intersecao de getBoundingClientRect); os rotulos de eixo
+   nao caem.
+
+   O limiar e 4.5:1, nao 3:1: estes rotulos NAO sao "texto grande" no WCAG.
+   O font-size abaixo esta em unidades de usuario do viewBox (640x240) e e
+   escalado pela razao largura-renderizada/largura-do-viewBox, entao o tamanho
+   que chega na tela e menor que o numero escrito aqui — medido, 9.65px num
+   viewport de 360px (21px x 0,4594) e 16.86px em 1280px (13px x 1,2969).
+   O WCAG exige 24px, ou 18.66px em negrito; nenhuma largura chega la.
+   Todas as seis medicoes passam em 4.5:1, a pior com 5.68:1 — nenhuma cor
+   precisou mudar. Refazer a medicao so e necessario se --ink-muted,
+   --attention-ink, --surface ou --band-fill mudarem em tokens.css. */
 .sz-chart .axis {
   font-family: var(--font-sans);
   font-size: 13px;
@@ -827,6 +855,13 @@
   gap: var(--space-4);
   font-size: 14px;
   color: var(--ink-muted);
+  /* Vindas de base.css: declarar sobre .sz-header-nav de la e o arranjo que
+     matou a antiga regra de gap, porque components.css e importado depois. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.sz-header-nav .sz-btn {
+  white-space: nowrap;
 }
 .sz-header-user {
   display: flex;
@@ -854,6 +889,17 @@
   }
   .sz-header-nav .sz-btn {
     padding: 0 var(--space-3);
+  }
+  /* O nome de quem esta logado sai da linha visual mas continua no fluxo de
+     leitura: e a unica confirmacao de sessao da tela, e esconde-la de leitor
+     de tela tiraria informacao que o visual nao devolve. */
+  .sz-header-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 }
 .sz-avatar {
