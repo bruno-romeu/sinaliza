@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from app.application.home.ports import StudentSearchRepositoryPort
 from app.domain.student import StudentSearchResult
 
+#: Mesmo par de `get_home.py`: `MAX_PAGE_SIZE` é o `le=` do `Query(...)` de
+#: `GET /home/search`, importado de cá em vez de repetido como literal.
 DEFAULT_PAGE_SIZE = 5
 MAX_PAGE_SIZE = 100
 
