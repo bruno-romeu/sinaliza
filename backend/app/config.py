@@ -63,10 +63,17 @@ class Settings(BaseSettings):
     # exposto diretamente. Ver `app.presentation.rate_limit.client_key`.
     rate_limit_trusted_proxy_hops: int = Field(default=1, ge=0)
 
-    # Where `python -m app.ml.train` (spec-5-1) writes serialized `Pipeline`
-    # artifacts. Offline-only — never read by the web process or FastAPI
-    # `Depends` (AD-3); Story 5.2's live-inference loader will read this same
-    # setting to locate an `MLModelVersion.artifact_path`.
+    # Onde `python -m app.ml.train` (spec-5-1) escreve os `Pipeline`
+    # serializados. Offline-only — nunca lido pelo processo web nem por
+    # `Depends` do FastAPI (AD-3).
+    #
+    # Quem *lê* o artefato (`predict.py`, `evaluate.py`) não passa por aqui:
+    # carrega o `artifact_path` gravado na própria linha `MLModelVersion`. O
+    # comentário anterior prometia o contrário ("Story 5.2's live-inference
+    # loader will read this same setting"), e era por causa dessa promessa que
+    # `run_prediction` carregava um `artifact_dir` que nunca lia — parâmetro
+    # removido na onda de higiene. Esta é, portanto, a configuração do
+    # **treino**, e só dele.
     ml_artifact_dir: str = "./ml_artifacts"
 
 
