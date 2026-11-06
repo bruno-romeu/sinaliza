@@ -34,11 +34,10 @@ from app.ml import evaluate as evaluate_module
 from app.ml.evaluate import (
     DISCLAIMER,
     NoEvaluationDataError,
-    NoModelVersionError,
     run_evaluation,
 )
 from app.ml.feature_aggregation import FeatureSchemaMismatchError
-from app.ml.model_version_selection import ModelVersionNotFoundError
+from app.ml.model_version_selection import ModelVersionNotFoundError, NoModelVersionError
 from app.ml.pipeline import build_pipeline
 from app.ml.train import run_training
 
