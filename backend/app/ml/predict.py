@@ -12,7 +12,10 @@ profile.
 
 Re-running this command is deliberately non-destructive and non-deduping
 (spec Never): each run is a fresh, independent batch of `MLPrediction` rows
-tied to whichever `MLModelVersion` was latest at that moment.
+tied to whichever `MLModelVersion` aquela execução selecionou — a nomeada por
+`--model-version`, ou a mais recente quando o argumento é omitido. Era "a mais
+recente naquele momento" até o `--model-version` existir (PR #54); a frase
+deixou de valer quando a seleção explícita entrou.
 """
 
 from __future__ import annotations
@@ -37,17 +40,11 @@ from app.ml.feature_aggregation import (
 )
 from app.ml.model_version_selection import (
     ModelVersionNotFoundError,
+    NoModelVersionError,
     model_version_not_found_message,
     select_model_version,
 )
 from app.ml.prediction_repository import PredictionRepository
-
-
-class NoModelVersionError(RuntimeError):
-    """Raised when `ml_model_version` is empty — there is no trained artifact
-    to score with (spec I/O Matrix "No MLModelVersion exists"). The CLI
-    catches this, prints to stderr and exits non-zero, writing no
-    `MLPrediction` rows."""
 
 
 class NoScoringDataError(RuntimeError):
@@ -58,17 +55,21 @@ class NoScoringDataError(RuntimeError):
 
 def run_prediction(
     session: Session,
-    artifact_dir: object = None,
     model_version: str | None = None,
 ) -> list[MLPrediction]:
     """Scores every `EVAL_DEMO` student with a `MLModelVersion`'s fitted
     `Pipeline` and persists one `MLPrediction` row each. Takes a
     `Session` (not `SessionLocal` directly) so the test suite can drive it
     inside its own rolled-back transaction, mirroring
-    `app.ml.train.run_training`'s precedent. `artifact_dir` is accepted only
-    for call-shape parity with `run_training` (spec Code Map) but unused —
-    the artifact path to load comes from the selected `MLModelVersionModel`
-    row itself, never from a directory the caller passes in.
+    `app.ml.train.run_training`'s precedent.
+
+    Não recebe `artifact_dir`, ao contrário de `run_training`: o caminho do
+    artefato a carregar vem da própria linha `MLModelVersionModel`
+    selecionada, nunca de um diretório que o chamador passe. O parâmetro
+    existiu até esta onda só por paridade de assinatura com `run_training`
+    (`spec-5-2` Code Map) e era ignorado — uma assinatura que anuncia uma
+    entrada que a função não lê descreve mal o que a função faz.
+    `app.ml.evaluate.run_evaluation`, escrita depois, já nasceu sem ele.
 
     `model_version` nomeia a `version` a usar; `None` (o padrão) mantém o
     comportamento anterior — a mais recente por `trained_at`."""
@@ -152,11 +153,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> None:
     args = _build_arg_parser().parse_args(argv)
-    settings = get_settings()
+    # Return value unused (predict reads the artifact path off the selected
+    # MLModelVersion row, not settings.ml_artifact_dir like train.py does) —
+    # called anyway as a fail-fast config/env validation step, the same call
+    # `app.ml.evaluate.main` makes for the same reason.
+    get_settings()
 
     with SessionLocal() as session:
         try:
-            predictions = run_prediction(session, settings.ml_artifact_dir, args.model_version)
+            predictions = run_prediction(session, args.model_version)
         except (
             NoModelVersionError,
             ModelVersionNotFoundError,
