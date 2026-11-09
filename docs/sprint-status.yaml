@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-17-2026 20:30
-last_updated: 11-05-2026 00:00
+last_updated: 11-09-2026 00:00
 project: Sinaliza
 project_key: NOKEY
 tracking_system: file-system
@@ -128,8 +128,8 @@ action_items:
       in backend/app/presentation/auth/dependencies.py:1-5 and backend/tests/test_auth_login.py:1-2
       - it has been enforced by 4 routers since Story 1.2."
     owner: "dev"
-    status: open
-    ref: "docs/epic-1-retro-2026-09-26.md"
+    status: done
+    ref: "docs/epic-1-retro-2026-09-26.md; closed by PR #56 (a docstring de presentation/auth/dependencies.py afirmava que get_current_user nao estava aplicado a rota nenhuma, enquanto ja estava em Depends() de sete routers; corrigida junto com outras quatro docstrings defasadas)"
   - id: "epic-1-retro-item-7-atividades-submission-reset"
     epic: 1
     action: "[defer] Mirror Notas.tsx's split-reset-effect pattern in frontend/src/pages/Lancamento/Atividades.tsx
