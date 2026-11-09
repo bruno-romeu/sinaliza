@@ -48,7 +48,14 @@ def _imputer_only_preprocessor() -> ColumnTransformer:
     monotônica."""
     return ColumnTransformer(
         transformers=[
-            ("numeric", SimpleImputer(strategy="mean"), list(range(_NUMERIC_FEATURE_COUNT))),
+            (
+                "numeric",
+                # Mesma razão de `app/ml/pipeline.py`: sem a flag, uma coluna
+                # inteiramente ausente no ajuste é descartada e o pipeline
+                # deixa de ter a largura que `FEATURE_COLUMNS` declara.
+                SimpleImputer(strategy="mean", keep_empty_features=True),
+                list(range(_NUMERIC_FEATURE_COUNT)),
+            ),
         ]
     )
 
@@ -71,7 +78,7 @@ def _imputer_and_scaler_preprocessor() -> ColumnTransformer:
                 "numeric",
                 Pipeline(
                     steps=[
-                        ("imputer", SimpleImputer(strategy="mean")),
+                        ("imputer", SimpleImputer(strategy="mean", keep_empty_features=True)),
                         ("scaler", StandardScaler()),
                     ]
                 ),

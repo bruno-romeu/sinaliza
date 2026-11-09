@@ -36,7 +36,7 @@ from app.ml.evaluate import (
     NoEvaluationDataError,
     run_evaluation,
 )
-from app.ml.feature_aggregation import FeatureSchemaMismatchError
+from app.ml.feature_aggregation import FEATURE_COLUMNS, FeatureSchemaMismatchError
 from app.ml.model_version_selection import ModelVersionNotFoundError, NoModelVersionError
 from app.ml.pipeline import build_pipeline
 from app.ml.train import run_training
@@ -220,11 +220,14 @@ def _seed_model_version_trained_on_subset_of_labels(
     model trained on all 4 labels (`_seed_model_version`/`_train_a_model`)
     never reaches."""
     pipeline = build_pipeline()
+    # Preenchido ate a largura de `FEATURE_COLUMNS` em vez de listar as
+    # colunas a mao (decisao 0002).
+    _padding = [0.0] * (len(FEATURE_COLUMNS) - 4)
     feature_matrix = [
-        [0.9, 7.0, 1.0, 2],
-        [0.85, 6.5, 0.9, 1],
-        [0.1, 3.0, 0.2, 0],
-        [0.15, 3.5, 0.3, 0],
+        [0.9, 7.0, 1.0, 2, *_padding],
+        [0.85, 6.5, 0.9, 1, *_padding],
+        [0.1, 3.0, 0.2, 0, *_padding],
+        [0.15, 3.5, 0.3, 0, *_padding],
     ]
     labels = [
         SyntheticProfile.STABLE.value,
