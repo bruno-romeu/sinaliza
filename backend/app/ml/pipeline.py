@@ -31,7 +31,27 @@ def build_pipeline() -> Pipeline:
     deterministic across runs (spec Design Notes)."""
     preprocessor = ColumnTransformer(
         transformers=[
-            ("numeric", SimpleImputer(strategy="mean"), list(range(_NUMERIC_FEATURE_COUNT))),
+            (
+                "numeric",
+                # `keep_empty_features=True` é obrigatório, não cosmético. Sem
+                # ele, uma coluna **inteiramente** ausente no conjunto de
+                # ajuste é silenciosamente *descartada* pelo `SimpleImputer`:
+                # o pipeline passa a ser ajustado com menos colunas do que
+                # `FEATURE_COLUMNS` declara, e a inferência — que monta 8
+                # colunas via `feature_vector()` — falha com erro de forma,
+                # ou pior, casaria colunas trocadas se o número coincidisse.
+                #
+                # `require_matching_feature_schema()` não alcança esse caso: o
+                # esquema de features *confere*: foi o ajuste que encolheu. A
+                # situação é rara no dataset de 200 estudantes (todo estudante
+                # tem notas em vários períodos) e comum em conjuntos pequenos,
+                # que é justamente onde ela passaria despercebida.
+                #
+                # Com a flag, a coluna sobrevive preenchida com 0.0 — a
+                # convenção do sklearn para "nenhum valor observado".
+                SimpleImputer(strategy="mean", keep_empty_features=True),
+                list(range(_NUMERIC_FEATURE_COUNT)),
+            ),
         ]
     )
     classifier = RandomForestClassifier(n_estimators=100, random_state=42)
