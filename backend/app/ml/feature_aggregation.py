@@ -26,11 +26,17 @@ from app.domain.assignment_submission import AssignmentSubmissionStatus
 from app.domain.attendance import AttendanceStatus
 from app.domain.student import DatasetSplit
 from app.infrastructure.db.models import (
+    AcademicPeriodModel,
     AssignmentSubmissionModel,
     AttendanceRecordModel,
     GradeModel,
     PedagogicalObservationModel,
     StudentModel,
+)
+from app.ml.temporal_features import (
+    first_to_last_group_delta,
+    half_split_delta,
+    longest_true_run,
 )
 
 #: The single declaration of which features exist and in which order. Every
@@ -39,11 +45,34 @@ from app.infrastructure.db.models import (
 #: build their feature matrices through `feature_vector()` below, so a
 #: reorder here reorders all three together instead of silently feeding the
 #: pipeline swapped columns (epic-5-retro-item-1).
+#:
+#: As quatro primeiras são agregados do ano inteiro — **nível**. As quatro
+#: últimas são temporais — **inclinação**
+#: (spec-features-temporais-de-trajetoria).
+#:
+#: A distinção importa porque todo perfil sintético não-`STABLE` é definido
+#: por uma rampa no tempo (`app/synthetic/profiles.py`): a probabilidade
+#: diária de presença interpola até um piso ao longo dos dias letivos, o
+#: quantil de nota é multiplicado por `(1 - progress)` ao longo dos períodos,
+#: e a taxa de não-entrega interpola até um teto. Uma média anual sobre uma
+#: rampa linear devolve aproximadamente o ponto médio dela: preserva o nível e
+#: apaga a inclinação, que é a grandeza que **define** o perfil. Com só os
+#: agregados, o modelo tentava reconhecer um fenômeno temporal a partir de
+#: números que haviam apagado o tempo (`AGENTS.md` §Features nomeia estas
+#: quatro).
+#:
+#: As antigas ficam: o conjunto novo é o antigo **mais** quatro. Remover o
+#: nível junto com a adição da inclinação impossibilitaria atribuir a diferença
+#: medida a uma das duas mudanças.
 FEATURE_COLUMNS: tuple[str, ...] = (
     "attendance_rate",
     "grade_average",
     "assignment_completion_rate",
     "observation_count",
+    "attendance_trend",
+    "consecutive_absences",
+    "grade_delta",
+    "missing_assignment_delta",
 )
 
 
@@ -106,7 +135,7 @@ def require_matching_feature_schema(version: str, persisted: str | None) -> None
             f"MLModelVersion {version} was fitted under feature schema "
             f"{persisted}, but the running code declares {FEATURE_SCHEMA_VERSION} "
             f"({', '.join(FEATURE_COLUMNS)}). FEATURE_COLUMNS changed since this "
-            "artifact was trained — retrain with `python -m app.ml.train` "
+            "artifact was trained - retrain with `python -m app.ml.train` "
             "instead of scoring with mismatched columns."
         )
 
@@ -133,9 +162,103 @@ class FeatureRow:
     grade_average: float | None
     assignment_completion_rate: float | None
     observation_count: int
+    attendance_trend: float | None
+    consecutive_absences: int
+    grade_delta: float | None
+    missing_assignment_delta: float | None
 
 
 require_feature_fields(FeatureRow)
+
+
+def _attendance_series_by_student(
+    session: Session, student_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[bool]]:
+    """Por estudante, a sequência cronológica de "esteve presente?".
+
+    Ordenada por `(date, id)`: o `id` é desempate determinístico para o caso
+    de dois registros na mesma data (o `UNIQUE` é por `(student, classroom,
+    date)`, então um estudante em duas turmas pode ter dois registros no mesmo
+    dia). Sem ele a ordem viria do plano de execução do Postgres e a feature
+    poderia mudar entre execuções.
+
+    `ABSENT_JUSTIFIED` e `ABSENT_UNJUSTIFIED` contam igual, seguindo o que
+    `app/domain/attendance.py` já registra para o cálculo de tendência do
+    produto (RF-11): a distinção está gravada para uso futuro, não usada na
+    matemática."""
+    series: dict[uuid.UUID, list[bool]] = {}
+    for row in session.execute(
+        select(
+            AttendanceRecordModel.student_id,
+            AttendanceRecordModel.status,
+        )
+        .where(AttendanceRecordModel.student_id.in_(student_ids))
+        .order_by(
+            AttendanceRecordModel.student_id,
+            AttendanceRecordModel.date,
+            AttendanceRecordModel.id,
+        )
+    ).all():
+        series.setdefault(row.student_id, []).append(row.status == AttendanceStatus.PRESENT)
+    return series
+
+
+def _grades_by_student_and_period(
+    session: Session, student_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, dict[int, list[float]]]:
+    """Por estudante, as notas agrupadas por `AcademicPeriod.order_index`.
+
+    Agrupado por período e não por data de lançamento porque a rampa de nota
+    do gerador é indexada por período (`_progress(period_index,
+    total_periods)` em `app/synthetic/profiles.py`). Uma nota lançada com
+    atraso move a data sem mover o período a que a nota pertence."""
+    grouped: dict[uuid.UUID, dict[int, list[float]]] = {}
+    for row in session.execute(
+        select(
+            GradeModel.student_id,
+            AcademicPeriodModel.order_index,
+            GradeModel.value,
+        )
+        .join(AcademicPeriodModel, GradeModel.period_id == AcademicPeriodModel.id)
+        .where(GradeModel.student_id.in_(student_ids))
+    ).all():
+        grouped.setdefault(row.student_id, {}).setdefault(row.order_index, []).append(
+            float(row.value)
+        )
+    return grouped
+
+
+def _non_delivery_series_by_student(
+    session: Session, student_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[float]]:
+    """Por estudante, a sequência cronológica de "não entregou?" (1.0/0.0).
+
+    `NOT_DELIVERED` apenas, não `PARTIAL`: é a taxa que o gerador interpola
+    (`ASSIGNMENT_NON_DELIVERY_RATE_BASELINE` → `..._AT_RISK_CEILING`), e só
+    para `COMBINED_DETERIORATION`. Por isso esta é a feature que separa
+    `COMBINED_DETERIORATION` dos perfis de um eixo só — distinção que
+    `assignment_completion_rate`, diluída sobre o ano inteiro, não consegue
+    fazer nem em princípio.
+
+    Mesmo desempate por `id` de `_attendance_series_by_student`, pelo mesmo
+    motivo: não há `UNIQUE` em `assignment_submissions`."""
+    series: dict[uuid.UUID, list[float]] = {}
+    for row in session.execute(
+        select(
+            AssignmentSubmissionModel.student_id,
+            AssignmentSubmissionModel.status,
+        )
+        .where(AssignmentSubmissionModel.student_id.in_(student_ids))
+        .order_by(
+            AssignmentSubmissionModel.student_id,
+            AssignmentSubmissionModel.date,
+            AssignmentSubmissionModel.id,
+        )
+    ).all():
+        series.setdefault(row.student_id, []).append(
+            1.0 if row.status == AssignmentSubmissionStatus.NOT_DELIVERED else 0.0
+        )
+    return series
 
 
 def fetch_feature_rows(session: Session, dataset_split: DatasetSplit) -> list[FeatureRow]:
@@ -210,6 +333,13 @@ def fetch_feature_rows(session: Session, dataset_split: DatasetSplit) -> list[Fe
         ).all()
     }
 
+    # As três séries temporais, lidas uma vez para todos os estudantes do
+    # corte. O cálculo em si está em `app/ml/temporal_features.py`, em funções
+    # puras sem SQLAlchemy: o que é testável sem banco fica fora daqui.
+    attendance_series = _attendance_series_by_student(session, student_ids)
+    grades_by_period = _grades_by_student_and_period(session, student_ids)
+    non_delivery_series = _non_delivery_series_by_student(session, student_ids)
+
     rows: list[FeatureRow] = []
     for student in students:
         present, total = attendance_by_student.get(student.id, (0, 0))
@@ -218,6 +348,14 @@ def fetch_feature_rows(session: Session, dataset_split: DatasetSplit) -> list[Fe
         delivered, submission_total = submission_by_student.get(student.id, (0, 0))
         assignment_completion_rate = (delivered / submission_total) if submission_total else None
 
+        presence_flags = attendance_series.get(student.id, [])
+        # Negativo = presença caindo ao longo do ano, que é exatamente a rampa
+        # de `FALLING_ATTENDANCE`/`COMBINED_DETERIORATION`.
+        attendance_trend = half_split_delta([1.0 if present else 0.0 for present in presence_flags])
+        # Contagem, não taxa: `0` sem registros, mesma convenção de
+        # `observation_count` — "nenhuma falta" é um valor real.
+        consecutive_absences = longest_true_run([not present for present in presence_flags])
+
         rows.append(
             FeatureRow(
                 student_id=student.id,
@@ -225,6 +363,10 @@ def fetch_feature_rows(session: Session, dataset_split: DatasetSplit) -> list[Fe
                 grade_average=grade_average_by_student.get(student.id),
                 assignment_completion_rate=assignment_completion_rate,
                 observation_count=observation_count_by_student.get(student.id, 0),
+                attendance_trend=attendance_trend,
+                consecutive_absences=consecutive_absences,
+                grade_delta=first_to_last_group_delta(grades_by_period.get(student.id, {})),
+                missing_assignment_delta=half_split_delta(non_delivery_series.get(student.id, [])),
             )
         )
     return rows

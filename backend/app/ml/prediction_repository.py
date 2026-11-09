@@ -51,6 +51,10 @@ class ScoringRow:
     grade_average: float | None
     assignment_completion_rate: float | None
     observation_count: int
+    attendance_trend: float | None
+    consecutive_absences: int
+    grade_delta: float | None
+    missing_assignment_delta: float | None
 
 
 #: `ScoringRow`'s field *order* no longer has to match `FEATURE_COLUMNS`:
@@ -77,6 +81,10 @@ class PredictionRepository:
                 grade_average=row.grade_average,
                 assignment_completion_rate=row.assignment_completion_rate,
                 observation_count=row.observation_count,
+                attendance_trend=row.attendance_trend,
+                consecutive_absences=row.consecutive_absences,
+                grade_delta=row.grade_delta,
+                missing_assignment_delta=row.missing_assignment_delta,
             )
             for row in feature_rows
         ]
