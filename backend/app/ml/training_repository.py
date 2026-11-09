@@ -56,6 +56,10 @@ class TrainingRow:
     grade_average: float | None
     assignment_completion_rate: float | None
     observation_count: int
+    attendance_trend: float | None
+    consecutive_absences: int
+    grade_delta: float | None
+    missing_assignment_delta: float | None
     label: SyntheticProfile
 
 
@@ -97,6 +101,10 @@ class TrainingRepository:
                     grade_average=feature_row.grade_average,
                     assignment_completion_rate=feature_row.assignment_completion_rate,
                     observation_count=feature_row.observation_count,
+                    attendance_trend=feature_row.attendance_trend,
+                    consecutive_absences=feature_row.consecutive_absences,
+                    grade_delta=feature_row.grade_delta,
+                    missing_assignment_delta=feature_row.missing_assignment_delta,
                     label=label,
                 )
             )
