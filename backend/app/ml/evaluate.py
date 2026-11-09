@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
@@ -62,7 +62,7 @@ from app.synthetic.fingerprint import population_fingerprint
 #: The fixed label set for precision/recall/F1/confusion-matrix — every
 #: `SyntheticProfile` member, in a stable order, so an absent class shows as
 #: a zero row/column instead of crashing (spec Boundaries).
-_ALL_LABELS: list[str] = [profile.value for profile in SyntheticProfile]
+ALL_LABELS: list[str] = [profile.value for profile in SyntheticProfile]
 
 #: Printed verbatim on every report (spec Boundaries: "Every printed report
 #: includes, verbatim, the phrase..."). Never claims real-world predictive
@@ -128,7 +128,7 @@ class EvaluationReport:
             "evaluation_dataset_version": self.evaluation_dataset_version,
             "feature_schema_version": FEATURE_SCHEMA_VERSION,
             "feature_columns": list(FEATURE_COLUMNS),
-            "labels": list(_ALL_LABELS),
+            "labels": list(ALL_LABELS),
             "averaging": "macro",
             "sample_count": self.sample_count,
             "missing_facts_count": self.missing_facts_count,
@@ -142,62 +142,41 @@ class EvaluationReport:
         }
 
 
-def run_evaluation(session: Session, model_version: str | None = None) -> EvaluationReport:
-    """Scores the full labeled `EVAL_DEMO` cut with a `MLModelVersion`'s fitted
-    `Pipeline` and computes the evaluation report. Takes a `Session` (not
-    `SessionLocal` directly) so the test suite can drive it inside its own
-    rolled-back transaction, mirroring `app.ml.predict.run_prediction`'s
-    precedent. Never refits the pipeline — `joblib.load`s the artifact verbatim
-    and only calls `.predict`/`.predict_proba`. Ao final, grava o relatório em
-    `metrics` da própria `MLModelVersion` avaliada (nenhuma linha nova é
-    criada).
+def compute_report(pipeline: Any, evaluation_rows: list[Any]) -> EvaluationReport:
+    """Scores `evaluation_rows` with an already-fitted `pipeline` and computes
+    the report. Pure measurement: reads nothing, writes nothing, and does not
+    know where the pipeline came from.
 
-    `model_version` nomeia a `version` a avaliar; `None` (o padrão) mantém o
-    comportamento anterior — a mais recente por `trained_at`. Poder apontar uma
-    versão específica é o que torna "reavalie este modelo" um comando, agora que
-    a procedência de cada versão está no banco."""
-    model_version_row = select_model_version(session, model_version)
-    if model_version_row is None:
-        if model_version is not None:
-            raise ModelVersionNotFoundError(model_version_not_found_message(model_version))
-        raise NoModelVersionError(
-            "No MLModelVersion rows were found — nothing to evaluate. "
-            "Run `python -m app.ml.train` first."
-        )
+    Extracted out of `run_evaluation` so `app/ml/compare.py` measures its
+    candidate pipelines with *this* code instead of a second implementation of
+    the same metrics. Two implementations of macro-F1 that drift apart would
+    make "candidate X beat the production model" unfalsifiable — the gap could
+    always be the metric rather than the model. One function, one definition of
+    the number, both callers comparable by construction.
 
-    evaluation_rows = EvaluationRepository(session).fetch_evaluation_rows()
-    if not evaluation_rows:
-        raise NoEvaluationDataError(
-            "No labeled EVAL_DEMO students were found — nothing to evaluate. "
-            "Run `python -m app.synthetic.generate` first."
-        )
-
-    require_matching_feature_schema(
-        model_version_row.version, model_version_row.feature_schema_version
-    )
-
-    pipeline = joblib.load(model_version_row.artifact_path)
-
+    `evaluated_at`/`evaluation_dataset_version` stay unset here: those are
+    provenance about a *persisted* evaluation, and only `run_evaluation`
+    persists one."""
     feature_matrix = [feature_vector(row) for row in evaluation_rows]
     y_true = [row.label.value for row in evaluation_rows]
 
     y_pred = pipeline.predict(feature_matrix)
 
     precision, recall, f1, _support = precision_recall_fscore_support(
-        y_true, y_pred, labels=_ALL_LABELS, average="macro", zero_division=0
+        y_true, y_pred, labels=ALL_LABELS, average="macro", zero_division=0
     )
-    matrix = confusion_matrix(y_true, y_pred, labels=_ALL_LABELS)
+    matrix = confusion_matrix(y_true, y_pred, labels=ALL_LABELS)
 
     distinct_true_labels = set(y_true)
     roc_auc: float | None = None
     pr_auc: float | None = None
     if len(distinct_true_labels) >= 2:
         # Restricted to labels actually present in y_true (not the fixed
-        # `_ALL_LABELS` 4-label set the confusion matrix uses) — a one-vs-rest
+        # `ALL_LABELS` 4-label set the confusion matrix uses) — a one-vs-rest
         # column for a label with zero true instances has no positives at
         # all, which makes that column's AUC undefined (NaN) and would
         # silently poison the macro average across every column.
-        present_labels = [label for label in _ALL_LABELS if label in distinct_true_labels]
+        present_labels = [label for label in ALL_LABELS if label in distinct_true_labels]
 
         probabilities = pipeline.predict_proba(feature_matrix)
         # `pipeline.classes_` may not be ordered/sized like `present_labels`
@@ -238,7 +217,7 @@ def run_evaluation(session: Session, model_version: str | None = None) -> Evalua
         or row.assignment_completion_rate is None
     )
 
-    report = EvaluationReport(
+    return EvaluationReport(
         precision=float(precision),
         recall=float(recall),
         f1=float(f1),
@@ -247,6 +226,51 @@ def run_evaluation(session: Session, model_version: str | None = None) -> Evalua
         pr_auc=pr_auc,
         missing_facts_count=missing_facts_count,
         sample_count=len(evaluation_rows),
+    )
+
+
+def run_evaluation(session: Session, model_version: str | None = None) -> EvaluationReport:
+    """Scores the full labeled `EVAL_DEMO` cut with a `MLModelVersion`'s fitted
+    `Pipeline` and computes the evaluation report. Takes a `Session` (not
+    `SessionLocal` directly) so the test suite can drive it inside its own
+    rolled-back transaction, mirroring `app.ml.predict.run_prediction`'s
+    precedent. Never refits the pipeline — `joblib.load`s the artifact verbatim
+    and only calls `.predict`/`.predict_proba`. Ao final, grava o relatório em
+    `metrics` da própria `MLModelVersion` avaliada (nenhuma linha nova é
+    criada).
+
+    `model_version` nomeia a `version` a avaliar; `None` (o padrão) mantém o
+    comportamento anterior — a mais recente por `trained_at`. Poder apontar uma
+    versão específica é o que torna "reavalie este modelo" um comando, agora que
+    a procedência de cada versão está no banco."""
+    model_version_row = select_model_version(session, model_version)
+    if model_version_row is None:
+        if model_version is not None:
+            raise ModelVersionNotFoundError(model_version_not_found_message(model_version))
+        raise NoModelVersionError(
+            "No MLModelVersion rows were found — nothing to evaluate. "
+            "Run `python -m app.ml.train` first."
+        )
+
+    evaluation_rows = EvaluationRepository(session).fetch_evaluation_rows()
+    if not evaluation_rows:
+        raise NoEvaluationDataError(
+            "No labeled EVAL_DEMO students were found — nothing to evaluate. "
+            "Run `python -m app.synthetic.generate` first."
+        )
+
+    require_matching_feature_schema(
+        model_version_row.version, model_version_row.feature_schema_version
+    )
+
+    pipeline = joblib.load(model_version_row.artifact_path)
+
+    # A medição em si vive em `compute_report` — a mesma função que
+    # `app/ml/compare.py` usa para medir seus candidatos. Aqui ficam só as
+    # responsabilidades que são desta função: escolher a versão, carregar o
+    # artefato, e carimbar a procedência da avaliação persistida.
+    report = replace(
+        compute_report(pipeline, list(evaluation_rows)),
         evaluated_at=datetime.now(UTC),
         evaluation_dataset_version=population_fingerprint(session),
     )
@@ -266,10 +290,10 @@ def _format_report(report: EvaluationReport) -> str:
     roc_auc_text = f"{report.roc_auc:.4f}" if report.roc_auc is not None else _NOT_COMPUTABLE
     pr_auc_text = f"{report.pr_auc:.4f}" if report.pr_auc is not None else _NOT_COMPUTABLE
 
-    header = "    ".join(_ALL_LABELS)
+    header = "    ".join(ALL_LABELS)
     matrix_lines = "\n".join(
         f"  {label:<24} " + "  ".join(str(value) for value in row)
-        for label, row in zip(_ALL_LABELS, report.confusion_matrix, strict=False)
+        for label, row in zip(ALL_LABELS, report.confusion_matrix, strict=False)
     )
 
     return (
