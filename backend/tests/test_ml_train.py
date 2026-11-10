@@ -32,6 +32,7 @@ from app.infrastructure.db.models import (
     UserModel,
 )
 from app.ml import train as train_module
+from app.ml.feature_aggregation import FEATURE_COLUMNS
 from app.ml.train import NoTrainingDataError, run_training
 from app.ml.training_repository import TrainingRepository
 
@@ -156,9 +157,12 @@ def test_happy_path_fits_pipeline_writes_artifact_and_model_version(
 
     loaded = joblib.load(model_version.artifact_path)
     assert isinstance(loaded, Pipeline)
-    prediction = loaded.predict([[0.9, 7.0, 1.0, 2]])
+    # Largura derivada de `FEATURE_COLUMNS`, não escrita à mão (decisão 0002):
+    # acrescentar uma feature não deve obrigar a contar colunas neste teste.
+    sample = [[0.9, 7.0, 1.0, 2] + [0.0] * (len(FEATURE_COLUMNS) - 4)]
+    prediction = loaded.predict(sample)
     assert prediction[0] in {p.value for p in SyntheticProfile}
-    probabilities = loaded.predict_proba([[0.9, 7.0, 1.0, 2]])
+    probabilities = loaded.predict_proba(sample)
     assert probabilities.shape[0] == 1
 
 
