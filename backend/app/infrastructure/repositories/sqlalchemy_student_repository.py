@@ -58,6 +58,34 @@ class SqlAlchemyStudentRepository:
             return None
         return Student(id=model.id, name=model.name, dataset_split=model.dataset_split)
 
+    def get_names_by_ids(self, student_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """Display names for a whole Home page in one query, under the same
+        `EVAL_DEMO` filter as `get_by_id` — an id absent from the returned
+        mapping is exactly what `get_by_id` answering `None` meant (unknown
+        student, or a `TRAIN`-split one, indistinguishably: "estudante
+        inexistente ou TRAIN → mesmo 404, nunca vaza o split").
+
+        `GetHomeService` called `get_by_id` once per listed row before this,
+        so the Home cost `4 + N + M` queries in two page sizes the client
+        controls (up to 100 each). Selecting `id`/`name` instead of whole
+        `StudentModel` rows is not an optimisation — it is what lets the
+        return type be a plain mapping, so no caller can reach a field (e.g.
+        `dataset_split`) the Home has no business showing. Duplicate ids are
+        harmless: the mapping collapses them, and the Home's two lists
+        legitimately overlap when the same student has both a recent change
+        and an open follow-up.
+        """
+        if not student_ids:
+            return {}
+        # `sorted(set(...))`: dedup, and a stable parameter order so the same
+        # page always produces the byte-identical statement — which is what
+        # makes an `EXPLAIN` of it reproducible.
+        stmt = select(StudentModel.id, StudentModel.name).where(
+            StudentModel.id.in_(sorted(set(student_ids)))
+        )
+        stmt = filter_eval_demo_students(stmt)
+        return {row_id: name for row_id, name in self._session.execute(stmt).all()}
+
     def get_profile(self, student_id: uuid.UUID) -> StudentProfile | None:
         """Name + classroom for the Trajectory page title (spec-ui-1). Same
         `EVAL_DEMO` filter as `get_by_id`. If the student has more than one

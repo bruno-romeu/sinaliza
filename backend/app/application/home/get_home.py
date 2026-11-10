@@ -10,12 +10,23 @@ from the Home) — this service never iterates students or triggers
 per-student trajectory endpoint.
 
 Each `TrajectoryChange` only carries `student_id`, so this service resolves
-the display name via `StudentRepositoryPort.get_by_id` — the same
-`EVAL_DEMO`-filtered lookup every other student-facing read uses (AD-11). A
-`TrajectoryChange` is only ever written for an `EVAL_DEMO` student by
-construction, but a row is skipped defensively (never raised) if that lookup
-ever comes back empty, rather than crash the whole Home read over one bad
-row.
+the display name via `StudentNameRepositoryPort.get_names_by_ids` — the same
+`EVAL_DEMO`-filtered lookup every other student-facing read uses (AD-11),
+asked for the whole page in **one** query. A `TrajectoryChange` is only ever
+written for an `EVAL_DEMO` student by construction, but a row is skipped
+defensively (never raised) if that lookup ever comes back empty, rather than
+crash the whole Home read over one bad row — an id absent from the returned
+mapping is exactly the old `get_by_id(...) is None`.
+
+That resolution used to be a `get_by_id` call *inside* each of the two loops
+below, which made the Home's query count `4 + N + M` — linear in two page
+sizes the client controls, up to 100 each (`MAX_CHANGES_PAGE_SIZE`/
+`MAX_FOLLOW_UPS_PAGE_SIZE`). Measured against a copy of the demo database: 10
+queries at the default 5+5 and 21 at 100/100, against 6 constant now. With
+~200 synthetic students even 204 queries finish in milliseconds, so this was
+never *slow* — it was a count that grows with data the demo does not have yet,
+which is why it is closed by batching and not by caching (`AGENTS.md`
+§Atalhos proibidos: nenhuma tecnologia nova).
 
 spec-4-5 extends this service to also read every `FollowUp` whose status is
 not `ENCERRADO` via `FollowUpRepositoryPort.list_active` — paginated by
@@ -23,7 +34,7 @@ not `ENCERRADO` via `FollowUpRepositoryPort.list_active` — paginated by
 matches the old fixed behavior's effective page-1 view) rather than the
 originally-"never capped" list, since open-case volume grows without bound
 over the life of a real deployment — the same `student_name`
-resolution/skip-if-`None` pattern is reused for these rows.
+resolution/skip-if-missing pattern is reused for these rows.
 """
 
 from __future__ import annotations
@@ -32,7 +43,7 @@ from dataclasses import dataclass
 
 from app.application.home.ports import (
     FollowUpRepositoryPort,
-    StudentRepositoryPort,
+    StudentNameRepositoryPort,
     TrajectoryChangeRepositoryPort,
 )
 from app.domain.follow_up import FollowUp
@@ -87,7 +98,7 @@ class GetHomeService:
     def __init__(
         self,
         trajectory_change_repository: TrajectoryChangeRepositoryPort,
-        student_repository: StudentRepositoryPort,
+        student_repository: StudentNameRepositoryPort,
         follow_up_repository: FollowUpRepositoryPort,
     ) -> None:
         self._trajectory_change_repository = trajectory_change_repository
@@ -106,23 +117,29 @@ class GetHomeService:
             changes_page_size, (changes_page - 1) * changes_page_size
         )
 
+        change_names = self._student_repository.get_names_by_ids(
+            [change.student_id for change in changes]
+        )
         recent_changes: list[RecentChange] = []
         for change in changes:
-            student = self._student_repository.get_by_id(change.student_id)
-            if student is None:
+            student_name = change_names.get(change.student_id)
+            if student_name is None:
                 continue
-            recent_changes.append(RecentChange(trajectory_change=change, student_name=student.name))
+            recent_changes.append(RecentChange(trajectory_change=change, student_name=student_name))
 
         total_active_follow_ups = self._follow_up_repository.count_active()
         offset = (follow_ups_page - 1) * follow_ups_page_size
         follow_ups = self._follow_up_repository.list_active(follow_ups_page_size, offset)
 
+        follow_up_names = self._student_repository.get_names_by_ids(
+            [follow_up.student_id for follow_up in follow_ups]
+        )
         active_follow_ups: list[ActiveFollowUp] = []
         for follow_up in follow_ups:
-            student = self._student_repository.get_by_id(follow_up.student_id)
-            if student is None:
+            student_name = follow_up_names.get(follow_up.student_id)
+            if student_name is None:
                 continue
-            active_follow_ups.append(ActiveFollowUp(follow_up=follow_up, student_name=student.name))
+            active_follow_ups.append(ActiveFollowUp(follow_up=follow_up, student_name=student_name))
 
         return HomeResult(
             recent_changes=RecentChangesPage(
