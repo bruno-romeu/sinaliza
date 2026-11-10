@@ -482,6 +482,65 @@ def test_home_with_no_active_follow_ups_returns_empty_list(client: TestClient, s
     assert response.json()["in_progress_follow_ups"] == []
 
 
+def test_home_skips_rows_whose_student_is_not_eval_demo(
+    client: TestClient,
+    db_session: Session,
+    seeded_user,
+    seeded_academic_period: AcademicPeriodModel,
+    seeded_classroom: ClassroomModel,
+    seeded_enrolled_student: StudentModel,
+) -> None:
+    """A `TrajectoryChange`/`FollowUp` written for a `TRAIN`-split student is
+    silently skipped, never surfaced and never an error — the same AD-11
+    filter the search already enforces, applied to the two Home lists.
+
+    By construction neither row should exist for a `TRAIN` student, which is
+    exactly why the branch needs a test: it is the defensive half of the name
+    resolution, unreachable through the product's own writes, and it changed
+    shape when that resolution went from one `get_by_id` per row to a single
+    batch lookup (an id absent from the returned mapping now stands for what
+    `None` used to).
+    """
+    train_student = StudentModel(name="Aluno de Treino", dataset_split=DatasetSplit.TRAIN)
+    db_session.add(train_student)
+    db_session.flush()
+    db_session.add(EnrollmentModel(student_id=train_student.id, classroom_id=seeded_classroom.id))
+    _add_change(
+        db_session, train_student, seeded_academic_period, datetime(2026, 9, 20, tzinfo=UTC)
+    )
+    _add_change(
+        db_session,
+        seeded_enrolled_student,
+        seeded_academic_period,
+        datetime(2026, 9, 19, tzinfo=UTC),
+    )
+    _add_follow_up(
+        db_session,
+        train_student,
+        seeded_user.id,
+        FollowUpStatus.EM_OBSERVACAO,
+        datetime(2026, 9, 20, tzinfo=UTC),
+    )
+    _add_follow_up(
+        db_session,
+        seeded_enrolled_student,
+        seeded_user.id,
+        FollowUpStatus.EM_OBSERVACAO,
+        datetime(2026, 9, 19, tzinfo=UTC),
+    )
+    db_session.commit()
+
+    response = client.get("/home", headers=_auth_headers(client, seeded_user))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["student_name"] for item in body["recent_changes"]] == ["Estudante Teste"]
+    assert [item["student_name"] for item in body["in_progress_follow_ups"]] == ["Estudante Teste"]
+    # O total vem da contagem no banco, que nao conhece o filtro de split —
+    # e isso e pre-existente, nao algo que esta mudanca introduziu.
+    assert body["recent_changes_total"] == 2
+
+
 # --- Search matches -------------------------------------------------------------------
 
 

@@ -18,13 +18,21 @@ What it caught, and what it did not:
 * `GetFollowUpService` loops over `list_evidence_by_follow_up`'s rows and
   calls `TrajectoryChangeRepositoryPort.get_by_id` plus a full
   `resolve_evidence` per row — a genuine per-item fan-out that grows with
-  the number of linked changes, and `GetHomeService` resolves
-  `StudentRepositoryPort.get_by_id` once per listed change and per listed
-  follow-up. Both loops live in `application/`, not in a repository, and
-  fixing them means adding batch (`get_by_ids`) methods to the ports and
-  rewriting those services — out of this change's scope. The test below
-  pins the current per-change cost so the growth is at least visible and
-  measured rather than assumed.
+  the number of linked changes. Still not fixed, deliberately: the `N` there
+  is how many `TrajectoryChange`s a human cited as evidence, not a query
+  parameter, and batching it means turning `resolve_evidence` into a
+  multi-change resolution shared by two screens. The test below pins the
+  per-change cost so the growth stays visible and measured rather than
+  assumed.
+* `GetHomeService` used to resolve `StudentRepositoryPort.get_by_id` once per
+  listed change *and* once per listed follow-up — the same class of defect,
+  but with `N` and `M` set by `changes_page_size`/`follow_ups_page_size`,
+  which the **client** controls up to 100 each. That one is closed: the port
+  now exposes `get_names_by_ids` and the service asks once per list, so the
+  Home's count no longer depends on page size at all. The two tests at the
+  bottom of this module are what hold that: one pins the constant, the other
+  asserts the same count at two very different page sizes, which is the
+  property that actually fails if someone reintroduces a per-row lookup.
 """
 
 from __future__ import annotations
@@ -202,3 +210,100 @@ def test_get_follow_up_detail_query_cost_grows_per_linked_trajectory_change(
     # 9 + 5 per additional change — i.e. the per-change fan-out itself also
     # got one query cheaper.
     assert counter[0] == 8 + 2 * 4
+
+
+def _seed_home_rows(
+    db_session: Session,
+    student: StudentModel,
+    period: AcademicPeriodModel,
+    user: UserModel,
+    changes: int,
+) -> None:
+    """`changes` `TrajectoryChange`s plus one open `FollowUp`, all for the same
+    student — the shape `GET /home` lists. The types cycle because
+    `uq_trajectory_change_student_type_period` only allows one row per
+    (student, type, período)."""
+    change_types = [
+        TrajectoryChangeType.ATTENDANCE_DROP,
+        TrajectoryChangeType.GRADE_DROP,
+        TrajectoryChangeType.MISSING_ASSIGNMENTS_INCREASE,
+        TrajectoryChangeType.COMBINED_DETERIORATION,
+    ]
+    assert changes <= len(change_types)
+    for index in range(changes):
+        db_session.add(
+            TrajectoryChangeModel(
+                id=uuid.uuid4(),
+                student_id=student.id,
+                type=change_types[index],
+                period_id=period.id,
+                detected_at=datetime(2026, 9, 10 + index, 0, 0, tzinfo=UTC),
+                description="Mudança recente observada.",
+            )
+        )
+    db_session.add(
+        FollowUpModel(
+            id=uuid.uuid4(),
+            student_id=student.id,
+            status="EM_OBSERVACAO",
+            reason=None,
+            responsible_user_id=user.id,
+            next_review_date=None,
+            created_at=datetime(2026, 9, 1, 12, 0, tzinfo=UTC),
+        )
+    )
+    db_session.commit()
+
+
+def test_get_home_costs_a_fixed_number_of_queries(
+    client: TestClient,
+    engine: Engine,
+    db_session: Session,
+    seeded_user: UserModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+) -> None:
+    _seed_home_rows(db_session, seeded_enrolled_student, seeded_academic_period, seeded_user, 4)
+    headers = _auth_headers(client, seeded_user)
+
+    counter = [0]
+    with count_queries(engine, counter):
+        response = client.get("/home", headers=headers)
+
+    assert response.status_code == 200
+    # count_recent + list_recent + names + count_active + list_active +
+    # names. `get_current_user` adds nothing: it validates the JWT without
+    # touching the database, which is why this is 6 and not 7. Measured: it
+    # was `4 + N + M` before batching the name resolution — 9 for this
+    # fixture's 4 changes + 1 follow-up, and 21 against the demo database at
+    # `?changes_page_size=100&follow_ups_page_size=100`.
+    assert counter[0] == 6
+
+
+def test_get_home_query_count_does_not_grow_with_page_size(
+    client: TestClient,
+    engine: Engine,
+    db_session: Session,
+    seeded_user: UserModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_academic_period: AcademicPeriodModel,
+) -> None:
+    """The property, not just the number: with a per-row `get_by_id` this
+    endpoint cost `4 + N + M` queries and `N`/`M` are set by query parameters
+    the client controls up to 100 each. Asking for a page big enough to hold
+    every seeded row must cost exactly what a page holding one row costs."""
+    _seed_home_rows(db_session, seeded_enrolled_student, seeded_academic_period, seeded_user, 4)
+    headers = _auth_headers(client, seeded_user)
+
+    small = [0]
+    with count_queries(engine, small):
+        narrow = client.get("/home?changes_page_size=1&follow_ups_page_size=1", headers=headers)
+    large = [0]
+    with count_queries(engine, large):
+        wide = client.get("/home?changes_page_size=100&follow_ups_page_size=100", headers=headers)
+
+    assert narrow.status_code == 200
+    assert wide.status_code == 200
+    assert len(narrow.json()["recent_changes"]) == 1
+    assert len(wide.json()["recent_changes"]) == 4
+    assert small[0] == large[0]
