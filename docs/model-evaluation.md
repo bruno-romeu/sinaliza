@@ -80,8 +80,10 @@ do caminho web, e a avaliação lê o desfecho completo do ano, sem truncar em
 
 ## 3. As features
 
-Quatro agregados por estudante, declarados em um lugar só — `FEATURE_COLUMNS`
-em `backend/app/ml/feature_aggregation.py`:
+Oito por estudante, declaradas em um lugar só — `FEATURE_COLUMNS` em
+`backend/app/ml/feature_aggregation.py` — em dois grupos.
+
+**Nível: quatro agregados do ano inteiro.**
 
 | coluna | significado | ausente quando |
 |---|---|---|
@@ -89,6 +91,67 @@ em `backend/app/ml/feature_aggregation.py`:
 | `grade_average` | média das notas | `None` se não tem nota |
 | `assignment_completion_rate` | entregues / total de atividades | `None` se não tem entrega registrada |
 | `observation_count` | nº de observações pedagógicas | `0` (é contagem; "nenhuma" é valor real) |
+
+**Inclinação: quatro temporais.**
+
+| coluna | significado | ausente quando |
+|---|---|---|
+| `attendance_trend` | taxa de presença da 2ª metade menos a da 1ª metade dos registros, em ordem cronológica. Negativo = caindo | `None` com menos de 2 registros |
+| `consecutive_absences` | maior corrida de faltas consecutivas | `0` sem registros (é contagem) |
+| `grade_delta` | média do último período com notas menos a do primeiro, ordenados por `AcademicPeriod.order_index`. Negativo = caindo | `None` com menos de 2 períodos com nota |
+| `missing_assignment_delta` | taxa de `NOT_DELIVERED` da 2ª metade menos a da 1ª metade das entregas, em ordem cronológica. Positivo = piorando | `None` com menos de 2 entregas |
+
+### Por que features temporais
+
+As quatro primeiras achatam o tempo, e isso não é um detalhe de estilo: **todo
+perfil sintético não-`STABLE` é definido por uma rampa no tempo**
+(`backend/app/synthetic/profiles.py`):
+
+- `attendance_is_present` interpola a probabilidade diária de presença de
+  `DAILY_ATTENDANCE_RATE_BASELINE` até `DAILY_ATTENDANCE_RATE_AT_RISK_FLOOR`
+  pelo índice do dia letivo;
+- `grade_value` multiplica o quantil habitual do estudante por
+  `(1 - progress)` ao longo dos períodos, de modo que no último período o
+  quantil tende a 0;
+- `assignment_submission_status` interpola a taxa de não-entrega até
+  `..._AT_RISK_CEILING` pelo índice do período — e **só** para
+  `COMBINED_DETERIORATION`.
+
+A média anual de uma rampa linear devolve aproximadamente o ponto médio dela.
+Ela preserva o nível — um estudante em queda termina o ano com média menor que
+um estável — mas apaga a inclinação, que é a grandeza que *define* o perfil.
+Com só os agregados, o modelo recebia um fenômeno temporal já destemporalizado.
+
+Um caso não era separável nem em princípio: `COMBINED_DETERIORATION` difere de
+`FALLING_ATTENDANCE` e de `FALLING_GRADES` exatamente pela rampa de
+não-entrega, e `assignment_completion_rate` dilui essa rampa sobre o ano
+inteiro. É o que `missing_assignment_delta` recupera.
+
+Cada escolha de implementação:
+
+- **Diferença entre metades, não coeficiente de regressão.** A rampa do gerador
+  é linear, então a diferença entre metades é proporcional à inclinação e
+  separa os perfis igual, com uma implementação que se explica numa frase. Com
+  número ímpar de pontos o ponto do meio cai na segunda metade — convenção
+  declarada e testada.
+- **`grade_delta` por período, não por data.** A rampa de nota é indexada por
+  período; uma nota lançada com atraso move a data sem mover o período a que
+  pertence.
+- **`consecutive_absences` não é redundante com `attendance_trend`.** A maior
+  corrida depende de como as faltas se *agrupam*, não só de quantas existem:
+  duas séries com o mesmo número de faltas têm corridas diferentes. Com a
+  probabilidade de presença caindo até o piso, as corridas do fim do ano se
+  alongam de forma não-linear enquanto a diferença entre metades cresce
+  linearmente.
+- **As quatro antigas ficaram.** O conjunto novo é o antigo *mais* quatro.
+  Removê-las junto impossibilitaria atribuir a diferença medida a uma das duas
+  mudanças.
+- **`None`, nunca `0.0`, para delta sem pontos suficientes.** `0.0` afirmaria
+  "não houve mudança"; o que houve foi ausência de dado, e o `SimpleImputer`
+  trata a diferença.
+- **Nenhuma feature sensível.** As oito são contagens e taxas de fatos
+  escolares — nada demográfico, familiar ou de saúde (`AGENTS.md` §Features,
+  §Privacidade).
 
 A ordem dessa tupla é o contrato: `train`, `evaluate` e `predict` montam a
 matriz por `feature_vector(row)`, que itera `FEATURE_COLUMNS`, e nenhum dos três
@@ -99,6 +162,13 @@ Valores `None` não excluem a linha: o `SimpleImputer(strategy="mean")` dentro d
 pipeline os preenche. A contagem de linhas com algum fato ausente é reportada
 junto da métrica (`missing_facts_count`), para que uma métrica calculada sobre
 muitos valores imputados não passe por métrica calculada sobre dados completos.
+
+`missing_facts_count` **continua olhando só as três taxas originais**, não os
+deltas novos. A decisão é consciente: ampliar o critério tornaria o número mais
+fiel a "linhas com algum valor imputado", mas quebraria a comparabilidade com
+as métricas já gravadas em `metrics` de versões anteriores, que foram medidas
+sob a definição antiga. Um número de procedência que muda de significado sem
+mudar de nome é pior que um número de escopo mais estreito e declarado.
 
 ## 4. O que é medido, e o que não é
 
@@ -138,6 +208,20 @@ inferência não possa reimplementar o preprocessing de outro jeito:
 ColumnTransformer(SimpleImputer(strategy="mean"))
 → RandomForestClassifier(n_estimators=100, random_state=42)
 ```
+
+O `SimpleImputer` leva `keep_empty_features=True`, e isso é obrigatório, não
+cosmético. Sem a flag, uma coluna **inteiramente** ausente no conjunto de
+ajuste é silenciosamente *descartada*: o pipeline passa a ser ajustado com
+menos colunas do que `FEATURE_COLUMNS` declara, e a inferência — que monta a
+matriz completa por `feature_vector()` — falha por forma, ou casaria colunas
+trocadas se o número coincidisse. A guarda de esquema de features não alcança
+esse caso: o esquema *confere*; foi o ajuste que encolheu.
+
+O defeito é anterior às features temporais, mas só ficou alcançável com elas:
+com os quatro agregados antigos, qualquer estudante com um fato já preenchia a
+coluna, enquanto `grade_delta` exige dois períodos com nota. No dataset de 200
+estudantes a situação não ocorre; em conjuntos pequenos, ocorre com facilidade
+— que é exatamente onde passaria despercebida.
 
 `random_state` fixo: duas execuções sobre o mesmo dataset produzem o mesmo
 modelo. O artefato é serializado com `joblib` sob um nome versionado, e
@@ -213,10 +297,17 @@ veda XGBoost/LightGBM nominalmente, e a regra é anterior à medição: não é
 "medimos e não precisou", é "não é para adicionar". Há um teste que falha se
 alguém acrescentar um.
 
-### O resultado
+### O resultado, nos dois conjuntos de features
+
+A comparação foi medida **duas vezes**: sob as quatro features instantâneas
+originais e sob as oito atuais (§3). Medir nos dois conjuntos separa duas
+perguntas que uma tabela só confundiria — "este modelo é melhor que aquele" e
+"estas features são melhores que aquelas".
 
 Dataset gerado com `--seed 42`, 200 estudantes, 60 no corte `EVAL_DEMO`,
 nenhum fato ausente. Médias macro sobre os quatro rótulos:
+
+**Features instantâneas** (`sha256:43f28fee098d` — as quatro originais):
 
 | candidato | Precision | Recall | F1 | ROC-AUC | PR-AUC |
 |---|---|---|---|---|---|
@@ -225,13 +316,56 @@ nenhum fato ausente. Médias macro sobre os quatro rótulos:
 | `logistic_regression` | **0,9611** | 0,8250 | **0,8685** | **0,9974** | **0,9717** |
 | `random_forest` | 0,8231 | **0,8642** | 0,8288 | 0,9870 | 0,8857 |
 
+**Features instantâneas + temporais** (`sha256:4276794409d7` — as oito atuais):
+
+| candidato | Precision | Recall | F1 | ROC-AUC | PR-AUC |
+|---|---|---|---|---|---|
+| `dummy_most_frequent` | 0,1792 | 0,2500 | 0,2087 | 0,5000 | 0,2500 |
+| `dummy_stratified` | 0,2022 | 0,1940 | 0,1970 | 0,4696 | 0,2489 |
+| `logistic_regression` | **1,0000** | **1,0000** | **1,0000** | **1,0000** | **1,0000** |
+| `random_forest` | 0,9722 | 0,9942 | 0,9824 | 1,0000 | 1,0000 |
+
+As duas linhas de `Dummy` são idênticas nas duas tabelas, como têm de ser: um
+classificador que ignora as entradas não muda quando as entradas mudam. É a
+verificação de sanidade de que as duas medições são comparáveis.
+
+**As features temporais melhoraram, e muito.** O F1 macro da floresta vai de
+0,8288 para 0,9824; o da regressão logística, de 0,8685 para 1,0000. A matriz
+de confusão mostra onde: sob as features antigas os dois modelos erravam um
+`COMBINED_DETERIORATION` (confundido com `FALLING_ATTENDANCE`) e a floresta
+marcava quatro `STABLE` como `FALLING_GRADES`. Sob as oito, os quatro
+`FALLING_GRADES` e os cinco `COMBINED_DETERIORATION` são recuperados
+integralmente pelos dois modelos; o único erro restante é um `STABLE` que a
+floresta chama de `FALLING_ATTENDANCE`.
+
+Isso confirma a hipótese de §3: `missing_assignment_delta` carrega o eixo que
+separa `COMBINED_DETERIORATION` dos perfis de um eixo só, e os deltas de
+presença e nota recuperam a inclinação que as médias anuais achatavam. O ganho
+não é de modelo — é de representação. Esse era o diagnóstico registrado antes
+da medição, e a medição o sustenta.
+
+**Um F1 de 1,0000 é motivo de cautela, não de comemoração.** Ele não diz que o
+sistema prevê evasão; diz que as features agora invertem quase exatamente a
+regra que o gerador usou para escrever o rótulo — o que é a **circularidade da
+§10.1 ficando mais visível, não menos**. Construímos features a partir da
+leitura de `profiles.py` e medimos se elas recuperam `profiles.py`. O
+resultado alto era esperado e é, em si, pouco informativo sobre o mundo. O que
+ele estabelece é mais modesto e ainda assim útil: o pipeline não tem defeito
+que o impeça de enxergar um padrão presente nos dados, e o desempenho mediano
+anterior era limitação das features, não do pipeline.
+
 **A floresta não ganhou.** A regressão logística — o modelo simples, o que o
 `AGENTS.md` mandava tentar primeiro — supera o `RandomForestClassifier` em
 Precision macro (0,9611 contra 0,8231), em F1 macro (0,8685 contra 0,8288), em
 ROC-AUC e em PR-AUC. A floresta só vence em Recall macro (0,8642 contra
 0,8250).
 
-A matriz de confusão mostra de onde vem a diferença:
+Sob as oito features a ordem se mantém: a regressão logística acerta os 60
+estudantes, a floresta erra um. A vantagem do modelo simples não foi um
+artefato das features antigas.
+
+A matriz de confusão **sob as features antigas** mostra de onde vinha a
+diferença entre os dois:
 
 ```text
   logistic_regression            STABLE  F_ATT  F_GRA  COMB
@@ -402,6 +536,15 @@ Em ordem de importância:
    informativo que um alto: indicaria que o pipeline não enxerga nem o padrão
    que foi deliberadamente posto ali.
 
+   Desde a §3, a circularidade é **mais forte, não menos**: as quatro features
+   temporais foram escolhidas lendo `app/synthetic/profiles.py` — uma rampa de
+   presença, uma rampa de quantil de nota por período, uma rampa de
+   não-entrega — e cada uma mede exatamente o eixo que o gerador move. O F1
+   macro de 1,0000 da regressão logística é a medida de quão bem features
+   derivadas de uma regra recuperam aquela regra. É um resultado sobre o
+   pipeline, não sobre estudantes, e tratá-lo como qualquer outra coisa seria
+   o erro que este documento inteiro existe para evitar.
+
 2. **Dados sintéticos, ~200 estudantes fictícios, um ano letivo.** Nenhum dado
    real, por proibição explícita do `AGENTS.md` §Privacidade. Com os padrões do
    gerador (200 estudantes, `train_ratio = 0.7`), o recorte de avaliação tem
@@ -416,8 +559,9 @@ Em ordem de importância:
    medida de um split; não se sabe quanto ele varia entre splits.
 
 4. **A comparação entre modelos existe, mas sobre uma única partição.** A §6
-   mede quatro candidatos sob o mesmo corte e registra o resultado: a
-   `LogisticRegression` supera o `RandomForestClassifier` em F1 macro, e o
+   mede quatro candidatos sob o mesmo corte, nos dois conjuntos de features, e
+   registra o resultado: a `LogisticRegression` supera o
+   `RandomForestClassifier` em F1 macro nos dois conjuntos, e o
    `build_pipeline()` continua carregando a floresta. Essa diferença entre o
    que foi medido e o que o código faz é consciente e está documentada — uma
    troca de classificador com base em um split, uma seed e ~60 estudantes de
@@ -425,16 +569,18 @@ Em ordem de importância:
    existe mais é a ausência de evidência; o que ainda não existe é evidência
    suficiente para decidir.
 
-5. **As features são instantâneas, não temporais** — divergência com o
-   `AGENTS.md` §Features, que prefere `attendance_trend`, `grade_delta`,
-   `missing_assignment_delta`, `consecutive_absences` e classifica
-   `attendance_current`/`grade_current` como "menos interessantes
-   isoladamente". As quatro features atuais são agregados do ano inteiro, sem
-   nenhuma noção de evolução. Isso é relevante justamente porque os perfis
-   sintéticos são definidos por **queda ao longo do tempo**: o modelo está
-   tentando reconhecer um fenômeno temporal a partir de médias que achatam o
-   tempo. É a limitação metodológica mais provável por trás de qualquer
-   desempenho fraco nas classes de deterioração.
+5. **As features temporais existem, e o desempenho que elas produzem é alto
+   demais para ser lido como capacidade.** A §3 acrescentou
+   `attendance_trend`, `consecutive_absences`, `grade_delta` e
+   `missing_assignment_delta`, fechando a divergência com o `AGENTS.md`
+   §Features. O efeito medido foi grande (F1 macro de 0,83 para 0,98 na
+   floresta, 1,00 na regressão logística), o que confirma que o desempenho
+   anterior era limitação de representação. Mas um resultado quase perfeito
+   sobre dados sintéticos **agrava** o item 1 desta lista em vez de aliviá-lo:
+   as features foram construídas lendo a regra geradora, e medem a recuperação
+   daquela mesma regra. Em dados reais, nada garante que "queda" se manifeste
+   como uma rampa linear sobre o ano inteiro, nem que os perfis sejam quatro,
+   nem que sejam mutuamente exclusivos.
 
 6. **Sem ajuste de hiperparâmetros.** `n_estimators=100`, demais valores nos
    padrões do Scikit-Learn. Não houve busca, e portanto também não houve o
@@ -460,7 +606,9 @@ experimento mantido ao lado, com procedência registrada e limites declarados.
 - `docs/decisions/0001-procedencia-do-ml-model-version.md`
 - `docs/decisions/0002-ordem-de-features-derivada-de-feature-columns.md`
 - `docs/decisions/0003-comparacao-de-modelos-como-comando-reproduzivel.md`
+- `docs/decisions/0004-features-temporais-derivadas-da-regra-geradora.md`
 - `docs/spec-comparacao-de-modelos-baseline.md`
+- `docs/spec-features-temporais-de-trajetoria.md`
 - `docs/spec-5-1-pipeline-pre-processamento-e-treino-do-modelo-offline.md`
 - `docs/spec-5-2-geracao-de-score-experimental-como-dado-de-pesquisa.md`
 - `docs/spec-5-3-avaliacao-do-modelo-com-split-de-dataset-sem-vazamento.md`
