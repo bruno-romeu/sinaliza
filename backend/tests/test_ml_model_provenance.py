@@ -260,12 +260,17 @@ def test_feature_vector_follows_feature_columns_order(monkeypatch: pytest.Monkey
         grade_average: float
         assignment_completion_rate: float
         observation_count: int
+        attendance_trend: float
+        consecutive_absences: int
+        grade_delta: float
+        missing_assignment_delta: float
 
-    row = _Row(0.9, 7.5, 1.0, 3)
-    assert feature_vector(row) == [0.9, 7.5, 1.0, 3]
+    row = _Row(0.9, 7.5, 1.0, 3, -0.2, 4, -1.5, 0.3)
+    expected = [0.9, 7.5, 1.0, 3, -0.2, 4, -1.5, 0.3]
+    assert feature_vector(row) == expected
 
     monkeypatch.setattr(feature_aggregation, "FEATURE_COLUMNS", tuple(reversed(FEATURE_COLUMNS)))
-    assert feature_vector(row) == [3, 1.0, 7.5, 0.9]
+    assert feature_vector(row) == list(reversed(expected))
 
 
 def test_reordering_feature_columns_changes_the_feature_schema_version() -> None:

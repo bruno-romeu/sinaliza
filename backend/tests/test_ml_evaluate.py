@@ -36,7 +36,7 @@ from app.ml.evaluate import (
     NoEvaluationDataError,
     run_evaluation,
 )
-from app.ml.feature_aggregation import FeatureSchemaMismatchError
+from app.ml.feature_aggregation import FEATURE_COLUMNS, FeatureSchemaMismatchError
 from app.ml.model_version_selection import ModelVersionNotFoundError, NoModelVersionError
 from app.ml.pipeline import build_pipeline
 from app.ml.train import run_training
@@ -215,16 +215,19 @@ def _seed_model_version_trained_on_subset_of_labels(
     db_session: Session, tmp_path: Path, version_label: str, trained_at: datetime
 ) -> MLModelVersionModel:
     """Fits a tiny real `Pipeline` on only 2 of the 4 `SyntheticProfile`
-    labels, so `pipeline.classes_` is a strict subset of `_ALL_LABELS` —
+    labels, so `pipeline.classes_` is a strict subset of `ALL_LABELS` —
     exercises `run_evaluation()`'s class-reindexing/zero-fill branch, which a
     model trained on all 4 labels (`_seed_model_version`/`_train_a_model`)
     never reaches."""
     pipeline = build_pipeline()
+    # Preenchido ate a largura de `FEATURE_COLUMNS` em vez de listar as
+    # colunas a mao (decisao 0002).
+    _padding = [0.0] * (len(FEATURE_COLUMNS) - 4)
     feature_matrix = [
-        [0.9, 7.0, 1.0, 2],
-        [0.85, 6.5, 0.9, 1],
-        [0.1, 3.0, 0.2, 0],
-        [0.15, 3.5, 0.3, 0],
+        [0.9, 7.0, 1.0, 2, *_padding],
+        [0.85, 6.5, 0.9, 1, *_padding],
+        [0.1, 3.0, 0.2, 0, *_padding],
+        [0.15, 3.5, 0.3, 0, *_padding],
     ]
     labels = [
         SyntheticProfile.STABLE.value,
@@ -441,7 +444,7 @@ def test_model_trained_on_label_subset_still_computes_valid_auc_metrics(
         db_session, tmp_path, "subset", datetime(2026, 1, 1, tzinfo=UTC)
     )
     # EVAL_DEMO labels span >=2 classes, including FALLING_GRADES — a label
-    # absent from the trained pipeline's `classes_` — so `_ALL_LABELS`'
+    # absent from the trained pipeline's `classes_` — so `ALL_LABELS`'
     # corresponding probability column must be zero-filled rather than
     # raising/misaligning.
     for profile in (SyntheticProfile.STABLE, SyntheticProfile.FALLING_GRADES):

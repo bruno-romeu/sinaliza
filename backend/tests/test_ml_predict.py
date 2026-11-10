@@ -33,7 +33,7 @@ from app.infrastructure.db.models import (
     UserModel,
 )
 from app.ml import predict as predict_module
-from app.ml.feature_aggregation import FeatureSchemaMismatchError
+from app.ml.feature_aggregation import FEATURE_COLUMNS, FeatureSchemaMismatchError
 from app.ml.model_version_selection import ModelVersionNotFoundError, NoModelVersionError
 from app.ml.pipeline import build_pipeline
 from app.ml.predict import NoScoringDataError, run_prediction
@@ -215,11 +215,15 @@ def _seed_model_version(
     tests control which of several model versions is "latest" without
     depending on wall-clock timing between successive `run_training` calls."""
     pipeline = build_pipeline()
+    # Preenchido ate a largura de `FEATURE_COLUMNS` em vez de listar as
+    # colunas a mao (decisao 0002): acrescentar uma feature nao deve obrigar a
+    # reescrever esta matriz.
+    _padding = [0.0] * (len(FEATURE_COLUMNS) - 4)
     feature_matrix = [
-        [0.9, 7.0, 1.0, 2],
-        [0.1, 3.0, 0.2, 0],
-        [0.5, 5.0, 0.5, 1],
-        [0.8, 6.0, 0.9, 2],
+        [0.9, 7.0, 1.0, 2, *_padding],
+        [0.1, 3.0, 0.2, 0, *_padding],
+        [0.5, 5.0, 0.5, 1, *_padding],
+        [0.8, 6.0, 0.9, 2, *_padding],
     ]
     labels = [
         SyntheticProfile.STABLE.value,
