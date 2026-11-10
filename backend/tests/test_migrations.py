@@ -491,3 +491,97 @@ def test_ondelete_rules_hold_against_real_deletes(migration_engine: Engine) -> N
         connection.execute(
             text("DELETE FROM users WHERE id = '11111111-1111-1111-1111-111111111111'")
         )
+
+
+# Migration 0016: os tres indices removidos, e o indice UNIQUE que cobre cada
+# um. A cobertura vale porque o unico **comeca** por `student_id`, e um B-tree
+# atende qualquer predicado sobre um prefixo a esquerda de suas colunas.
+_REDUNDANT_INDEX_COVERAGE: dict[str, str] = {
+    "ix_enrollments_student_id": "uq_enrollment_student_classroom",
+    "ix_attendance_records_student_id": "uq_attendance_student_classroom_date",
+    "ix_trajectory_changes_student_id": "uq_trajectory_change_student_type_period",
+}
+
+
+def _index_names(engine: Engine) -> set[str]:
+    with engine.connect() as connection:
+        return {
+            row[0]
+            for row in connection.execute(
+                text("SELECT indexname FROM pg_indexes WHERE schemaname = 'public'")
+            ).all()
+        }
+
+
+def test_0016_drops_the_three_redundant_indexes_and_downgrade_restores_them(
+    migration_engine: Engine,
+) -> None:
+    """Migration 0016. `downgrade("base")` derruba as tabelas inteiras, o que
+    nao prova nada sobre um `drop_index`/`create_index` — este teste desce ate
+    0015, onde as tabelas continuam existindo e os tres indices tem de estar de
+    volta, e volta a subir."""
+    cfg = _alembic_config()
+
+    command.upgrade(cfg, "head")
+    assert _index_names(migration_engine).isdisjoint(_REDUNDANT_INDEX_COVERAGE)
+
+    command.downgrade(cfg, "0015")
+    assert _REDUNDANT_INDEX_COVERAGE.keys() <= _index_names(migration_engine)
+
+    command.upgrade(cfg, "head")
+    present = _index_names(migration_engine)
+    assert present.isdisjoint(_REDUNDANT_INDEX_COVERAGE)
+    # O que torna a remocao segura continua la nos dois sentidos.
+    assert set(_REDUNDANT_INDEX_COVERAGE.values()) <= present
+
+
+def test_no_non_unique_index_is_a_left_prefix_of_a_unique_one(migration_engine: Engine) -> None:
+    """A propriedade que a 0016 explorou, afirmada contra o catalogo em vez de
+    contra uma lista escrita a mao.
+
+    Um indice nao-unico cujas colunas (e opclasses) sao um prefixo a esquerda
+    de um indice UNIQUE da mesma tabela nunca acrescenta capacidade: o unico ja
+    atende todo predicado que o outro atenderia. Este teste falha quando um
+    indice assim for acrescentado de novo — inclusive por um `index=True`
+    distraido em `models.py` ao lado de um `UniqueConstraint` que ja comeca
+    pela mesma coluna.
+
+    Comparacao por **array**, nao por `LIKE`/prefixo textual: `indkey` '2'
+    casaria com '20 3' como texto, o que produziria falso positivo em qualquer
+    tabela com 20+ colunas.
+    """
+    command.upgrade(_alembic_config(), "head")
+    with migration_engine.connect() as connection:
+        redundant = connection.execute(
+            text(
+                """
+                WITH ix AS (
+                  SELECT i.indrelid, i.indexrelid, c.relname, i.indisunique,
+                         string_to_array(i.indkey::text, ' ')::int[] AS cols,
+                         string_to_array(i.indclass::text, ' ')::text[] AS opc,
+                         i.indpred IS NOT NULL AS partial,
+                         i.indexprs IS NOT NULL AS expr
+                  FROM pg_index i
+                  JOIN pg_class c ON c.oid = i.indexrelid
+                  JOIN pg_class t ON t.oid = i.indrelid
+                  JOIN pg_namespace n ON n.oid = t.relnamespace
+                  WHERE n.nspname = 'public'
+                )
+                SELECT r.relname, u.relname
+                FROM ix r
+                JOIN ix u
+                  ON u.indrelid = r.indrelid
+                 AND u.indexrelid <> r.indexrelid
+                 AND u.indisunique
+                WHERE NOT r.indisunique
+                  AND NOT r.partial AND NOT u.partial
+                  AND NOT r.expr AND NOT u.expr
+                  AND u.cols[1:array_length(r.cols, 1)] = r.cols
+                  AND u.opc[1:array_length(r.opc, 1)] = r.opc
+                """
+            )
+        ).all()
+    assert redundant == [], (
+        "indice(s) nao-unico(s) cobertos por um UNIQUE da mesma tabela: "
+        f"{[(name, covered_by) for name, covered_by in redundant]}"
+    )
