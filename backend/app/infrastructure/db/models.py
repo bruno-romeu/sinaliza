@@ -120,7 +120,10 @@ class EnrollmentModel(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("students.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
+        # Sem `index=True`: migration 0016. O UNIQUE `uq_enrollment_student_classroom`
+        # comeca por `student_id`, e um B-tree atende qualquer predicado sobre
+        # um prefixo a esquerda de suas colunas — entao um indice so de
+        # `student_id` aqui seria uma segunda copia do mesmo prefixo.
     )
     classroom_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -145,7 +148,10 @@ class AttendanceRecordModel(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("students.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
+        # Sem `index=True`: migration 0016. O UNIQUE `uq_attendance_student_classroom_date`
+        # comeca por `student_id`, e um B-tree atende qualquer predicado sobre
+        # um prefixo a esquerda de suas colunas — entao um indice so de
+        # `student_id` aqui seria uma segunda copia do mesmo prefixo.
     )
     classroom_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -319,7 +325,10 @@ class TrajectoryChangeModel(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("students.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
+        # Sem `index=True`: migration 0016. O UNIQUE `uq_trajectory_change_student_type_period`
+        # comeca por `student_id`, e um B-tree atende qualquer predicado sobre
+        # um prefixo a esquerda de suas colunas — entao um indice so de
+        # `student_id` aqui seria uma segunda copia do mesmo prefixo.
     )
     type: Mapped[TrajectoryChangeType] = mapped_column(trajectory_change_type_enum, nullable=False)
     period_id: Mapped[uuid.UUID] = mapped_column(
