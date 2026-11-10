@@ -143,6 +143,13 @@ Para ler só o que continua aberto: entradas **sem** campo `resolved:`.
   summary: Três índices são prefixos à esquerda de índices UNIQUE na mesma tabela, então nunca são escolhidos pelo planner — o índice UNIQUE já atende qualquer busca por `student_id`. Ocupam 728 kB e são escrita duplicada em todo INSERT.
   evidence: Medido no banco de dev real (`sinaliza-postgres-1`), comparando `indkey` de cada índice não-único com o prefixo do `indkey` de cada índice único da mesma tabela: `ix_enrollments_student_id` (32 kB) coberto por `uq_enrollment_student_classroom`; `ix_attendance_records_student_id` (680 kB) coberto por `uq_attendance_student_classroom_date`; `ix_trajectory_changes_student_id` (16 kB) coberto por `uq_trajectory_change_student_type_period`. Em todos os três o índice único começa exatamente por `student_id`, que é a condição para a cobertura valer. Não removido nesta onda porque exige migration e porque o ganho (728 kB e três escritas de índice por INSERT num dataset de ~200 estudantes sintéticos) não justifica tocar no schema no meio de uma onda de segurança — mas é remoção segura e de baixo risco quando houver outra migration passando pela área.
 
+  resolved: PR #62 (migration `0016`). Removidos — **mas duas das tres justificativas que esta entrada dava nao sobreviveram a medicao, e isso importa mais que a remocao.**
+
+    (a) "o planner nunca os escolhe" e **falso como afirmacao geral**: `WHERE student_id = ?` *sem* predicado de data escolhe sim `ix_attendance_records_student_id`, por ser menor (680 kB contra 4416 kB do unico) — `Bitmap Index Scan`, rows=210. O que e verdade e mais estreito: nenhuma consulta que a aplicacao emite tem essa forma, porque toda leitura por estudante tambem restringe `date`, e ai o unico atende o predicado composto.
+
+    (b) "escrita duplicada em todo INSERT" e real em principio e **nao mensuravel**: 3x10.000 linhas deram 459/241/187 ms sem os indices contra 240/248/313 ms com eles — faixas sobrepostas.
+
+    Logo **nao foi ganho de desempenho, foi higiene de schema** (728 kB e um indice a menos), e o PR declara isso em vez de vender o contrario. Fica tambem a licao de que a evidencia que eu mesmo escrevi aqui era mais forte que o medido: afirmacao de desempenho sem plano de execucao e palpite, mesmo quando plausivel.
 ## Deferred from: onda de ML + frontend — PRs #49..#52 (2026-11-05)
 
 - source_spec: `docs/spec-ml-model-provenance.md`
@@ -190,6 +197,29 @@ Para ler só o que continua aberto: entradas **sem** campo `resolved:`.
 
     Nenhuma das duas foi corrigida porque cada uma é escopo próprio: a primeira exige medir pelo menos um baseline (`DummyClassifier` + `LogisticRegression`) e registrar a comparação; a segunda exige acrescentar features à agregação, o que muda `FEATURE_SCHEMA_VERSION` e invalida artefatos treinados — mudança de pipeline, não de documentação. Ambas são perguntas que uma banca pode fazer, e estarem escritas como limite numerado em vez de ausentes é a diferença entre ter resposta e ser pego.
 
+  resolved: Fechadas, cada uma por seu PR, e **nenhuma das duas confirmou a suposicao implicita de que o estado atual estava certo**.
+
+    **Divergencia 1 — PR #59.** A comparacao virou comando reproduzivel (`python -m app.ml.compare`), nao medicao pontual, para que a banca possa pedir para ver rodando. Resultado: **a floresta aleatoria perdeu nos dois conjuntos de features**. Com as 4 originais, F1 macro 0,8288 contra 0,8685 da `LogisticRegression` — o modelo simples que o `AGENTS.md` mandava tentar primeiro. A matriz mostra de onde vem: a floresta marca quatro estudantes `STABLE` como `FALLING_GRADES`, a regressao nenhum; num produto cuja saida e levar o caso a revisao pedagogica, esse e o erro mais caro. **O classificador NAO foi trocado**: uma decisao sobre um unico split, uma seed e menos de dez exemplos por classe minoritaria repetiria o erro metodologico que o PR existe para corrigir. Fica como decisao aberta em `docs/model-evaluation.md`, agora com o dado que nao existia.
+
+    **Divergencia 2 — PR #61** (originalmente #60, que mergeou na branch errada; ver a licao de processo abaixo). Quatro features temporais derivadas da leitura de `app/synthetic/profiles.py`, uma por eixo que o gerador move. F1 macro da floresta 0,8288 -> 0,9824, da regressao 0,8685 -> 1,0000. **O ganho e de representacao, nao de modelo**, e so e demonstravel porque a comparacao foi medida nos dois conjuntos — e isso que separa "o modelo e melhor" de "as features sao melhores".
+
+    **Ressalva que acompanha o numero, nao vem depois dele:** um F1 de 1,0000 sobre dados sinteticos *agrava* a circularidade em vez de alivia-la, porque as features foram derivadas lendo a mesma regra geradora que elas medem. O que o resultado estabelece e modesto: o pipeline nao tem defeito que o impeca de enxergar um padrao presente nos dados. Decisoes em `docs/decisions/0003` e `0004`.
 - source_spec: none
   summary: O commit `83dc011` ("docs: corrige dois erros meus nas entradas do deferred-work") ficou fora da `master` — o PR #53 foi mergeado sem ele, e as duas correções que carregava (caminho de spec inexistente e um `resolved:` faltando) voltaram a valer até serem reaplicadas em 2026-11-09.
   evidence: `git log master --grep="corrige dois erros meus"` devolve vazio enquanto `git log --all` acha o commit. Registrado não como dívida a fazer, mas como lição de processo: **um push feito depois que o PR já foi aprovado pode não entrar no merge**, e nada avisa. Quando eu corrigir algo num PR já anunciado como pronto, preciso confirmar que o commit entrou — `git log master --grep` ou olhar o diff mergeado — em vez de assumir.
+
+## Deferred from: onda de ML e queries — PRs #59, #61, #62 (2026-11-10)
+
+- source_spec: none
+  summary: O banco de demonstração (`sinaliza-postgres-1`, o que a stack do `docker compose` serve) está em `alembic_version` = **0014**, enquanto a `master` já está em **0016**. As colunas de procedência de `ml_model_version` (`training_dataset_version`, `feature_schema_version`, `metrics`) **não existem no banco que a banca vai ver**.
+  evidence: Verificado direto no container: `SELECT version_num FROM alembic_version` devolve `0014`. Não é bug de código e não exige PR: o `backend/docker-entrypoint.sh` roda `alembic upgrade head` na subida, então `docker compose up -d --build` resolve sozinho. Fica registrado porque o sintoma é silencioso e o custo é alto no pior momento possível — uma demonstração em que a procedência persistida é justamente o argumento de reprodutibilidade, e a coluna não existe. Vale conferir a versão do banco antes de qualquer apresentação, não só depois de mudar schema.
+
+- source_spec: `docs/spec-desempenho-de-consultas.md`
+  summary: `GET /follow-ups/{id}` tem um N+1 na resolução de evidências — cerca de 7 consultas por linha de evidência (9 medidas no dataset atual).
+  evidence: Medido pelo agente do PR #62, que deliberadamente não corrigiu. É a mesma classe do N+1 da Home que aquele PR fechou, mas com uma diferença que muda a prioridade: **o `N` aqui é quantas mudanças um humano citou como evidência, não um parâmetro que o cliente controla**. Na Home o `N` vinha de `changes_page_size`, que um cliente pode pedir até 100 — crescimento alheio ao operador. Aqui cresce com o trabalho pedagógico real, que é pequeno por natureza. Fechar exige transformar `resolve_evidence` numa resolução multi-mudança compartilhada por duas telas, o que é refatoração de aplicação e não ajuste de consulta. Já existe teste fixando o crescimento, então uma regressão apareceria.
+
+- source_spec: none
+  summary: Lição de processo — **um merge pode não levar o que parece levar, e nada avisa**. Dois casos nesta semana, de causas diferentes.
+  evidence: (a) O commit `83dc011`, com correções minhas, ficou fora da `master`: foi empurrado **depois** de o PR já ter sido anunciado como pronto, e o merge não o incluiu. (b) O PR #60 aparece como `MERGED` no GitHub, mas mergeou em `feat/ml-comparacao-de-modelos` em vez de `master` — era um PR empilhado, e o de baixo (#59) entrou primeiro sem que a base do de cima fosse reapontada. O trabalho ficou órfão numa branch já consumida e só apareceu porque conferi `ls backend/app/ml/temporal_features.py` em vez de confiar no status.
+
+    Em ambos o GitHub mostrava estado verde e correto. A regra que fica: **confirmar o conteúdo no `master`, não o status do PR** — `git log master --grep`, `ls` do arquivo esperado, ou o diff mergeado. Para PR empilhado, confirmar que a base foi reapontada para `master` antes de mergear o de cima.
