@@ -23,6 +23,7 @@ import {
   SelectField,
   TextField,
 } from '../../components/ui'
+import { earliestDate, latestDueDate, latestFactDate } from './dateBounds'
 import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 type SubmissionStatusValue = AssignmentSubmissionCreateRequest['status']
@@ -304,6 +305,8 @@ export function Atividades() {
             <TextField
               label="Data de entrega"
               type="date"
+              min={earliestDate()}
+              max={latestDueDate()}
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
             />
@@ -357,6 +360,8 @@ export function Atividades() {
             <TextField
               label="Data"
               type="date"
+              min={earliestDate()}
+              max={latestFactDate()}
               value={submissionDate}
               onChange={(event) => setSubmissionDate(event.target.value)}
             />
