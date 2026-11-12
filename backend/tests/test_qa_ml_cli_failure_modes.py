@@ -8,12 +8,20 @@ features divergente. Este arquivo ataca o modo de falha que ficou de fora
 afirmacao "a guarda funciona" so vale testada contra o codigo, nao lida na
 docstring.
 
-Por que D3 morde de verdade: `docker-compose.yml` declara `postgres_data`
-como volume nomeado e **nao declara volume para `/app/ml_artifacts`**, que o
+Por que D3 mordia de verdade: `docker-compose.yml` declarava `postgres_data`
+como volume nomeado e **nenhum volume para `/app/ml_artifacts`**, que o
 `backend/Dockerfile` cria dentro da camada gravavel da imagem. Treinar dentro
-do container grava a linha em um lugar que sobrevive e o `.joblib` em um que
-nao sobrevive. Depois de `docker compose up --build`, toda linha de modelo
-aponta para um arquivo ausente.
+do container gravava a linha em um lugar que sobrevive e o `.joblib` em um
+que nao sobrevive; depois de `docker compose up --build`, toda linha de
+modelo apontava para um arquivo ausente.
+
+As duas metades de D3 foram corrigidas em
+`docs/spec-correcao-defeitos-qa.md`: o volume `ml_artifacts` existe, e
+`_load_pipeline` traduz artefato ausente ou ilegivel em
+`UnusableArtifactError`. Os dois testes continuam aqui, passando, com o
+defeito descrito no proprio docstring — o volume fecha a causa mais provavel,
+nao todas (volume removido a mao, copia pela metade, banco restaurado de
+outra maquina).
 """
 
 from __future__ import annotations
@@ -32,7 +40,7 @@ from app.infrastructure.db.models import (
 )
 from app.ml.feature_aggregation import FeatureSchemaMismatchError
 from app.ml.model_version_selection import ModelVersionNotFoundError, NoModelVersionError
-from app.ml.predict import NoScoringDataError, run_prediction
+from app.ml.predict import NoScoringDataError, UnusableArtifactError, run_prediction
 from tests.test_ml_predict import _seed_eval_demo_student, _seed_model_version
 
 
@@ -62,47 +70,41 @@ def model_version_and_student(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "D3: o `artifact_path` gravado na linha `ml_model_version` pode nao "
-        "existir mais no disco — `/app/ml_artifacts` nao e volume no "
-        "`docker-compose.yml`, enquanto `postgres_data` e. `joblib.load` "
-        "levanta `FileNotFoundError` cru em vez do par "
-        "'mensagem acionavel + exit 1' que todos os outros modos de falha "
-        "deste CLI recebem. Fecha com uma checagem de existencia ao lado de "
-        "`require_matching_feature_schema`, levantando um erro proprio que o "
-        "`main` ja captura."
-    ),
-)
 def test_qa_missing_artifact_file_raises_an_actionable_ml_error(
     db_session: Session, model_version_and_student
 ) -> None:
+    """D3, corrigido. O `artifact_path` gravado na linha `ml_model_version`
+    podia nao existir mais no disco — `/app/ml_artifacts` nao era volume no
+    `docker-compose.yml`, enquanto `postgres_data` era — e `joblib.load`
+    levantava `FileNotFoundError` cru em vez do par 'mensagem acionavel +
+    exit 1' que todos os outros modos de falha deste CLI recebem. Fechado
+    por `_load_pipeline`, que checa a existencia depois de
+    `require_matching_feature_schema` e levanta `UnusableArtifactError`, hoje
+    na lista de excecoes que o `main` captura para sair com 1.
+
+    `UnusableArtifactError` entrou na tupla esperada abaixo quando a correcao
+    a criou: a assercao que carrega o peso — a mensagem tem de dizer o que
+    fazer — continua intacta."""
     Path(model_version_and_student.artifact_path).unlink()
 
     with pytest.raises(
-        (NoModelVersionError, ModelVersionNotFoundError, NoScoringDataError)
+        (NoModelVersionError, ModelVersionNotFoundError, NoScoringDataError, UnusableArtifactError)
     ) as excinfo:
         run_prediction(db_session)
     assert "train" in str(excinfo.value).lower()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "D3 (segunda metade): um artefato truncado ou corrompido no disco faz "
-        "o `joblib.load` levantar `KeyError: 110`, que nao diz nada a quem "
-        "roda o comando. Mesma correcao: um erro proprio, capturado pelo "
-        "`main`, nomeando o arquivo e a versao."
-    ),
-)
 def test_qa_corrupt_artifact_file_raises_an_actionable_ml_error(
     db_session: Session, model_version_and_student
 ) -> None:
+    """D3 (segunda metade), corrigido. Um artefato truncado ou corrompido no
+    disco fazia o `joblib.load` levantar `KeyError: 110`, que nao diz nada a
+    quem roda o comando. Mesma correcao: `UnusableArtifactError`, capturado
+    pelo `main`, nomeando o arquivo, a versao e o tipo da falha original."""
     Path(model_version_and_student.artifact_path).write_bytes(b"isto nao e um joblib")
 
     with pytest.raises(
-        (NoModelVersionError, ModelVersionNotFoundError, NoScoringDataError)
+        (NoModelVersionError, ModelVersionNotFoundError, NoScoringDataError, UnusableArtifactError)
     ) as excinfo:
         run_prediction(db_session)
     assert "train" in str(excinfo.value).lower()
