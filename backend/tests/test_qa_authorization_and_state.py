@@ -10,8 +10,11 @@ recurso por id vaza — porque nenhum outro recurso do dominio escolar tem dono.
 Isso esta fixado aqui como invariante, nao so afirmado.
 
 O defeito encontrado nesta superficie e outro (D4): a unicidade de "um
-acompanhamento aberto por (estudante, responsavel)" existe so como
-`SELECT`-depois-`INSERT` na aplicacao, nunca no banco.
+acompanhamento aberto por (estudante, responsavel)" existia so como
+`SELECT`-depois-`INSERT` na aplicacao, nunca no banco. Corrigido pela
+migration 0017 (`uq_follow_up_open_per_student_and_owner`); os testes do bloco
+D4 abaixo guardam tanto a restricao quanto o que a tela ve quando a corrida
+acontece.
 """
 
 from __future__ import annotations
@@ -21,6 +24,9 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+from sqlalchemy import text as sa_text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.domain.follow_up import FollowUpStatus
@@ -35,6 +41,9 @@ from app.infrastructure.db.models import (
     TrajectoryChangeModel,
     TrajectoryChangeSourceModel,
     UserModel,
+)
+from app.infrastructure.repositories.sqlalchemy_follow_up_repository import (
+    SqlAlchemyFollowUpRepository,
 )
 from app.infrastructure.repositories.sqlalchemy_pedagogical_observation_repository import (
     SqlAlchemyPedagogicalObservationRepository,
@@ -232,43 +241,226 @@ def test_qa_trajectory_change_of_another_student_is_refused(
 
 
 # ---------------------------------------------------------------------------
-# D4 — a unicidade do acompanhamento aberto nao existe no banco
+# D4 — a unicidade do acompanhamento aberto, agora no banco (migration 0017)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "D4: `spec-ui-1` adicionou o reaproveitamento de `POST /follow-ups` "
-        "exatamente porque casos abertos duplicados eram um defeito. A "
-        "implementacao e `find_open_for_student` (SELECT) seguido de "
-        "`save_with_evidence` (INSERT), sem indice unico parcial no banco: "
-        "duas requisicoes que leem antes de qualquer uma escrever criam dois "
-        "acompanhamentos abertos para o mesmo estudante e o mesmo "
-        "responsavel. O botao da tela de trajetoria se desabilita enquanto "
-        "salva, entao o duplo clique numa aba esta coberto -- duas abas na "
-        "mesma trajetoria nao estao. Fecha com "
-        "`UNIQUE (student_id, responsible_user_id) WHERE status <> "
-        "'ENCERRADO'` e um `ON CONFLICT` no `save_with_evidence`."
-    ),
-)
+def test_qa_the_declared_schema_carries_the_same_index_the_migration_creates(
+    db_session: Session,
+) -> None:
+    """A suite constroi o schema por `Base.metadata.create_all`, nao por
+    Alembic (`conftest.py`): o indice declarado em `models.py` e o criado pela
+    migration 0017 sao dois textos diferentes que tem de produzir o mesmo
+    objeto. Sem esta afirmacao, todos os testes do D4 podem passar contra um
+    indice que o banco de producao nao tem.
+
+    A string e identica a afirmada em `test_migrations.py`
+    (`test_0017_creates_the_partial_unique_index_and_downgrade_drops_it`) — e
+    isso que faz as duas pontas se prenderem uma na outra."""
+    indexdef = db_session.execute(
+        sa_text(
+            "SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' "
+            "AND indexname = 'uq_follow_up_open_per_student_and_owner'"
+        )
+    ).scalar_one_or_none()
+    assert indexdef == (
+        "CREATE UNIQUE INDEX uq_follow_up_open_per_student_and_owner "
+        "ON public.follow_ups USING btree (student_id, responsible_user_id) "
+        "WHERE (status <> 'ENCERRADO'::follow_up_status)"
+    )
+
+
+def _follow_up_row(student: StudentModel, user: UserModel, status: FollowUpStatus) -> FollowUpModel:
+    return FollowUpModel(
+        id=uuid.uuid4(),
+        student_id=student.id,
+        status=status,
+        responsible_user_id=user.id,
+        created_at=datetime.now(UTC),
+    )
+
+
 def test_qa_database_refuses_two_open_follow_ups_for_the_same_student_and_owner(
     db_session: Session,
     seeded_user: UserModel,
     seeded_enrolled_student: StudentModel,
 ) -> None:
+    """D4, o defeito original: `spec-ui-1` adicionou o reaproveitamento de
+    `POST /follow-ups` exatamente porque casos abertos duplicados eram um
+    defeito, mas a implementacao era `find_open_for_student` (SELECT) seguido
+    de `save_with_evidence` (INSERT) e **nada** no banco. Duas requisicoes que
+    leem antes de qualquer uma escrever passavam ambas pela verificacao. O
+    botao da tela de trajetoria se desabilita enquanto salva, entao o duplo
+    clique numa aba estava coberto -- duas abas na mesma trajetoria nao
+    estavam: dois cards identicos na Home, com a evidencia dividida entre eles.
+
+    Este teste e o INSERT direto, contornando o SELECT da aplicacao: a regra
+    agora e do banco (`uq_follow_up_open_per_student_and_owner`, migration
+    0017), nao da sequencia de chamadas."""
     for _ in range(2):
         db_session.add(
-            FollowUpModel(
-                id=uuid.uuid4(),
-                student_id=seeded_enrolled_student.id,
-                status=FollowUpStatus.EM_OBSERVACAO,
-                responsible_user_id=seeded_user.id,
-                created_at=datetime.now(UTC),
-            )
+            _follow_up_row(seeded_enrolled_student, seeded_user, FollowUpStatus.EM_OBSERVACAO)
         )
-    with pytest.raises(Exception):  # noqa: B017 - o tipo exato depende da guarda escolhida
+    with pytest.raises(IntegrityError):
         db_session.commit()
+
+
+@pytest.mark.parametrize(
+    "first_status",
+    [FollowUpStatus.EM_OBSERVACAO, FollowUpStatus.ACOMPANHAMENTO_ATIVO],
+)
+def test_qa_the_index_predicate_covers_every_non_encerrado_status(
+    db_session: Session,
+    seeded_user: UserModel,
+    seeded_enrolled_student: StudentModel,
+    first_status: FollowUpStatus,
+) -> None:
+    """ "Em aberto" nao e so `EM_OBSERVACAO`. `AGUARDANDO_RETORNO` e processo em
+    curso como qualquer outro, e o predicado do indice e o complemento de
+    `ENCERRADO` justamente para nao depender de uma lista que envelhece."""
+    db_session.add(_follow_up_row(seeded_enrolled_student, seeded_user, first_status))
+    db_session.commit()
+
+    db_session.add(
+        _follow_up_row(seeded_enrolled_student, seeded_user, FollowUpStatus.AGUARDANDO_RETORNO)
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+
+def test_qa_a_closed_follow_up_never_blocks_a_new_one(
+    db_session: Session,
+    seeded_user: UserModel,
+    seeded_enrolled_student: StudentModel,
+) -> None:
+    """A unicidade e por "estudante com processo em aberto", nao por estudante.
+    Um estudante pode ter varios acompanhamentos ao longo do ano -- abriu,
+    conduziu, encerrou, meses depois abriu outro. Um indice unico total
+    proibiria isso; o parcial nao."""
+    for _ in range(3):
+        db_session.add(
+            _follow_up_row(seeded_enrolled_student, seeded_user, FollowUpStatus.ENCERRADO)
+        )
+    db_session.add(
+        _follow_up_row(seeded_enrolled_student, seeded_user, FollowUpStatus.EM_OBSERVACAO)
+    )
+    db_session.commit()
+
+    assert (
+        db_session.execute(
+            select(func.count())
+            .select_from(FollowUpModel)
+            .where(FollowUpModel.student_id == seeded_enrolled_student.id)
+        ).scalar_one()
+        == 4
+    )
+
+
+def test_qa_two_coordinations_still_open_separate_cases_for_the_same_student(
+    db_session: Session,
+    seeded_user: UserModel,
+    second_user: UserModel,
+    seeded_enrolled_student: StudentModel,
+) -> None:
+    """`responsible_user_id` faz parte da chave. Sem ele, o indice imporia uma
+    regra que ninguem decidiu -- "um acompanhamento por estudante na escola
+    inteira" -- e quebraria
+    `test_qa_opening_a_follow_up_never_reuses_another_users_case`."""
+    for user in (seeded_user, second_user):
+        db_session.add(_follow_up_row(seeded_enrolled_student, user, FollowUpStatus.EM_OBSERVACAO))
+    db_session.commit()  # nao levanta
+
+
+def test_qa_losing_the_open_race_returns_the_winner_instead_of_an_error(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    seeded_user: UserModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_trajectory_change: TrajectoryChangeModel,
+) -> None:
+    """A corrida das duas abas, de verdade e deterministica.
+
+    A janela e o intervalo entre `find_open_for_student` e
+    `save_with_evidence`. Aqui ela e reproduzida fazendo a **primeira** leitura
+    devolver `None` embora o acompanhamento ja exista -- que e exatamente o que
+    a aba perdedora enxerga quando le antes de a vencedora escrever. O INSERT
+    entao bate no indice.
+
+    O que se afirma e o comportamento de tela: a aba perdedora recebe 200 com o
+    id do acompanhamento que ganhou a corrida (o caminho de reaproveitamento
+    que `spec-ui-1` especificou), nao 409 nem 500 -- e continua existindo **um**
+    acompanhamento."""
+    headers = _auth_headers(client, seeded_user)
+    winner_id = _open_follow_up(client, headers, seeded_enrolled_student, seeded_trajectory_change)
+
+    original = SqlAlchemyFollowUpRepository.find_open_for_student
+    blind_reads = {"remaining": 1}
+
+    def _blind_first_read(self, student_id, responsible_user_id):  # type: ignore[no-untyped-def]
+        if blind_reads["remaining"]:
+            blind_reads["remaining"] -= 1
+            return None
+        return original(self, student_id, responsible_user_id)
+
+    monkeypatch.setattr(SqlAlchemyFollowUpRepository, "find_open_for_student", _blind_first_read)
+
+    response = client.post(
+        "/follow-ups",
+        headers=headers,
+        json={
+            "student_id": str(seeded_enrolled_student.id),
+            "trajectory_change_id": str(seeded_trajectory_change.id),
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["id"] == winner_id
+    assert blind_reads["remaining"] == 0
+
+    open_rows = db_session.execute(
+        select(func.count())
+        .select_from(FollowUpModel)
+        .where(
+            FollowUpModel.student_id == seeded_enrolled_student.id,
+            FollowUpModel.status != FollowUpStatus.ENCERRADO,
+        )
+    ).scalar_one()
+    assert open_rows == 1
+    # A evidencia nao se divide entre dois processos: segue uma so, no vencedor.
+    detail = client.get(f"/follow-ups/{winner_id}", headers=headers)
+    assert detail.status_code == 200, detail.text
+    assert len(detail.json()["trajectory_changes"]) == 1
+
+
+def test_qa_reopening_a_closed_case_over_an_open_one_is_refused_in_the_envelope(
+    client: TestClient,
+    db_session: Session,
+    seeded_user: UserModel,
+    seeded_enrolled_student: StudentModel,
+    seeded_trajectory_change: TrajectoryChangeModel,
+) -> None:
+    """`ENCERRADO` nao e terminal: `ChangeFollowUpStatusService` nao tem regra
+    de adjacencia, qualquer estado e alvo valido a partir de qualquer outro
+    (AD-6). Entao reabrir um encerrado passa a esbarrar no mesmo indice quando
+    ja existe outro aberto para o par. Fixado aqui como comportamento
+    deliberado -- a resposta e o 409 do envelope de integridade, nao um 500."""
+    headers = _auth_headers(client, seeded_user)
+    first_id = _open_follow_up(client, headers, seeded_enrolled_student, seeded_trajectory_change)
+    assert (
+        client.patch(
+            f"/follow-ups/{first_id}/status", headers=headers, json={"status": "ENCERRADO"}
+        ).status_code
+        == 200
+    )
+    _open_follow_up(client, headers, seeded_enrolled_student, seeded_trajectory_change)
+
+    response = client.patch(
+        f"/follow-ups/{first_id}/status",
+        headers=headers,
+        json={"status": "ACOMPANHAMENTO_ATIVO"},
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "duplicate_record"
 
 
 # ---------------------------------------------------------------------------

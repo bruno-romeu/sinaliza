@@ -15,12 +15,14 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
     UniqueConstraint,
     false,
+    text,
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
@@ -377,6 +379,24 @@ class FollowUpModel(Base):
     them in this story (spec Boundaries & Constraints)."""
 
     __tablename__ = "follow_ups"
+    # Indice unico PARCIAL (migration 0017): no maximo um acompanhamento **em
+    # aberto** por `(student_id, responsible_user_id)`. O predicado e
+    # exatamente o mesmo de `find_open_for_student` (`status <> 'ENCERRADO'`),
+    # para que a restricao do banco e a verificacao da aplicacao nao possam
+    # divergir sobre o que conta como "em aberto". Encerrados ficam de fora do
+    # indice de proposito: um estudante pode ter varios acompanhamentos ao
+    # longo do ano, desde que nao simultaneos. Declarado aqui **e** na
+    # migration porque a suite constroi o schema por `Base.metadata.create_all`,
+    # nunca por Alembic (`tests/conftest.py`).
+    __table_args__ = (
+        Index(
+            "uq_follow_up_open_per_student_and_owner",
+            "student_id",
+            "responsible_user_id",
+            unique=True,
+            postgresql_where=text("status <> 'ENCERRADO'"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
