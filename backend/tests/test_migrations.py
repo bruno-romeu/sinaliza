@@ -585,3 +585,49 @@ def test_no_non_unique_index_is_a_left_prefix_of_a_unique_one(migration_engine: 
         "indice(s) nao-unico(s) cobertos por um UNIQUE da mesma tabela: "
         f"{[(name, covered_by) for name, covered_by in redundant]}"
     )
+
+
+def _open_follow_up_index_def(engine: Engine) -> str | None:
+    with engine.connect() as connection:
+        return connection.execute(
+            text(
+                "SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' "
+                "AND indexname = 'uq_follow_up_open_per_student_and_owner'"
+            )
+        ).scalar_one_or_none()
+
+
+def test_0017_creates_the_partial_unique_index_and_downgrade_drops_it(
+    migration_engine: Engine,
+) -> None:
+    """Migration 0017 (D4, `docs/spec-acompanhamento-aberto-unico-no-banco.md`).
+    `downgrade("base")` derruba `follow_ups` inteira, o que nao prova nada
+    sobre um `create_index`/`drop_index` — este teste desce ate 0016, onde a
+    tabela continua existindo e o indice tem de ter sumido, e volta a subir.
+
+    O `indexdef` e afirmado inteiro de proposito: o que fecha o defeito nao e
+    "existe um indice chamado assim", e **UNIQUE** sobre
+    `(student_id, responsible_user_id)` com o predicado parcial
+    `status <> 'ENCERRADO'`. Perder qualquer uma das tres partes reabre o D4
+    ou proibe o que e legitimo (varios acompanhamentos encerrados por
+    estudante, ou um caso por coordenacao)."""
+    cfg = _alembic_config()
+    expected = (
+        "CREATE UNIQUE INDEX uq_follow_up_open_per_student_and_owner "
+        "ON public.follow_ups USING btree (student_id, responsible_user_id) "
+        "WHERE (status <> 'ENCERRADO'::follow_up_status)"
+    )
+
+    command.upgrade(cfg, "head")
+    assert _open_follow_up_index_def(migration_engine) == expected
+
+    command.downgrade(cfg, "0016")
+    with migration_engine.connect() as connection:
+        table_still_there = connection.execute(
+            text("SELECT to_regclass('public.follow_ups') IS NOT NULL")
+        ).scalar_one()
+    assert table_still_there is True
+    assert _open_follow_up_index_def(migration_engine) is None
+
+    command.upgrade(cfg, "head")
+    assert _open_follow_up_index_def(migration_engine) == expected
