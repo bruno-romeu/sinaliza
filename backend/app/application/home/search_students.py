@@ -34,6 +34,13 @@ from app.domain.student import StudentSearchResult
 DEFAULT_PAGE_SIZE = 5
 MAX_PAGE_SIZE = 100
 
+#: O teto do número da página, pelo mesmo motivo (e com o mesmo valor) do
+#: `MAX_PAGE_NUMBER` de `get_home.py`: sem ele o `OFFSET` derivado estoura o
+#: `bigint`. Fica repetido aqui, e não importado de lá, porque os dois
+#: módulos de aplicação são independentes — a mesma razão pela qual
+#: `MAX_PAGE_SIZE` já é declarado nos dois.
+MAX_PAGE_NUMBER = 1_000_000
+
 
 @dataclass(frozen=True)
 class StudentSearchPage:

@@ -12,6 +12,11 @@ grows unbounded over a real deployment's lifetime).
 `GET /home/search?q=` matches `q` against student name or classroom name
 (case-insensitive), paginated via `page`/`page_size`; an empty/no-match query
 is a normal 200 with an empty `results` array, never an error.
+
+Todo número de página tem `le=MAX_*_PAGE_NUMBER` ao lado do `ge=1`, pelo mesmo
+motivo que o `page_size` irmão tem `le=MAX_*_PAGE_SIZE`: sem teto, o
+`offset = (page - 1) * page_size` derivado estoura o `bigint` do Postgres e a
+rota responde 500 em vez de 422 (D1 de `docs/spec-qa-adversarial.md`).
 """
 
 from __future__ import annotations
@@ -25,11 +30,13 @@ from app.application.home.get_home import (
     MAX_FOLLOW_UPS_PAGE_SIZE,
     GetHomeService,
 )
+from app.application.home.get_home import MAX_PAGE_NUMBER as MAX_HOME_PAGE_NUMBER
 from app.application.home.search_students import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
     SearchStudentsService,
 )
+from app.application.home.search_students import MAX_PAGE_NUMBER as MAX_SEARCH_PAGE_NUMBER
 from app.composition import get_get_home_service, get_search_students_service
 from app.presentation.auth.dependencies import get_current_user
 from app.presentation.schemas.home import (
@@ -45,11 +52,11 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 
 @router.get("/home", response_model=HomeOut)
 def get_home(
-    follow_ups_page: int = Query(default=1, ge=1),
+    follow_ups_page: int = Query(default=1, ge=1, le=MAX_HOME_PAGE_NUMBER),
     follow_ups_page_size: int = Query(
         default=DEFAULT_FOLLOW_UPS_PAGE_SIZE, ge=1, le=MAX_FOLLOW_UPS_PAGE_SIZE
     ),
-    changes_page: int = Query(default=1, ge=1),
+    changes_page: int = Query(default=1, ge=1, le=MAX_HOME_PAGE_NUMBER),
     changes_page_size: int = Query(
         default=DEFAULT_CHANGES_PAGE_SIZE, ge=1, le=MAX_CHANGES_PAGE_SIZE
     ),
@@ -88,7 +95,7 @@ def get_home(
 @router.get("/home/search", response_model=StudentSearchOut)
 def search_students(
     q: str = Query(default=""),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=MAX_SEARCH_PAGE_NUMBER),
     page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     service: SearchStudentsService = Depends(get_search_students_service),
 ) -> StudentSearchOut:
