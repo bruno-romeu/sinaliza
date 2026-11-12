@@ -24,6 +24,8 @@ import argparse
 import sys
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 import joblib
 from sqlalchemy.orm import Session
@@ -47,10 +49,57 @@ from app.ml.model_version_selection import (
 from app.ml.prediction_repository import PredictionRepository
 
 
+class UnusableArtifactError(RuntimeError):
+    """Raised when the `artifact_path` on the selected `MLModelVersion` row
+    cannot be loaded — the file is gone, or it is there but is not a readable
+    joblib. The CLI catches this, prints to stderr and exits non-zero,
+    writing no `MLPrediction` rows.
+
+    O caso não é hipotético: a linha `ml_model_version` e o `.joblib` moram em
+    lugares com durabilidades diferentes. Até esta correção o
+    `docker-compose.yml` declarava volume para o banco e **nenhum** para
+    `/app/ml_artifacts`, então um `docker compose up --build` orfanava toda
+    linha de procedência. O volume agora existe; esta guarda cobre o que
+    sobra — um volume removido à mão, um artefato copiado pela metade, um
+    banco restaurado de outra máquina. Sem ela, `joblib.load` respondia
+    `FileNotFoundError` cru, ou `KeyError: 110` para arquivo corrompido, que
+    não diz nada a quem rodou o comando (D3 de
+    `docs/spec-qa-adversarial.md`)."""
+
+
 class NoScoringDataError(RuntimeError):
     """Raised when zero `EVAL_DEMO` students exist (spec I/O Matrix "No
     EVAL_DEMO rows"). The CLI catches this, prints to stderr and exits
     non-zero, writing no `MLPrediction` rows."""
+
+
+def _load_pipeline(version: str, artifact_path: str) -> Any:
+    """`joblib.load` com as duas falhas de artefato traduzidas para
+    `UnusableArtifactError`, na mesma forma 'mensagem acionável + nome do
+    arquivo + o que fazer' que os outros modos de falha deste CLI já usam.
+
+    A checagem de existência é explícita (e não só o `except OSError`) para
+    que o caminho mais provável — o arquivo sumiu — tenha a mensagem mais
+    direta. O `except Exception` largo cobre o artefato corrompido, cuja
+    exceção depende do formato do lixo que está no arquivo: `joblib` responde
+    `KeyError: 110` a um arquivo truncado, `UnpicklingError` a outros, e
+    nenhuma delas é contrato público."""
+    path = Path(artifact_path)
+    if not path.is_file():
+        raise UnusableArtifactError(
+            f"The artifact for MLModelVersion {version!r} is missing from disk "
+            f"({artifact_path}). Nothing was scored. Run `python -m app.ml.train` "
+            "to produce a new version, or restore the artifact directory."
+        )
+    try:
+        return joblib.load(path)
+    except Exception as exc:  # noqa: BLE001 — ver docstring
+        raise UnusableArtifactError(
+            f"The artifact for MLModelVersion {version!r} could not be loaded "
+            f"({artifact_path}): {type(exc).__name__}: {exc}. Nothing was scored. "
+            "Run `python -m app.ml.train` to produce a new version, or restore "
+            "the artifact directory."
+        ) from exc
 
 
 def run_prediction(
@@ -96,7 +145,7 @@ def run_prediction(
         model_version_row.version, model_version_row.feature_schema_version
     )
 
-    pipeline = joblib.load(model_version_row.artifact_path)
+    pipeline = _load_pipeline(model_version_row.version, model_version_row.artifact_path)
     classes = pipeline.classes_.tolist()
     stable_index = classes.index(SyntheticProfile.STABLE.value)
 
@@ -167,6 +216,7 @@ def main(argv: list[str] | None = None) -> None:
             ModelVersionNotFoundError,
             NoScoringDataError,
             FeatureSchemaMismatchError,
+            UnusableArtifactError,
         ) as exc:
             print(str(exc), file=sys.stderr)
             sys.exit(1)
