@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel
 
+from app.presentation.schemas.free_text import FreeText
 from app.presentation.schemas.trajectory import EvidenceItemOut, TrajectoryChangeOut
 
 _FollowUpStatusLiteral = Literal[
@@ -28,8 +29,9 @@ class FollowUpOut(BaseModel):
 class RegisterFollowUpActionRequest(BaseModel):
     # `strip_whitespace=True` + `min_length=1` rejects blank/whitespace-only
     # text with FastAPI's standard 422 (spec I/O Matrix, "Blank action
-    # text") — same idiom as `PedagogicalObservationCreateRequest.text`.
-    description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    # text") — same idiom as `PedagogicalObservationCreateRequest.text`,
+    # agora o mesmo tipo compartilhado, com a recusa do byte NUL junto.
+    description: FreeText
 
 
 class FollowUpActionOut(BaseModel):

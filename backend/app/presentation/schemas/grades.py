@@ -5,7 +5,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field
+
+from app.presentation.schemas.free_text import ShortText
+from app.presentation.schemas.school_dates import SchoolFactDate
 
 
 class AcademicPeriodOut(BaseModel):
@@ -27,10 +30,11 @@ class GradeCreateRequest(BaseModel):
     # whitespace-only value (e.g. a single space) is rejected as empty
     # rather than persisted as a blank disciplina — matching
     # `AssignmentCreateRequest.subject` and
-    # `PedagogicalObservationCreateRequest.text`.
-    subject: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+    # `PedagogicalObservationCreateRequest.text`. O byte NUL, que atravessava
+    # esse par intacto, é recusado por `ShortText` (ver `schemas/free_text.py`).
+    subject: ShortText
     period_id: uuid.UUID
-    date: date
+    date: SchoolFactDate
     # `Field(ge=0, le=10)` is the API-boundary half of the double validation
     # (spec Boundaries & Constraints / Implementation Notes): a bypassed
     # request still gets FastAPI's untouched standard 422, never a bespoke

@@ -17,6 +17,7 @@ import {
   SelectField,
   TextField,
 } from '../../components/ui'
+import { earliestDate, latestFactDate } from './dateBounds'
 import { LancamentoLayout, RosterStates, rowStatus } from './LancamentoLayout'
 
 type AttendanceStatusValue = AttendanceCreateRequest['status']
@@ -174,6 +175,8 @@ export function Presenca() {
           <TextField
             label="Data"
             type="date"
+            min={earliestDate()}
+            max={latestFactDate()}
             value={date}
             onChange={(event) => setDate(event.target.value)}
           />

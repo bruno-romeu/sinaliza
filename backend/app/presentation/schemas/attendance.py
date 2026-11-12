@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.presentation.schemas.school_dates import SchoolFactDate
+
 
 class ClassroomOut(BaseModel):
     id: str
@@ -23,7 +25,9 @@ class AttendanceCreateRequest(BaseModel):
     # standard 422 validation, never reaches the application service.
     student_id: uuid.UUID
     classroom_id: uuid.UUID
-    date: date
+    # Faixa e tipo estritos — ver `schemas/school_dates.py` para por que o
+    # teto é `as_of()` e não uma constante.
+    date: SchoolFactDate
     status: Literal["PRESENT", "ABSENT_JUSTIFIED", "ABSENT_UNJUSTIFIED"]
 
 

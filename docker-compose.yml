@@ -27,6 +27,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # O artefato de ML tem de durar tanto quanto a linha `ml_model_version`
+    # que aponta para ele. Sem este volume, treinar dentro do container
+    # gravava a linha no `postgres_data` (que sobrevive) e o `.joblib` na
+    # camada gravável da imagem (que não), e o `docker compose up --build`
+    # seguinte deixava toda procedência apontando para um arquivo ausente
+    # (D3 de `docs/spec-qa-adversarial.md`).
+    volumes:
+      - ml_artifacts:/app/ml_artifacts
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sinaliza}:${POSTGRES_PASSWORD:-sinaliza}@postgres:5432/${POSTGRES_DB:-sinaliza}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
@@ -54,3 +62,4 @@ services:
 
 volumes:
   postgres_data:
+  ml_artifacts:
