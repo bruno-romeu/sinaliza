@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel
+
+from app.presentation.schemas.free_text import ShortText
+from app.presentation.schemas.school_dates import AssignmentDueDate, SchoolFactDate
 
 
 class AssignmentCreateRequest(BaseModel):
@@ -16,9 +19,11 @@ class AssignmentCreateRequest(BaseModel):
     # `strip_whitespace=True` runs before `min_length` is checked, so a
     # whitespace-only value (e.g. a single space) is rejected as empty
     # rather than persisted as a blank disciplina.
-    subject: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+    subject: ShortText
     period_id: uuid.UUID
-    due_date: date
+    # A única data que pode estar à frente de `as_of()`: um prazo é, por
+    # natureza, futuro. Ver `schemas/school_dates.py`.
+    due_date: AssignmentDueDate
 
 
 class AssignmentOut(BaseModel):
@@ -33,7 +38,7 @@ class AssignmentSubmissionCreateRequest(BaseModel):
     assignment_id: uuid.UUID
     student_id: uuid.UUID
     status: Literal["DELIVERED", "NOT_DELIVERED", "PARTIAL"]
-    date: date
+    date: SchoolFactDate
 
 
 class AssignmentSubmissionOut(BaseModel):

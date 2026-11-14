@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel
+
+from app.presentation.schemas.free_text import FreeText
 
 
 class PedagogicalObservationCreateRequest(BaseModel):
@@ -18,8 +19,9 @@ class PedagogicalObservationCreateRequest(BaseModel):
     classroom_id: uuid.UUID
     # `strip_whitespace=True` + `min_length=1` rejects blank/whitespace-only
     # text with FastAPI's standard 422 (spec I/O Matrix, "Whitespace-only
-    # text (API bypass)") — never a bespoke `AppError`.
-    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    # text (API bypass)") — never a bespoke `AppError`. `FreeText` carries
+    # esse par e mais a recusa do byte NUL (`schemas/free_text.py`).
+    text: FreeText
     # spec-ui-3: optional, so existing clients keep working. Only a
     # concern-marked observation counts as a convergence signal.
     registers_concern: bool = False
