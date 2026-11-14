@@ -96,7 +96,7 @@ COMBINED_DETERIORATION
 ## Acompanhamento
 
 ```
-FollowUp         { id, student_id, status, reason, responsible_user_id, next_review_date, created_at }
+FollowUp         { id, student_id, status, reason, responsible_user_id, next_review_date, created_at }  -- UNIQUE(student_id, responsible_user_id) WHERE status <> 'ENCERRADO'
 FollowUpEvidence { id, follow_up_id, trajectory_change_id }
 FollowUpAction   { id, follow_up_id, description, author_user_id, created_at }
 ```
@@ -112,6 +112,8 @@ ENCERRADO
 
 Não existe estado `HIGH_RISK` nem substituto — acompanhamento é processo humano, não classificação automática.
 
+A unicidade é **parcial**: no máximo um acompanhamento *em aberto* por `(student_id, responsible_user_id)` (índice `uq_follow_up_open_per_student_and_owner`, migration 0017). Encerrados ficam de fora do índice de propósito — um estudante pode ter vários acompanhamentos ao longo do ano, desde que não simultâneos. O predicado é o complemento de `ENCERRADO`, o mesmo que `find_open_for_student` usa, para que a regra do banco e a da aplicação não divirjam.
+
 ---
 
 ## Decisões registradas
@@ -126,6 +128,7 @@ Não existe estado `HIGH_RISK` nem substituto — acompanhamento é processo hum
 - **Split de dataset:** `Student.dataset_split` (arquitetura, AD-4) — decidido na geração sintética, nunca em query time.
 - **`PedagogicalObservation` trazida para o MVP:** definida acima (arquitetura, AD-8/AD-11) — corrige a agregação anterior com entidades de NLP (Etapa 5), que era um erro de escopo deste rascunho.
 - **Duplicidade de presença em nível de banco:** `UNIQUE(student_id, classroom_id, date)` em `AttendanceRecord` (arquitetura, AD-7) — resolve RF-04/RNF-11.
+- **Duplicidade de acompanhamento aberto em nível de banco:** índice único parcial `UNIQUE(student_id, responsible_user_id) WHERE status <> 'ENCERRADO'` em `FollowUp` (migration 0017, `docs/spec-acompanhamento-aberto-unico-no-banco.md`) — a regra que `spec-ui-1` escreveu como `SELECT`-depois-`INSERT` passa a ser do banco; perder a corrida devolve o acompanhamento vencedor, não erro.
 - **Proveniência de geração persistida:** `SyntheticGenerationRun` (seed + versão do gerador + data) — sem ela o determinismo do gerador é inverificável depois do fato (RNF-13, Epic 2).
 - **Perfil sintético em `Student`, fora da API do produto:** `Student.synthetic_profile` nullable, consultável pela avaliação offline e nunca exposto em schema de resposta do produto — mesma fronteira que AD-3 impõe ao score de ML.
 - **"Fator Preocupante" nunca persistido:** puramente computado por requisição (arquitetura, AD-1) — nenhuma tabela nova para ele.
