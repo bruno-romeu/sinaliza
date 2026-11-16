@@ -1,0 +1,36 @@
+#cloud-config
+# Primeiro boot da VM que hospeda o Sinaliza (Azure Standard_B2s, 2 vCPU /
+# 4 GiB). Deixa a maquina pronta para `git clone` + `docker compose up`.
+# Idempotente: pode rodar de novo sem efeito colateral.
+#
+# Swap de 2 GB, nao 6 como no projeto ecommerce: la o `next build` rodava na
+# VM e pedia 2-3 GiB sozinho. Aqui o bundle do React ja vem compilado dentro
+# da imagem do frontend (multi-stage no `frontend/Dockerfile`), entao a VM so
+# executa os tres containers em regime permanente. 2 GB cobrem o pico do
+# `docker compose build` e o `alembic upgrade head` do primeiro boot.
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - git
+  - unattended-upgrades
+
+write_files:
+  # Swap em disco e barato mas lento; nao deixe o kernel preferi-lo ao cache
+  # de paginas, senao o Postgres paga por isso em toda leitura.
+  - path: /etc/sysctl.d/99-sinaliza.conf
+    content: |
+      vm.swappiness=10
+
+runcmd:
+  - [sh, -ec, "[ -f /swapfile ] || { fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile; }"]
+  - [sh, -ec, "swapon --show=NAME | grep -qx /swapfile || swapon /swapfile"]
+  - [sh, -ec, "grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab"]
+  - [sysctl, --system]
+  - [systemctl, enable, --now, docker]
+  - [usermod, -aG, docker, azureuser]
+  # `restart: unless-stopped` no compose so sobrevive ao reboot se o Docker
+  # subir sozinho — por isso o enable acima nao e redundante.
+  - [install, -d, -o, azureuser, -g, azureuser, /opt/sinaliza]
+  - [touch, /var/lib/sinaliza-cloud-init-done]
