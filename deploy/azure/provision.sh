@@ -83,6 +83,25 @@ create_vm() {
         --output none
 }
 
+# `az vm create` cria VNET/NSG/IP/NIC antes de alocar a VM. Quando a alocacao
+# falha por capacidade, esses quatro sobrevivem -- presos a regiao da tentativa.
+# A proxima candidata entao morre com InvalidResourceLocation, porque o nome ja
+# existe em outra regiao. Limpar entre tentativas e o que torna a varredura de
+# regioes util de verdade.
+#
+# Ordem importa: a NIC referencia IP e VNET; o NSG e referenciado pela subnet.
+cleanup_partial() {
+    for r in "${VM_NAME}VMNic:nic" "${VM_NAME}PublicIP:public-ip"              "${VM_NAME}NSG:nsg" "${VM_NAME}VNET:vnet"; do
+        name=${r%%:*}
+        kind=${r#*:}
+        az network "$kind" delete --resource-group "$RG" --name "$name"             --output none 2>/dev/null || true
+    done
+    az disk list --resource-group "$RG" --query "[?starts_with(name,'${VM_NAME}_OsDisk')].name" -o tsv 2>/dev/null |
+        while read -r d; do
+            [ -n "$d" ] && az disk delete --resource-group "$RG" --name "$d" --yes --output none 2>/dev/null || true
+        done
+}
+
 if az vm show --resource-group "$RG" --name "$VM_NAME" --output none 2>/dev/null; then
     echo "VM $VM_NAME ja existe; pulando criacao."
 else
@@ -98,8 +117,15 @@ else
             created=1
             break
         fi
-        if printf '%s' "$err" | grep -Eq 'SkuNotAvailable|Capacity'; then
-            echo "  sem capacidade para essa combinacao; proxima."
+        # -i porque a Azure devolve a falta de capacidade em tres formas
+        # diferentes: SkuNotAvailable (a SKU nao existe na regiao),
+        # AllocationFailed (existe mas esgotou) e o texto "sufficient
+        # capacity" em minuscula. O filtro original so pegava a primeira
+        # e abortava a varredura na segunda, sem tentar as demais regioes.
+        if printf '%s' "$err" | grep -Eqi 'SkuNotAvailable|AllocationFailed|capacity|InvalidResourceLocation'; then
+            echo "  sem capacidade para essa combinacao; limpando e tentando a proxima."
+            az vm delete --resource-group "$RG" --name "$VM_NAME" --yes --output none 2>/dev/null || true
+            cleanup_partial
             continue
         fi
         printf '%s\n' "$err" >&2

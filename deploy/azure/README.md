@@ -100,9 +100,44 @@ grep DEV_SEED /opt/sinaliza/.env
 cd /opt/sinaliza && docker compose up -d --build
 ```
 
-O `docker-entrypoint.sh` do backend roda `alembic upgrade head` antes do
-uvicorn, então o schema e o usuário semeado nascem com a stack. O primeiro
-build leva alguns minutos.
+O `docker-entrypoint.sh` roda `alembic upgrade head` antes do uvicorn, então
+o **schema** nasce com a stack. O primeiro build leva alguns minutos.
+
+**Os dados não nascem.** O entrypoint só migra e serve — semear é manual, e
+a ordem importa:
+
+```sh
+cd /opt/sinaliza
+
+# 1. O usuário de avaliação. Precisa vir primeiro: o gerador atribui a
+#    autoria de cada observação pedagógica a ele.
+docker compose exec -T backend python -m app.infrastructure.db.seed_dev_user
+
+# 2. Turmas e os quatro períodos letivos. Sem os períodos, o gerador para.
+docker compose exec -T backend python -m app.infrastructure.db.seed_dev_fixtures
+
+# 3. A base sintética. `--reset` é necessário porque o passo 2 já populou o
+#    banco com turmas de exemplo, e o gerador recusa base populada.
+#    Preserva users e academic_periods.
+docker compose exec -T backend python -m app.synthetic.generate     --seed 42 --students 200 --reset
+
+# 4. As mudanças de trajetória.
+docker compose exec -T backend python -m app.synthetic.prepare_demo
+```
+
+O passo 4 é o menos óbvio e o mais fácil de esquecer: `TrajectoryChange` é
+calculado **dentro da requisição** que lê a trajetória de um estudante
+(AD-1), e `GET /home` só lê linhas que já existem. Numa base recém-gerada a
+Home fica **vazia** até alguém abrir cada estudante um a um. O
+`prepare_demo` abre todos de uma vez, pelo mesmo serviço que o endpoint usa.
+
+Ao final, confira:
+
+```sh
+docker compose exec -T postgres psql -U sinaliza -d sinaliza -c   "SELECT count(*) FROM students UNION ALL SELECT count(*) FROM trajectory_changes;"
+```
+
+Esperado na configuração acima: 200 estudantes e ~15 mudanças detectadas.
 
 ## Etapa 5 — Verificar
 

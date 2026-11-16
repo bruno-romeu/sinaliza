@@ -31,6 +31,6 @@ runcmd:
   - [systemctl, enable, --now, docker]
   - [usermod, -aG, docker, azureuser]
   # `restart: unless-stopped` no compose so sobrevive ao reboot se o Docker
-  # subir sozinho — por isso o enable acima nao e redundante.
+  # subir sozinho -- por isso o enable acima nao e redundante.
   - [install, -d, -o, azureuser, -g, azureuser, /opt/sinaliza]
   - [touch, /var/lib/sinaliza-cloud-init-done]
