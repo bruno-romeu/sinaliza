@@ -169,3 +169,7 @@ Comentários no código citam identificadores de requisito (`RF-`, `RNF-`) e de 
 O dataset é gerado de forma determinística a partir de uma seed. As taxas de abandono, evasão e reprovação são calibradas pelo Censo Escolar 2023 (INEP); os parâmetros sem fonte pública são declarados como suposições de projeto. Cada parâmetro registra sua fonte e seu nível de confiança em [`backend/app/synthetic/calibration.py`](backend/app/synthetic/calibration.py).
 
 Nenhum dado real de estudante é usado ou versionado.
+
+## Licença
+
+Distribuído sob a licença MIT. Veja [`LICENSE`](LICENSE).
