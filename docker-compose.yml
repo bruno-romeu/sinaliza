@@ -32,7 +32,7 @@ services:
     # gravava a linha no `postgres_data` (que sobrevive) e o `.joblib` na
     # camada gravável da imagem (que não), e o `docker compose up --build`
     # seguinte deixava toda procedência apontando para um arquivo ausente
-    # (D3 de `docs/spec-qa-adversarial.md`).
+    # (D3 da passagem adversarial de QA).
     volumes:
       - ml_artifacts:/app/ml_artifacts
     environment:

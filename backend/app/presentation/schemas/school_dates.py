@@ -9,7 +9,7 @@ torna isso pior que um dado feio no banco: toda leitura de trajetória é
 truncada em `as_of()` (`filter_as_of`, aplicado às quatro colunas de data de
 fato) e não existe endpoint de releitura de presença/nota/entrega — então um
 ano digitado errado é confirmado com "Registro salvo." e nunca mais aparece,
-nem para ser corrigido (D5 de `docs/spec-qa-adversarial.md`).
+nem para ser corrigido (D5 da passagem adversarial de QA).
 
 **De onde vem o teto.** Não é número escolhido a dedo: é a própria regra de
 leitura do projeto. `filter_as_of` trunca em `as_of()`, logo um fato datado
@@ -27,7 +27,7 @@ horizonte de um ano letivo, e recusa tanto `0001-01-01` quanto o
 `1970-01-01` que a coerção de inteiro produzia.
 
 **Por que não derivar de `academic_periods`.** Investigado e descartado
-(`docs/spec-correcao-defeitos-qa.md`): `AttendanceRecordModel` não tem
+(`docs/decisions/0005-faixa-de-data-de-fato-escolar.md`): `AttendanceRecordModel` não tem
 `period_id`, então para presença seria preciso consultar o banco dentro do
 caminho de validação de um POST — contra `AGENTS.md` §API; e os períodos são
 fixture de desenvolvimento, cujas janelas semeadas não cobrem nem a data de

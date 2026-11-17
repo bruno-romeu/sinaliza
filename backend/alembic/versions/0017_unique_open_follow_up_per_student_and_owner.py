@@ -4,8 +4,7 @@ Revision ID: 0017
 Revises: 0016
 Create Date: 2026-11-12
 
-Fecha o D4 da passagem adversarial de QA (`docs/spec-qa-adversarial.md`,
-Causa 3; `docs/spec-acompanhamento-aberto-unico-no-banco.md`).
+Fecha o D4 da passagem adversarial de QA.
 
 `spec-ui-1` acrescentou o reaproveitamento de `POST /follow-ups` porque
 acompanhamento aberto duplicado era defeito. A regra, porem, existia so como

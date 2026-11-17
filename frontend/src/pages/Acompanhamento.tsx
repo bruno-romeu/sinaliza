@@ -113,7 +113,7 @@ export function Acompanhamento() {
         } else if (caught instanceof ApiError && caught.status === 403) {
           // Oferecer "Tentar novamente" aqui seria oferecer um botão que
           // nunca pode dar certo: o 403 não é falha transitória, é escopo de
-          // leitura (`docs/deferred-work.md`, `GET /home` × `list_active`).
+          // leitura (`GET /home` × `list_active`).
           setLoadState({ status: 'forbidden' })
         } else {
           setLoadState({ status: 'error' })

@@ -45,8 +45,8 @@ from app.synthetic.population import (
 
 SEED = 777
 
-# A judgment-label vocabulary scan (spec AC 4 / EXPERIENCE.md Voice and
-# Tone): none of these may ever appear in generated observation text.
+# A judgment-label vocabulary scan (spec AC 4 / the UX voice-and-tone guide):
+# none of these may ever appear in generated observation text.
 _BANNED_PATTERN = re.compile(r"risco|evas[ãa]o|abandono|alerta|%|chance de", re.IGNORECASE)
 
 

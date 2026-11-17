@@ -15,8 +15,8 @@ do container gravava a linha em um lugar que sobrevive e o `.joblib` em um
 que nao sobrevive; depois de `docker compose up --build`, toda linha de
 modelo apontava para um arquivo ausente.
 
-As duas metades de D3 foram corrigidas em
-`docs/spec-correcao-defeitos-qa.md`: o volume `ml_artifacts` existe, e
+As duas metades de D3 foram corrigidas:
+o volume `ml_artifacts` existe, e
 `_load_pipeline` traduz artefato ausente ou ilegivel em
 `UnusableArtifactError`. Os dois testes continuam aqui, passando, com o
 defeito descrito no proprio docstring — o volume fecha a causa mais provavel,

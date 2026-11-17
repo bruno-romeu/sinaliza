@@ -13,12 +13,12 @@ student.
 Every template below is a plain literal string, never an f-string that
 embeds a fabricated statistic: no invented absence counts, no percentages,
 no judgment-label vocabulary ("risco", "evasão", "abandono", "alerta") —
-`EXPERIENCE.md`'s Voice and Tone. `STABLE` only ever selects from
+the UX voice-and-tone guide. `STABLE` only ever selects from
 `_ROUTINE_TEMPLATES`. `FALLING_ATTENDANCE` only from
 `_ATTENDANCE_DECLINE_TEMPLATES`. `FALLING_GRADES` only from
 `_PERFORMANCE_DECLINE_TEMPLATES`. `COMBINED_DETERIORATION` composes one
 attendance-decline fragment with one assignment-decline fragment (mirrors
-`EXPERIENCE.md`'s own Do example: "queda de frequência e aumento de
+the UX voice-and-tone guide's own Do example: "queda de frequência e aumento de
 atividades pendentes") — the composition itself never introduces a number,
 only joins two already-literal fragments with fixed connective text.
 
@@ -117,7 +117,7 @@ _COMBINED_ASSIGNMENT_FRAGMENTS: dict[Stage, tuple[str, ...]] = {
 }
 
 #: Fixed connective text joining the two `COMBINED_DETERIORATION` fragments
-#: (mirrors `EXPERIENCE.md`'s "queda de frequência e aumento de atividades
+#: (mirrors the UX voice-and-tone guide's "queda de frequência e aumento de atividades
 #: pendentes" worked example). Never an f-string carrying a number.
 _COMBINED_PREFIX = "Mudança observada neste período: "
 

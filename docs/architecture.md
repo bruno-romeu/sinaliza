@@ -11,9 +11,6 @@ updated: '2026-09-23'
 binds: ['RF-01..RF-23', 'RNF-01..RNF-14']
 sources:
   - docs/prd.md
-  - `DESIGN` (removido da arvore; ver historico do repositorio)
-  - `EXPERIENCE` (removido da arvore; ver historico do repositorio)
-  - docs/research-bases-publicas.md
   - docs/data-model.md
   - AGENTS.md
 companions: []
@@ -180,7 +177,7 @@ sinaliza/
   frontend/
     src/
       pages/              # Home, StudentTrajectory, FollowUp, Launch (chamada/nota/entrega/observação)
-      components/          # trajectory-chart, evidence-card, calm-state-card, factor-preocupante, followup-status-pill (ver DESIGN.md)
+      components/          # trajectory-chart, evidence-card, calm-state-card, factor-preocupante, followup-status-pill
       api/                  # cliente HTTP tipado
     Dockerfile
   docker-compose.yml       # postgres + backend + nginx (frontend estático + reverse proxy /api)
@@ -216,8 +213,8 @@ erDiagram
 | §4.7 Acompanhamento (RF-12..RF-14) | `application/followup`, `domain/followup` | AD-1, AD-6, AD-7 |
 | §4.8 Privacidade e Acesso (RF-22) | `application/records` (filtro de leitura) | AD-8, AD-11 |
 | §4.9 Machine Learning (RF-15..RF-17, RF-23) | `ml/` (offline), `domain` (read-models) | AD-3, AD-4, AD-5, AD-11 |
-| §4.10 Interface (RF-18..RF-21) | `frontend/src/pages` | DESIGN.md, EXPERIENCE.md (companion) |
-| RNF-02 Usabilidade responsiva, RNF-08 Acessibilidade, RNF-10 Compatibilidade | `frontend/src/components` | DESIGN.md, EXPERIENCE.md (companion) — altitude de UX, não desta spine |
+| §4.10 Interface (RF-18..RF-21) | `frontend/src/pages` | — |
+| RNF-02 Usabilidade responsiva, RNF-08 Acessibilidade, RNF-10 Compatibilidade | `frontend/src/components` | altitude de UX, não desta spine |
 | RNF-06 Hospedagem | `docker-compose.yml`, deploy da VM | AD-9 |
 | RNF-07 Dados exclusivamente sintéticos, RNF-13 Origem/governança | `synthetic/` | AD-4, research.md (companion) |
 | RNF-09 Manutenibilidade/testes | `tests/`, camadas de `backend/app/` | AD-2, AD-12, AGENTS.md §Testes |
@@ -226,7 +223,7 @@ erDiagram
 ## Deferred
 
 - **Limiar exato de convergência de sinais** — já é `[ASSUMPTION]` do próprio PRD (RF-11: confirmação/persistência/coincidência de ≥2 sinais no mesmo bimestre); esta arquitetura só fixa a forma (`SignalEvaluator` por sinal + `ConvergenceRule`, AD-12), não o valor exato, a calibrar quando a base sintética existir.
-- ~~**Tela técnica de visualização do score**~~ — **Decidido (PRD §9, item 2, atualizado 2026-09-23): não é construída no MVP.** O relatório de `python -m app.ml.evaluate` (Story 5.3, RNF-14) é o artefato de avaliação acadêmica/pesquisa; nenhum boundary de leitura novo além do já especificado em `epics` (removido da arvore; ver historico do repositorio)`. Racional original preservado como contexto: se viesse a ser construída, seria leitura read-only de `MLPrediction` já persistido por AD-3, sem novo pipeline nem inferência ao vivo fora do padrão de cache já fixado.
+- ~~**Tela técnica de visualização do score**~~ — **Decidido (PRD §9, item 2, atualizado 2026-09-23): não é construída no MVP.** O relatório de `python -m app.ml.evaluate` (Story 5.3, RNF-14) é o artefato de avaliação acadêmica/pesquisa; nenhum boundary de leitura novo além do já especificado para a Épica 5. Racional original preservado como contexto: se viesse a ser construída, seria leitura read-only de `MLPrediction` já persistido por AD-3, sem novo pipeline nem inferência ao vivo fora do padrão de cache já fixado.
 - **Log de acesso aos registros pedagógicos** (Should, §6.2) — fora desta spine; se houver tempo até 23/11/2026, entra como tabela de auditoria append-only sobre o mesmo padrão de AD-6/AD-7.
 - **Carve-out de visibilidade "coordenação pedagógica" além de `responsible_user_id`** (RF-22) — deliberadamente não implementado agora (ver AD-8); revisitar apenas se o produto real ganhar múltiplos usuários com necessidade de visão cruzada.
 - **DNS/domínio da VM Oracle** — usar IP público ou um DNS dinâmico gratuito (ex. DuckDNS); decisão de deploy, não de arquitetura.

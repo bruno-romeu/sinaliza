@@ -6,9 +6,10 @@ consultada **offline**, por um humano, no momento de calibrar estes números —
 nunca em tempo de execução, e nunca persistida no banco do sistema
 (`epic-2-context.md` §Requirements & Constraints; AC 2 da Story 2.4).
 
-A pesquisa que origina estes valores está em
-`docs/research/technical-bases-publicas-dados-educacionais-calibr-2026-09-17/research.md`
-e chegou a **três veredictos distintos**, que este módulo mantém distintos:
+A pesquisa que origina estes valores (16 fontes públicas consultadas em
+setembro de 2026; a numeração `[n]` dos `source_refs` remete à lista de
+referências dela, preservada no histórico do repositório) chegou a
+**três veredictos distintos**, que este módulo mantém distintos:
 
 1. **Calibrável, confiança alta** — abandono/evasão/reprovação do Censo
    Escolar 2023. `ParameterKind.CALIBRATED`.
@@ -548,8 +549,8 @@ SYNTHETIC_PROFILE_PROPORTIONS = CalibrationParameter(
 # decisão de metodologia de machine learning. Fica registrada aqui, com a
 # mesma disciplina de proveniência dos demais parâmetros, em vez de viver
 # como um número mágico embutido em `GenerationConfig`/no `argparse` do CLI
-# (epic-2-context.md AD-4; `docs/epics.md` Story 2.3, AC "proporção...
-# documentada explicitamente... como constante nomeada").
+# (Story 2.3, critério de aceite: "proporção... documentada explicitamente...
+# como constante nomeada").
 # ---------------------------------------------------------------------------
 
 TRAIN_EVAL_SPLIT_RATIO = CalibrationParameter(

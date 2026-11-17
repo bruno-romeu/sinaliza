@@ -607,12 +607,5 @@ experimento mantido ao lado, com procedência registrada e limites declarados.
 - `docs/decisions/0002-ordem-de-features-derivada-de-feature-columns.md`
 - `docs/decisions/0003-comparacao-de-modelos-como-comando-reproduzivel.md`
 - `docs/decisions/0004-features-temporais-derivadas-da-regra-geradora.md`
-- `spec-comparacao-de-modelos-baseline` (removido da arvore; ver historico do repositorio)`
-- `spec-features-temporais-de-trajetoria` (removido da arvore; ver historico do repositorio)`
-- `spec-5-1-pipeline-pre-processamento-e-treino-do-modelo-offline` (removido da arvore; ver historico do repositorio)`
-- `spec-5-2-geracao-de-score-experimental-como-dado-de-pesquisa` (removido da arvore; ver historico do repositorio)`
-- `spec-5-3-avaliacao-do-modelo-com-split-de-dataset-sem-vazamento` (removido da arvore; ver historico do repositorio)`
-- `spec-ml-model-provenance` (removido da arvore; ver historico do repositorio)`
-- `spec-ml-avaliacao-documentada` (removido da arvore; ver historico do repositorio)`
 - `backend/tests/test_ml_train.py`, `test_ml_evaluate.py`, `test_ml_predict.py`,
   `test_ml_model_provenance.py`

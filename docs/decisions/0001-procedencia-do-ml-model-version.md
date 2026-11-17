@@ -2,7 +2,7 @@
 
 - **Data:** 2026-11-04
 - **Status:** aceita
-- **Contexto no repositório:** `spec-ml-model-provenance` (removido da arvore; ver historico do repositorio)`, `deferred-work` (removido da arvore; ver historico do repositorio)` (entrada da onda de hardening sobre `MLModelVersionModel`), `epic-5-retro-item-1`
+- **Contexto:** `AGENTS.md` §Versionamento de modelo
 
 ## Contexto
 
@@ -50,7 +50,7 @@ calculado em `app/ml/feature_aggregation.py`.
 
 Por quê derivado e não uma constante mantida à mão (como `GENERATOR_VERSION`):
 uma constante que alguém esquece de bumpar ao mexer nas features é exatamente a
-classe de drift silencioso que `epic-5-retro-item-1` abriu. Um valor derivado
+classe de drift silencioso que a retrospectiva da Épica 5 apontou. Um valor derivado
 muda sozinho quando uma feature é acrescentada, removida, renomeada **ou
 reordenada**.
 

@@ -2,9 +2,8 @@
 
 - **Data:** 2026-11-12
 - **Status:** aceita
-- **Fecha:** `spec-qa-adversarial` (removido da arvore; ver historico do repositorio)` §Open questions ("D5 se corrige com
+- **Fecha:** o defeito D5 da passagem adversarial de QA ("D5 se corrige com
   faixa de data no schema (qual faixa?)")
-- **Spec:** `spec-correcao-defeitos-qa` (removido da arvore; ver historico do repositorio)`
 
 ## Contexto
 
@@ -66,7 +65,7 @@ ficariam com regra mais estrita que presença sem que o usuário conseguisse
 prever a diferença.
 
 **Endpoint de releitura/correção.** É a resposta certa para a outra metade do
-defeito ("nem para ser corrigido"), já adiada em `deferred-work` (removido da arvore; ver historico do repositorio)` desde
+defeito ("nem para ser corrigido"), já adiada desde
 a Story 1.3. É RF nova — rota, serviço e tela —, não correção de defeito.
 
 ## Consequências

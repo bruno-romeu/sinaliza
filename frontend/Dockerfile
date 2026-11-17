@@ -32,7 +32,7 @@ RUN npm run generate:api-types && npm run build
 
 # ---- stage 3: serve the static build with Nginx, reverse-proxying /api ----
 #
-# Sem `USER` aqui, de propósito (deferred-work, spec-6-1). Na imagem oficial
+# Sem `USER` aqui, de propósito. Na imagem oficial
 # do Nginx o master roda como root por desenho — precisa disso para o bind na
 # 80 e para preparar /var/cache/nginx e o pid — e já baixa privilégio nos
 # workers, que rodam como `nginx` e são quem de fato atende requisição

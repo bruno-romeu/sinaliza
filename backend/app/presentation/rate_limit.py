@@ -2,7 +2,7 @@
 
 Por que existe
 --------------
-`docs/deferred-work.md` (Story 1.1): o login é a única rota anônima do
+Divida registrada desde a Story 1.1: o login é a única rota anônima do
 sistema e protege a única conta semeada, sem lockout nem backoff — portanto
 aberta a adivinhação ilimitada de senha. Além disso o bcrypt (custo 12) faz
 de cada tentativa algo caro: sem limite, o próprio login é um amplificador

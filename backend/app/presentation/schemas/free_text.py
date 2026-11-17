@@ -5,7 +5,7 @@ sozinho não cobre tudo o que a coluna recusa: o byte NUL (`\\u0000`)
 atravessa `strip_whitespace` e `min_length` intacto e só é recusado lá no
 fundo, pelo psycopg — `PostgreSQL text fields cannot contain NUL (0x00)
 bytes` —, o que fazia um texto inválido virar 500 em vez do 422 que todo
-outro texto inválido recebe (D2 de `docs/spec-qa-adversarial.md`).
+outro texto inválido recebe (D2 da passagem adversarial de QA).
 
 A recusa é **só** do NUL, e não de caracteres de controle em geral: o resto
 do Unicode atravessa a coluna `Text` sem perda, e um teste existente fixa

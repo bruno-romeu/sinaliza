@@ -2,7 +2,7 @@
 
 - **Data:** 2026-11-04
 - **Status:** aceita
-- **Fecha:** `epic-5-retro-item-1` (`[fix-now]`, aberto desde 2026-10-20)
+- **Fecha:** o risco de a ordem das features divergir entre os CLIs de ML, apontado na retrospectiva da Épica 5 (aberto desde 2026-10-20)
 
 ## Contexto
 
