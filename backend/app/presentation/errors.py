@@ -22,7 +22,7 @@ the chance to give the violation a domain-specific meaning (as
 `RegisterAttendanceService` does for a duplicate attendance).
 
 A third backstop, added when the adversarial QA pass measured it
-(`docs/spec-qa-adversarial.md`, D1/D2), covers `sqlalchemy.exc.DataError` —
+(defects D1/D2), covers `sqlalchemy.exc.DataError` —
 SQLSTATE class 22, "data exception": the value sent is not representable in
 the column's type. Two triggers were reachable from the HTTP boundary: a page
 number with no upper bound, whose derived `OFFSET` overflowed `bigint`, and a

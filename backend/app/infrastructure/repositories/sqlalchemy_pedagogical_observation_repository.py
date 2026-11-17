@@ -50,7 +50,7 @@ from app.infrastructure.repositories.errors import translating_integrity_errors
 # Story 4.4 (RF-22, AD-8): shown in place of the real text whenever an
 # observation is cited as evidence of a real `FollowUp` and the requesting
 # user is not that `FollowUp`'s responsible user — factual, never a vague
-# "access denied" (EXPERIENCE.md Voice and Tone).
+# "access denied" (the UX voice-and-tone guide).
 _RESTRICTED_TEXT = (
     "Texto do registro pedagógico restrito ao responsável pelo "
     "acompanhamento que o cita como evidência."

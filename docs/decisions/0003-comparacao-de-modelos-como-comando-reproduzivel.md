@@ -4,7 +4,6 @@
 - **Status:** aceita
 - **Fecha:** `docs/model-evaluation.md` §Limites item 4 (comparação entre
   modelos inexistente), aberto desde a primeira versão de `build_pipeline()`
-- **Spec:** `docs/spec-comparacao-de-modelos-baseline.md`
 
 ## Contexto
 

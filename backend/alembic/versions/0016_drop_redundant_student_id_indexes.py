@@ -24,7 +24,7 @@ tabelas. A condicao que torna isso valido e o unico **comecar** por
 dependa desta lista escrita a mao envelhecer junto com o schema.
 
 O que esta remocao **nao** e: ganho de desempenho. Duas afirmacoes que
-justificavam a remocao em `docs/deferred-work.md` foram medidas e nao se
+justificavam a remocao no catalogo de divida tecnica foram medidas e nao se
 sustentam como escritas.
 
 - "o planner nunca os escolhe" e falso como afirmacao geral: um

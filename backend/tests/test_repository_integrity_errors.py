@@ -1,7 +1,7 @@
 """Repository-level translation of Postgres integrity violations
 (`app/infrastructure/repositories/errors.py`).
 
-Closes the `deferred-work.md` entry open since Story 1.5: "no repository
+Closes the gap open since Story 1.5: "no repository
 translates an `IntegrityError` into a domain error, so deleting a referenced
 student/user later would surface as an unhandled 500". Two things were
 actually wrong, and this file covers both:

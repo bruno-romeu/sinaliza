@@ -63,8 +63,8 @@ class UnusableArtifactError(RuntimeError):
     sobra — um volume removido à mão, um artefato copiado pela metade, um
     banco restaurado de outra máquina. Sem ela, `joblib.load` respondia
     `FileNotFoundError` cru, ou `KeyError: 110` para arquivo corrompido, que
-    não diz nada a quem rodou o comando (D3 de
-    `docs/spec-qa-adversarial.md`)."""
+    não diz nada a quem rodou o comando (D3 da
+    passagem adversarial de QA)."""
 
 
 class NoScoringDataError(RuntimeError):

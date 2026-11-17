@@ -1,7 +1,7 @@
 """Day-bucketing of `timestamptz` columns must be UTC, never the Postgres
 session's `timezone` GUC.
 
-`deferred-work.md` carried this as "maybe-false" since the Story 3.2 code
+The technical-debt log carried this as "maybe-false" since the Story 3.2 code
 review: `SqlAlchemyPedagogicalObservationRepository.list_by_student_in_range`
 bucketed `created_at` (a `timestamptz`) with a plain `cast(created_at, Date)`,
 whose day boundary Postgres resolves at the session's `timezone` setting —

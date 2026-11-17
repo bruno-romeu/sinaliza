@@ -5,8 +5,8 @@ procuram nao e cobertura: e a diferenca entre **422 limpo** e **500 feio** na
 borda de cada entrada que o cliente controla.
 
 Os defeitos que este arquivo nasceu provando — D1 e D2 (`DataError` sem
-tradutor) e D5 (data de fato sem faixa) — foram **corrigidos** em
-`docs/spec-correcao-defeitos-qa.md`. Os testes continuam aqui, agora
+tradutor) e D5 (data de fato sem faixa) — foram **corrigidos**.
+Os testes continuam aqui, agora
 passando, e cada um guarda no proprio docstring o defeito que o fez nascer:
 e a unica memoria de por que a validacao tem a forma que tem.
 

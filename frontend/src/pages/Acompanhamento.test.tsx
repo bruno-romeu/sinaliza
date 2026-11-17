@@ -143,7 +143,7 @@ describe('Acompanhamento — tela de acompanhamento (Story 4.1)', () => {
   })
 
   it('trata 403 como escopo, não como falha transitória — sem retry impossível', async () => {
-    // Cenário descrito em `docs/deferred-work.md`: a Home lista
+    // Cenário conhecido: a Home lista
     // acompanhamentos via `list_active`, que não filtra por responsável, e o
     // `GET /follow-ups/{id}` responde 403 quando o responsável é outro. Antes
     // isso caía no erro genérico e oferecia um "Tentar novamente" que nunca

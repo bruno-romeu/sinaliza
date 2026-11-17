@@ -16,7 +16,7 @@ is a normal 200 with an empty `results` array, never an error.
 Todo número de página tem `le=MAX_*_PAGE_NUMBER` ao lado do `ge=1`, pelo mesmo
 motivo que o `page_size` irmão tem `le=MAX_*_PAGE_SIZE`: sem teto, o
 `offset = (page - 1) * page_size` derivado estoura o `bigint` do Postgres e a
-rota responde 500 em vez de 422 (D1 de `docs/spec-qa-adversarial.md`).
+rota responde 500 em vez de 422 (D1 da passagem adversarial de QA).
 """
 
 from __future__ import annotations

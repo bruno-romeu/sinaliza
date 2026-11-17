@@ -4,7 +4,7 @@ Revision ID: 0014
 Revises: 0013
 Create Date: 2026-11-01
 
-Fecha a lacuna catalogada em `deferred-work.md` desde a Story 1.5 e
+Fecha a lacuna registrada desde a Story 1.5 e
 reconfirmada na 3.2: nenhuma FK do schema declarava `ondelete`, de modo que
 toda remoção de linha-pai caía no `NO ACTION` implícito do Postgres — um
 comportamento por omissão, não uma decisão de domínio.

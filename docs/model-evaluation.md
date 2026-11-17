@@ -204,10 +204,10 @@ Um único `Pipeline` do Scikit-Learn (`backend/app/ml/pipeline.py`), como o
 `AGENTS.md` §Pipeline pede — preprocessing fundido ao modelo, para que a
 inferência não possa reimplementar o preprocessing de outro jeito:
 
-```text
+`text
 ColumnTransformer(SimpleImputer(strategy="mean"))
 → RandomForestClassifier(n_estimators=100, random_state=42)
-```
+`
 
 O `SimpleImputer` leva `keep_empty_features=True`, e isso é obrigatório, não
 cosmético. Sem a flag, uma coluna **inteiramente** ausente no conjunto de
@@ -239,9 +239,9 @@ primeira versão e nenhum baseline fora medido contra ela.
 
 A comparação é **código permanente**, não uma medição de uma tarde:
 
-```bash
+`bash
 uv run python -m app.ml.compare
-```
+`
 
 A escolha de transformar em comando foi deliberada. Um número medido uma vez e
 colado num documento não é verificável por quem lê — numa defesa, "por que
@@ -367,7 +367,7 @@ artefato das features antigas.
 A matriz de confusão **sob as features antigas** mostra de onde vinha a
 diferença entre os dois:
 
-```text
+`text
   logistic_regression            STABLE  F_ATT  F_GRA  COMB
     STABLE                           43      0      0     0
     FALLING_ATTENDANCE                0      8      0     0
@@ -379,7 +379,7 @@ diferença entre os dois:
     FALLING_ATTENDANCE                0      8      0     0
     FALLING_GRADES                    1      0      3     0
     COMBINED_DETERIORATION            0      1      0     4
-```
+`
 
 Os dois erram o mesmo `COMBINED_DETERIORATION` (confundido com
 `FALLING_ATTENDANCE`) e acertam `FALLING_ATTENDANCE` inteiro. A diferença está
@@ -463,7 +463,7 @@ diz *qual* artefato usar, nunca *apesar de quê*.
 
 ## 8. Como reproduzir
 
-```bash
+`bash
 cd backend
 
 # 1. gerar o dataset sintético (determinístico pela seed)
@@ -487,7 +487,7 @@ uv run python -m app.ml.predict [--model-version <version>]
 # 5. comparar os modelos candidatos sob o mesmo corte (§6)
 uv run python -m app.ml.compare
 #    não escreve nada: nem MLModelVersion, nem artefato, nem predição
-```
+`
 
 Sem `--model-version`, os dois últimos comandos usam a versão mais recente por
 `trained_at` — o comportamento que sempre existiu. Uma `version` inexistente
@@ -498,12 +498,12 @@ está em `composition.py` e não é chamado por scheduler nenhum.
 
 Consultar o que ficou registrado:
 
-```sql
+`sql
 SELECT version, trained_at, training_dataset_version, feature_schema_version,
        metrics->>'f1' AS f1_macro, metrics->>'sample_count' AS n
 FROM ml_model_version
 ORDER BY trained_at DESC;
-```
+`
 
 ## 9. Sobre o score de `predict`
 
@@ -607,12 +607,5 @@ experimento mantido ao lado, com procedência registrada e limites declarados.
 - `docs/decisions/0002-ordem-de-features-derivada-de-feature-columns.md`
 - `docs/decisions/0003-comparacao-de-modelos-como-comando-reproduzivel.md`
 - `docs/decisions/0004-features-temporais-derivadas-da-regra-geradora.md`
-- `docs/spec-comparacao-de-modelos-baseline.md`
-- `docs/spec-features-temporais-de-trajetoria.md`
-- `docs/spec-5-1-pipeline-pre-processamento-e-treino-do-modelo-offline.md`
-- `docs/spec-5-2-geracao-de-score-experimental-como-dado-de-pesquisa.md`
-- `docs/spec-5-3-avaliacao-do-modelo-com-split-de-dataset-sem-vazamento.md`
-- `docs/spec-ml-model-provenance.md`
-- `docs/spec-ml-avaliacao-documentada.md`
 - `backend/tests/test_ml_train.py`, `test_ml_evaluate.py`, `test_ml_predict.py`,
   `test_ml_model_provenance.py`

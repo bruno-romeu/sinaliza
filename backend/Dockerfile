@@ -27,7 +27,7 @@ COPY backend/alembic.ini ./alembic.ini
 COPY backend/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
-# deferred-work (spec-6-1): o processo não precisa de root. Ele escuta na
+# O processo não precisa de root. Ele escuta na
 # 8000 (porta alta, não privilegiada), não instala nada em runtime e só
 # escreve em `ml_artifact_dir` — criado aqui já pertencente ao usuário para
 # que `docker compose exec backend python -m app.ml.train` continue

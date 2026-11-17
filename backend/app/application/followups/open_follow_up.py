@@ -17,8 +17,8 @@ Before this, every click created another `FollowUp`, so a double click or a
 second visit to the trajectory page left duplicate open cases.
 
 Esse `SELECT`-depois-`INSERT` e uma verificacao, nao uma garantia: duas
-requisicoes que leiam antes de qualquer uma escrever passam ambas por ele (D4,
-`docs/spec-acompanhamento-aberto-unico-no-banco.md`). Quem garante e o indice
+requisicoes que leiam antes de qualquer uma escrever passam ambas por ele (D4
+da passagem adversarial de QA). Quem garante e o indice
 unico parcial `uq_follow_up_open_per_student_and_owner` (migration 0017), e
 este servico trata a recusa dele como o que ela significa: outra requisicao
 acabou de abrir o acompanhamento deste estudante. Perder a corrida cai no

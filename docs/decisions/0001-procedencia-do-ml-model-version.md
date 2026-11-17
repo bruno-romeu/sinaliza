@@ -2,7 +2,7 @@
 
 - **Data:** 2026-11-04
 - **Status:** aceita
-- **Contexto no repositório:** `docs/spec-ml-model-provenance.md`, `docs/deferred-work.md` (entrada da onda de hardening sobre `MLModelVersionModel`), `epic-5-retro-item-1`
+- **Contexto:** `AGENTS.md` §Versionamento de modelo
 
 ## Contexto
 
@@ -50,7 +50,7 @@ calculado em `app/ml/feature_aggregation.py`.
 
 Por quê derivado e não uma constante mantida à mão (como `GENERATOR_VERSION`):
 uma constante que alguém esquece de bumpar ao mexer nas features é exatamente a
-classe de drift silencioso que `epic-5-retro-item-1` abriu. Um valor derivado
+classe de drift silencioso que a retrospectiva da Épica 5 apontou. Um valor derivado
 muda sozinho quando uma feature é acrescentada, removida, renomeada **ou
 reordenada**.
 
@@ -75,7 +75,7 @@ Um `MLModelVersion` recém-treinado tem `metrics = NULL`, e isso é honesto.
 
 Formato (versionado em `metrics_schema_version`, hoje `1`):
 
-```json
+`json
 {
   "metrics_schema_version": 1,
   "evaluated_at": "2026-11-04T12:00:00+00:00",
@@ -92,7 +92,7 @@ Formato (versionado em `metrics_schema_version`, hoje `1`):
   "confusion_matrix": [[...]],
   "disclaimer": "These metrics measure the model's ability to recognize simulated patterns in the synthetic dataset. They are NOT a measure of real-world predictive validity."
 }
-```
+`
 
 Dois pontos não negociáveis nesse formato:
 

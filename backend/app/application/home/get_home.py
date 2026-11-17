@@ -62,7 +62,7 @@ MAX_FOLLOW_UPS_PAGE_SIZE = 100
 #: Teto do **número** da página, o irmão que faltava dos `MAX_*_PAGE_SIZE`
 #: acima. Sem ele, `offset = (page - 1) * page_size` aceita qualquer inteiro
 #: escrito na query string, estoura o `bigint` do Postgres, e o `DataError`
-#: resultante vira 500 (D1 de `docs/spec-qa-adversarial.md`). O valor é
+#: resultante vira 500 (D1 da passagem adversarial de QA). O valor é
 #: folgado de propósito: um milhão de páginas de 100 linhas é muito além de
 #: qualquer base que este projeto venha a ter, e o maior `OFFSET` que ele
 #: permite (10^8) cabe com sobra no `bigint`.

@@ -2,7 +2,7 @@
 
 - **Data:** 2026-11-04
 - **Status:** aceita
-- **Fecha:** `epic-5-retro-item-1` (`[fix-now]`, aberto desde 2026-10-20)
+- **Fecha:** o risco de a ordem das features divergir entre os CLIs de ML, apontado na retrospectiva da Épica 5 (aberto desde 2026-10-20)
 
 ## Contexto
 
@@ -14,12 +14,12 @@ tupla literal.
 Mas `train.py`, `evaluate.py` e `predict.py` montavam a matriz de features com a
 ordem dos campos **escrita à mão**:
 
-```python
+`python
 feature_matrix = [
     [row.attendance_rate, row.grade_average, row.assignment_completion_rate, row.observation_count]
     for row in rows
 ]
-```
+`
 
 Reordenar `FEATURE_COLUMNS` faria os três alimentarem o pipeline com colunas
 trocadas **silenciosamente**: o modelo treina, as métricas saem, tudo errado. A

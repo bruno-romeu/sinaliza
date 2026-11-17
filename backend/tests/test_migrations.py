@@ -66,7 +66,7 @@ _ALL_NATIVE_ENUMS: tuple[str, ...] = (
 # `pg_constraint.confdeltype` ('c' = CASCADE, 'r' = RESTRICT). The rationale
 # for each choice lives in the migration's own docstring; this table is the
 # executable half of it, so a future `op.create_table` that silently omits an
-# `ondelete` (the gap `deferred-work.md` tracked since Story 1.5) fails here.
+# `ondelete` (the gap tracked since Story 1.5) fails here.
 _EXPECTED_ONDELETE: dict[str, str] = {
     "enrollments_student_id_fkey": "c",
     "enrollments_classroom_id_fkey": "r",
@@ -173,7 +173,7 @@ def test_migration_upgrade_downgrade_upgrade_does_not_raise(migration_engine: En
         ).scalar_one()
     assert ml_prediction_dropped is True
 
-    # `deferred-work.md` (Story 1.3 entry): until now this test only checked
+    # Gap recorded since Story 1.3: until now this test only checked
     # that a handful of *tables* were gone after `downgrade("base")`. Every
     # migration manages its native enum type explicitly with
     # `checkfirst=True` on both `create()` and `drop()` — which means a drop
@@ -395,7 +395,7 @@ def test_0015_provenance_columns_survive_upgrade_downgrade_upgrade(
 def test_every_foreign_key_declares_its_ondelete(migration_engine: Engine) -> None:
     """Migration 0014. Until it landed, every FK fell through to Postgres'
     implicit `NO ACTION` — a default, never a domain decision
-    (`deferred-work.md`, Stories 1.5 and 3.2). This asserts both halves: the
+    (gap recorded since Stories 1.5 and 3.2). This asserts both halves: the
     exact `ondelete` each FK carries, and that the set of FKs in the schema is
     exactly the set the migration enumerates — so a new table added later with
     an un-declared FK fails here instead of silently reintroducing the gap."""
@@ -600,7 +600,7 @@ def _open_follow_up_index_def(engine: Engine) -> str | None:
 def test_0017_creates_the_partial_unique_index_and_downgrade_drops_it(
     migration_engine: Engine,
 ) -> None:
-    """Migration 0017 (D4, `docs/spec-acompanhamento-aberto-unico-no-banco.md`).
+    """Migration 0017 (D4 da passagem adversarial de QA).
     `downgrade("base")` derruba `follow_ups` inteira, o que nao prova nada
     sobre um `create_index`/`drop_index` — este teste desce ate 0016, onde a
     tabela continua existindo e o indice tem de ter sumido, e volta a subir.

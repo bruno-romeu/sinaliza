@@ -32,7 +32,7 @@ services:
     # gravava a linha no `postgres_data` (que sobrevive) e o `.joblib` na
     # camada gravável da imagem (que não), e o `docker compose up --build`
     # seguinte deixava toda procedência apontando para um arquivo ausente
-    # (D3 de `docs/spec-qa-adversarial.md`).
+    # (D3 da passagem adversarial de QA).
     volumes:
       - ml_artifacts:/app/ml_artifacts
     environment:
@@ -45,7 +45,7 @@ services:
       # spec-ui-4: read only by the one-off population commands run with
       # `docker compose exec backend ...` (seed_dev_user, synthetic.generate),
       # never by the API itself. Without them the hosted base could not get
-      # its login user. See deploy/vm-provisioning-runbook.md, step 9b.
+      # its login user. See deploy/azure/README.md, step 4.
       DEV_SEED_NAME: ${DEV_SEED_NAME:-}
       DEV_SEED_EMAIL: ${DEV_SEED_EMAIL:-}
       DEV_SEED_PASSWORD: ${DEV_SEED_PASSWORD:-}
