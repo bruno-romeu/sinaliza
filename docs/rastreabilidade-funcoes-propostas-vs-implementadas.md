@@ -11,7 +11,7 @@ A coluna **Função proposta** reúne tudo o que as etapas anteriores previram: 
 texto da **Proposta**, os requisitos funcionais e não funcionais do
 **Levantamento de Requisitos** e as entidades e campos desenhados na etapa de
 **Projeto** (`docs/data-model.md`). A coluna **Requisito** traz a numeração
-RF/RNF consolidada em `docs/prds/prd-sinaliza-2026-09-16/prd.md`, que renumera
+RF/RNF consolidada em `docs/prd.md`, que renumera
 sem reinterpretar o documento aprovado; funções que vieram da etapa de Projeto e
 não têm RF próprio estão marcadas como tal.
 
@@ -81,7 +81,7 @@ existência de código executável e de teste que o exercite.
 |---|---|---|---|
 | Abrir um acompanhamento para um estudante | RF-12 | Implementada | `app/presentation/follow_ups/router.py`; abertura sempre vinculada a uma evidência. Unicidade de acompanhamento aberto garantida por índice parcial no banco (migration `0017`). Testes: `tests/test_follow_ups.py`; `tests/test_ui_package_1.py`. |
 | Registrar ações e alterar o status entre os quatro estados previstos | RF-13 | Implementada | `PATCH /follow-ups/{id}/status` e `POST /follow-ups/{id}/actions`. Testes: `tests/test_follow_ups.py`; `frontend/src/pages/Acompanhamento.test.tsx::'shows a native <select> with exactly the 4 closed status values'`. Não existe estado equivalente a "alto risco". |
-| Manter histórico de ações e evidências de cada acompanhamento | RF-14 | Implementada | `FollowUpAction` e `FollowUpEvidence` são somente-inserção (`GRANT INSERT, SELECT` / `REVOKE UPDATE, DELETE`, migration 0014); exibidos em ordem cronológica. Testes: `tests/test_follow_ups.py`; `Acompanhamento.test.tsx::'shows every registered action in chronological order'`. *Defeito de interface conhecido: uma ação recém-registrada só aparece na lista após recarregar a página (`docs/deferred-work.md`, item `epic-4-retro-item-16`).* |
+| Manter histórico de ações e evidências de cada acompanhamento | RF-14 | Implementada | `FollowUpAction` e `FollowUpEvidence` são somente-inserção (`GRANT INSERT, SELECT` / `REVOKE UPDATE, DELETE`, migration 0014); exibidos em ordem cronológica. Testes: `tests/test_follow_ups.py`; `Acompanhamento.test.tsx::'shows every registered action in chronological order'`. *Defeito de interface conhecido: uma ação recém-registrada só aparece na lista após recarregar a página (`deferred-work` (removido da arvore; ver historico do repositorio)`, item `epic-4-retro-item-16`).* |
 | Campos `reason` e `next_review_date` do acompanhamento | Etapa de Projeto — `docs/data-model.md` | Não implementada | Colunas existem e permanecem sempre `NULL`; nenhuma tela as captura. Ver 2.5. |
 
 ### 1.8 Privacidade e acesso a registros
@@ -114,7 +114,7 @@ existência de código executável e de teste que o exercite.
 
 | Função proposta | Requisito | Status | Observação |
 |---|---|---|---|
-| Responder às interações em no máximo 5 segundos | RNF-01 | Implementada | Custo de consulta fixado por teste: `tests/test_repository_query_counts.py::test_get_home_query_count_does_not_grow_with_page_size`. Verificação em ambiente real por `deploy/smoke-test.sh`. *Dívida registrada: `GET /follow-ups/{id}` ainda resolve evidências em N+1 — o N é o número de evidências citadas por uma pessoa, não um parâmetro do cliente (`docs/deferred-work.md`).* |
+| Responder às interações em no máximo 5 segundos | RNF-01 | Implementada | Custo de consulta fixado por teste: `tests/test_repository_query_counts.py::test_get_home_query_count_does_not_grow_with_page_size`. Verificação em ambiente real por `deploy/smoke-test.sh`. *Dívida registrada: `GET /follow-ups/{id}` ainda resolve evidências em N+1 — o N é o número de evidências citadas por uma pessoa, não um parâmetro do cliente (`deferred-work` (removido da arvore; ver historico do repositorio)`).* |
 | Interface responsiva, adaptando-se a desktop e tablet | RNF-02 | Implementada | 18 media queries em `frontend/src/styles`; comportamento conferido em 9 larguras durante a onda de frontend. Não há teste automatizado de viewport. |
 | Mesmo pipeline de pré-processamento e inferência usado no treinamento | RNF-03 | Implementada | Pipeline único do Scikit-Learn em `app/ml/candidates.py`, serializado e recarregado; `require_matching_feature_schema()` recusa artefato cujo esquema de features divergiu. Testes: `tests/test_ml_model_provenance.py::test_prediction_refuses_an_artifact_fitted_under_another_feature_schema` e `::test_explicit_version_does_not_bypass_the_feature_schema_guard`. |
 | Disponibilidade durante desenvolvimento e demonstração | RNF-04 | Implementada | Três contêineres com `restart: unless-stopped` em VM que não hiberna; `deploy/verify-always-on.sh` confere o estado. |
@@ -255,7 +255,7 @@ listagem, funcionalidade que não foi pedida.
 
 Vale registrar que a documentação da Épica 4 chegou a afirmar que
 `next_review_date` era lido por uma consulta da página inicial; isso **nunca foi
-verdade**, e a correção está registrada em `docs/deferred-work.md`
+verdade**, e a correção está registrada em `deferred-work` (removido da arvore; ver historico do repositorio)`
 (`epic-4-retro-item-19`).
 
 **O que seria necessário para concluir.** Para `reason`: um campo opcional no

@@ -14,12 +14,12 @@ tupla literal.
 Mas `train.py`, `evaluate.py` e `predict.py` montavam a matriz de features com a
 ordem dos campos **escrita à mão**:
 
-```python
+`python
 feature_matrix = [
     [row.attendance_rate, row.grade_average, row.assignment_completion_rate, row.observation_count]
     for row in rows
 ]
-```
+`
 
 Reordenar `FEATURE_COLUMNS` faria os três alimentarem o pipeline com colunas
 trocadas **silenciosamente**: o modelo treina, as métricas saem, tudo errado. A

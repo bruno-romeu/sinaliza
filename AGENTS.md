@@ -12,24 +12,24 @@ A origem do problema é a evasão escolar, mas o produto **não deve rotular ou 
 
 Fluxo principal:
 
-```text
+`text
 dados acadêmicos
 → trajetória temporal
 → mudanças
 → evidências
 → acompanhamento
 → decisão humana
-```
+`
 
 Fluxo experimental de ML:
 
-```text
+`text
 dados sintéticos
 → features
 → modelo
 → métricas
 → resultado experimental
-```
+`
 
 ## Regra mais importante
 
@@ -37,22 +37,22 @@ Nunca transformar a saída do sistema em uma afirmação determinística ou pseu
 
 Proibido como comportamento padrão:
 
-```text
+`text
 "82% de chance de evasão"
 "aluno de alto risco"
 "este aluno irá abandonar"
 "ranking dos alunos mais críticos"
-```
+`
 
 Preferir:
 
-```text
+`text
 "mudanças recentes na trajetória"
 "sinais observados"
 "evidências"
 "acompanhamento"
 "revisão pedagógica"
-```
+`
 
 ## Limites do MVP
 
@@ -127,11 +127,11 @@ Priorizar:
 
 Não exigir que o professor preencha manualmente:
 
-```text
+`text
 risk_score
 engagement_score
 student_priority
-```
+`
 
 O professor registra ações naturais da rotina:
 
@@ -146,40 +146,40 @@ Solicitar fatos observáveis.
 
 Bom:
 
-```text
+`text
 "Participou menos das discussões nas últimas duas aulas e não
 entregou a atividade desta semana."
-```
+`
 
 Evitar induzir:
 
-```text
+`text
 "Está desmotivado."
 "É aluno de risco."
 "Provavelmente irá evadir."
-```
+`
 
 ## NLP / LLM
 
 Se implementado:
 
-```text
+`text
 observation
 → extraction
 → suggested signals
 → human review
 → confirmed signals
-```
+`
 
 Todo `ExtractedSignal` deve manter:
 
-```text
+`text
 source_observation_id
 signal_type
 value
 provider/model
 review_status
-```
+`
 
 Nunca descartar a fonte original.
 
@@ -199,11 +199,11 @@ Não afirmar validade real.
 
 Preferir um pipeline único do Scikit-Learn:
 
-```text
+`text
 preprocessing
 +
 model
-```
+`
 
 Evitar preprocessing duplicado entre treino e inferência.
 
@@ -213,10 +213,10 @@ Começar simples.
 
 Exemplo:
 
-```text
+`text
 LogisticRegression
 RandomForestClassifier
-```
+`
 
 Comparar antes de adicionar modelos complexos.
 
@@ -228,15 +228,15 @@ Se `predict_proba()` for utilizado, persistir como dado experimental.
 
 Exemplo interno:
 
-```text
+`text
 model_score = 0.82
-```
+`
 
 Não exibir automaticamente como:
 
-```text
+`text
 82% de chance de evasão
-```
+`
 
 No produto, preferir evidências e mudanças.
 
@@ -246,19 +246,19 @@ Priorizar features temporais.
 
 Bom:
 
-```text
+`text
 attendance_trend
 grade_delta
 missing_assignment_delta
 consecutive_absences
-```
+`
 
 Menos interessante isoladamente:
 
-```text
+`text
 attendance_current
 grade_current
-```
+`
 
 Nunca introduzir feature sensível sem necessidade e justificativa.
 
@@ -275,9 +275,9 @@ Cada perfil sintético deve possuir regra conhecida.
 
 Exemplo:
 
-```text
+`text
 profile = falling_attendance
-```
+`
 
 Não depender de geração aleatória opaca.
 
@@ -322,18 +322,18 @@ Toda mudança exibida deve poder apontar para dado-fonte.
 
 Exemplo:
 
-```text
+`text
 TrajectoryChange
 type: ATTENDANCE_DROP
 period: last_8_weeks
 source_records: [...]
-```
+`
 
 Evitar:
 
-```text
+`text
 reason = "AI detected"
-```
+`
 
 ## Acompanhamento
 
@@ -341,18 +341,18 @@ Entidade `FollowUp` representa um processo humano.
 
 Estados possíveis:
 
-```text
+`text
 EM_OBSERVACAO
 ACOMPANHAMENTO_ATIVO
 AGUARDANDO_RETORNO
 ENCERRADO
-```
+`
 
 Não criar estado:
 
-```text
+`text
 HIGH_RISK
-```
+`
 
 como substituto de acompanhamento.
 
@@ -362,7 +362,7 @@ Usar migrations.
 
 Entidades previstas:
 
-```text
+`text
 User
 Role
 Student
@@ -389,7 +389,7 @@ FollowUpAction
 
 MLModelVersion
 MLPrediction
-```
+`
 
 Evitar misturar resultados de modelo com fatos escolares.
 
@@ -399,13 +399,13 @@ Controllers finos.
 
 Fluxo:
 
-```text
+`text
 request
 → validation
 → application service
 → domain/repository
 → response
-```
+`
 
 Não colocar feature engineering dentro de endpoint HTTP.
 
@@ -415,14 +415,14 @@ Não carregar artefato ML a cada request.
 
 Persistir ao menos:
 
-```text
+`text
 model_version
 training_dataset_version
 feature_schema_version
 metrics
 artifact_path
 created_at
-```
+`
 
 Prediction deve apontar para a versão usada.
 
@@ -468,11 +468,11 @@ Mostrar:
 
 Evitar:
 
-```text
+`text
 KPI: 38 alunos de alto risco
 ranking
 heatmap de risco
-```
+`
 
 ### Estudante
 
@@ -584,13 +584,13 @@ Não:
 
 Atualizar:
 
-```text
+`text
 README.md
 docs/architecture.md
 docs/data-model.md
 docs/model-evaluation.md
 docs/decisions/
-```
+`
 
 Registrar decisões importantes sobre:
 

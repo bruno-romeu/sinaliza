@@ -4,7 +4,7 @@
 - **Status:** aceita
 - **Fecha:** `docs/model-evaluation.md` §Limites item 5 (features instantâneas
   num problema temporal)
-- **Spec:** `docs/spec-features-temporais-de-trajetoria.md`
+- **Spec:** `spec-features-temporais-de-trajetoria` (removido da arvore; ver historico do repositorio)`
 
 ## Contexto
 

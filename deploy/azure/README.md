@@ -26,15 +26,15 @@ Uma VM com `restart: unless-stopped` não dorme.
   PATH do shell.
 - Uma chave SSH dedicada — **não reaproveite a do GitHub**:
 
-  ```sh
+  ``sh
   ssh-keygen -t ed25519 -C sinaliza-azure -f ~/.ssh/sinaliza_azure -N ""
-  ```
+  ``
 
 ## Etapa 1 — Provisionar
 
-```sh
+``sh
 deploy/azure/provision.sh
-```
+``
 
 O script cria o resource group, a VM (Ubuntu 24.04, IP público **estático**,
 rótulo DNS gratuito) e o NSG. Ele percorre uma lista de região×tamanho e fica
@@ -52,25 +52,25 @@ Ao final o script imprime a **URL pública** no formato
 
 ## Etapa 2 — Confirmar o primeiro boot
 
-```sh
+``sh
 ssh -i ~/.ssh/sinaliza_azure azureuser@<IP> 'cloud-init status --wait; free -h; docker --version'
-```
+``
 
 Espere `status: done`, 2 GB de swap ativos e o Docker respondendo. O
 `cloud-init` leva ~3 minutos.
 
 ## Etapa 3 — Clonar e configurar
 
-```sh
+``sh
 ssh -i ~/.ssh/sinaliza_azure azureuser@<IP>
 git clone https://github.com/bruno-romeu/sinaliza.git /opt/sinaliza
 cd /opt/sinaliza
-```
+``
 
 Crie o `.env` **na VM**, com segredos gerados ali — nunca copie os de
 desenvolvimento:
 
-```sh
+``sh
 cat > /opt/sinaliza/.env <<EOF
 POSTGRES_USER=sinaliza
 POSTGRES_DB=sinaliza
@@ -82,7 +82,7 @@ DEV_SEED_EMAIL=avaliacao@sinaliza.app
 DEV_SEED_PASSWORD=$(openssl rand -base64 12 | tr -d '/+=')
 EOF
 chmod 600 /opt/sinaliza/.env
-```
+``
 
 `JWT_SECRET` precisa de **no mínimo 32 caracteres**: `Settings` valida e o
 backend não sobe sem isso. O `.env` está no `.gitignore` e nunca é versionado.
@@ -90,15 +90,15 @@ backend não sobe sem isso. O `.env` está no `.gitignore` e nunca é versionado
 Guarde `DEV_SEED_EMAIL` e `DEV_SEED_PASSWORD` — são as credenciais que vão no
 item 3.2 do documento de entrega:
 
-```sh
+``sh
 grep DEV_SEED /opt/sinaliza/.env
-```
+``
 
 ## Etapa 4 — Subir
 
-```sh
+``sh
 cd /opt/sinaliza && docker compose up -d --build
-```
+``
 
 O `docker-entrypoint.sh` roda `alembic upgrade head` antes do uvicorn, então
 o **schema** nasce com a stack. O primeiro build leva alguns minutos.
@@ -106,7 +106,7 @@ o **schema** nasce com a stack. O primeiro build leva alguns minutos.
 **Os dados não nascem.** O entrypoint só migra e serve — semear é manual, e
 a ordem importa:
 
-```sh
+``sh
 cd /opt/sinaliza
 
 # 1. O usuário de avaliação. Precisa vir primeiro: o gerador atribui a
@@ -123,7 +123,7 @@ docker compose exec -T backend python -m app.synthetic.generate     --seed 42 --
 
 # 4. As mudanças de trajetória.
 docker compose exec -T backend python -m app.synthetic.prepare_demo
-```
+``
 
 O passo 4 é o menos óbvio e o mais fácil de esquecer: `TrajectoryChange` é
 calculado **dentro da requisição** que lê a trajetória de um estudante
@@ -133,19 +133,19 @@ Home fica **vazia** até alguém abrir cada estudante um a um. O
 
 Ao final, confira:
 
-```sh
+``sh
 docker compose exec -T postgres psql -U sinaliza -d sinaliza -c   "SELECT count(*) FROM students UNION ALL SELECT count(*) FROM trajectory_changes;"
-```
+``
 
 Esperado na configuração acima: 200 estudantes e ~15 mudanças detectadas.
 
 ## Etapa 5 — Verificar
 
-```sh
+``sh
 curl -sf http://localhost/api/openapi.json > /dev/null && echo "backend ok"
 docker compose ps
 bash deploy/smoke-test.sh          # da Épica 6, continua válido
-```
+``
 
 E de fora da VM, no seu navegador: abra a URL pública **numa janela anônima**
 — é assim que o avaliador vai abrir, e é o que o checklist da entrega pede.
@@ -158,10 +158,10 @@ igual a ligada e em uso.
 `shutdown` por dentro do sistema **não** para a cobrança — a VM fica
 `Stopped` e o compute continua faturando. Só `deallocate` para:
 
-```sh
+``sh
 deploy/azure/power.sh stop     # desaloca
 deploy/azure/power.sh start    # religa
-```
+``
 
 Mesmo desalocada, o disco gerenciado e o IP estático seguem custando alguns
 centavos por mês.

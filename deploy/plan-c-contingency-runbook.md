@@ -63,17 +63,17 @@ application code or build artifacts. No code under `backend/app` or
    does not need Neon's external PgBouncer pooler, and the pooled endpoint
    can behave differently for session-level features the app may rely on
    (e.g. prepared statements). It looks like:
-   ```
+   ``
    postgresql://<user>:<password>@<endpoint>.neon.tech/<dbname>?sslmode=require
-   ```
+   ``
 4. Rewrite it for SQLAlchemy's `psycopg` (v3) driver, matching
    `backend/.env.example`'s `DATABASE_URL` format — add `+psycopg` after
    `postgresql` and keep `?sslmode=require` (Neon requires TLS; the vanilla
    `docker-compose.yml` Postgres container does not need this flag, Neon
    does):
-   ```
+   ``
    postgresql+psycopg://<user>:<password>@<endpoint>.neon.tech/<dbname>?sslmode=require
-   ```
+   ``
 5. Keep this value — it is the `DATABASE_URL` Render needs in Step 2.
    Neon's free tier auto-suspends the compute endpoint after inactivity;
    the next query wakes it, contributing to the same cold-start window the
@@ -144,9 +144,9 @@ problem, solved the same way, at the platform level instead of in Nginx:
    project settings to call `openapi-typescript` directly against the
    **Render** backend's live schema URL — `openapi-typescript` accepts an
    HTTP(S) URL as its input in place of a local file path:
-   ```
+   ``
    npx openapi-typescript https://<render-backend-url>/openapi.json -o src/api/schema.d.ts && npm run build
-   ```
+   ``
    This is a Vercel build-command override only — no change to
    `frontend/package.json` or any file under `frontend/src`.
 3. Output directory: `dist` (matches `frontend/Dockerfile`'s
@@ -171,10 +171,10 @@ constraint exactly the way a keep-warm ping would.**
 
 Shortly (a few minutes) before starting a live demonstration on Plan C:
 
-```bash
+``bash
 ./deploy/prewarm.sh https://<render-backend-url>
 # and, separately, visit the Vercel frontend URL in a browser once
-```
+``
 
 `deploy/prewarm.sh` hits the backend's unauthenticated `/openapi.json`
 route directly on the Render URL (no `/api` prefix — that prefix only
@@ -195,7 +195,7 @@ Neon are the services that actually sleep.
 - No CI/CD pipeline triggers the pre-warm or any deploy step — deploys on
   Render/Vercel are triggered manually (via the dashboard or a `git push`
   the operator makes), consistent with Plan A/B's "manual SSH + git pull"
-  deploy philosophy (`docs/epic-6-context.md`).
+  deploy philosophy (`epic-6-context` (removido da arvore; ver historico do repositorio)`).
 - No cron job, systemd timer, GitHub Actions schedule, or third-party
   "keep my Render service awake" ping service is used or recommended, even
   though such services exist and are commonly suggested for this exact

@@ -10,10 +10,10 @@ created: '2026-09-17'
 updated: '2026-09-23'
 binds: ['RF-01..RF-23', 'RNF-01..RNF-14']
 sources:
-  - docs/prds/prd-sinaliza-2026-09-16/prd.md
-  - docs/ux-designs/ux-sinaliza-2026-09-17/DESIGN.md
-  - docs/ux-designs/ux-sinaliza-2026-09-17/EXPERIENCE.md
-  - docs/research/technical-bases-publicas-dados-educacionais-calibr-2026-09-17/research.md
+  - docs/prd.md
+  - `DESIGN` (removido da arvore; ver historico do repositorio)
+  - `EXPERIENCE` (removido da arvore; ver historico do repositorio)
+  - docs/research-bases-publicas.md
   - docs/data-model.md
   - AGENTS.md
 companions: []
@@ -33,7 +33,7 @@ companions: []
 | Presentation | `backend/app/presentation/` | Application | Domain diretamente, Infrastructure diretamente |
 | ML | `backend/app/ml/` | Domain (read-models/ports) | Presentation, Application (não é chamado por rotas ao vivo, ver AD-3) |
 
-```mermaid
+`mermaid
 graph LR
   Presentation --> Application
   Application --> Domain
@@ -42,7 +42,7 @@ graph LR
   ML --> Domain
   ML -.lê via.-> Infrastructure
   Presentation -."inferência em cache apenas, AD-3".-> ML
-```
+`
 
 ## Invariants & Rules
 
@@ -164,7 +164,7 @@ graph LR
 
 ## Structural Seed
 
-```text
+`text
 sinaliza/
   backend/
     app/
@@ -185,9 +185,9 @@ sinaliza/
     Dockerfile
   docker-compose.yml       # postgres + backend + nginx (frontend estático + reverse proxy /api)
   docs/
-```
+`
 
-```mermaid
+`mermaid
 erDiagram
   Student ||--o{ Enrollment : has
   Classroom ||--o{ Enrollment : has
@@ -203,7 +203,7 @@ erDiagram
   FollowUpEvidence }o--|| TrajectoryChange : references
   FollowUp ||--o{ FollowUpAction : has
   User ||--o{ FollowUp : responsible_for
-```
+`
 
 ## Capability → Architecture Map
 
@@ -226,7 +226,7 @@ erDiagram
 ## Deferred
 
 - **Limiar exato de convergência de sinais** — já é `[ASSUMPTION]` do próprio PRD (RF-11: confirmação/persistência/coincidência de ≥2 sinais no mesmo bimestre); esta arquitetura só fixa a forma (`SignalEvaluator` por sinal + `ConvergenceRule`, AD-12), não o valor exato, a calibrar quando a base sintética existir.
-- ~~**Tela técnica de visualização do score**~~ — **Decidido (PRD §9, item 2, atualizado 2026-09-23): não é construída no MVP.** O relatório de `python -m app.ml.evaluate` (Story 5.3, RNF-14) é o artefato de avaliação acadêmica/pesquisa; nenhum boundary de leitura novo além do já especificado em `docs/epics.md`. Racional original preservado como contexto: se viesse a ser construída, seria leitura read-only de `MLPrediction` já persistido por AD-3, sem novo pipeline nem inferência ao vivo fora do padrão de cache já fixado.
+- ~~**Tela técnica de visualização do score**~~ — **Decidido (PRD §9, item 2, atualizado 2026-09-23): não é construída no MVP.** O relatório de `python -m app.ml.evaluate` (Story 5.3, RNF-14) é o artefato de avaliação acadêmica/pesquisa; nenhum boundary de leitura novo além do já especificado em `epics` (removido da arvore; ver historico do repositorio)`. Racional original preservado como contexto: se viesse a ser construída, seria leitura read-only de `MLPrediction` já persistido por AD-3, sem novo pipeline nem inferência ao vivo fora do padrão de cache já fixado.
 - **Log de acesso aos registros pedagógicos** (Should, §6.2) — fora desta spine; se houver tempo até 23/11/2026, entra como tabela de auditoria append-only sobre o mesmo padrão de AD-6/AD-7.
 - **Carve-out de visibilidade "coordenação pedagógica" além de `responsible_user_id`** (RF-22) — deliberadamente não implementado agora (ver AD-8); revisitar apenas se o produto real ganhar múltiplos usuários com necessidade de visão cruzada.
 - **DNS/domínio da VM Oracle** — usar IP público ou um DNS dinâmico gratuito (ex. DuckDNS); decisão de deploy, não de arquitetura.

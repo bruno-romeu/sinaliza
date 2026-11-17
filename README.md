@@ -61,23 +61,23 @@ Ela deve ajudar a responder:
 
 Evitar como elemento principal:
 
-```text
+`text
 Risco: 82%
 ALTO RISCO
 ranking de estudantes
 top 10 alunos críticos
-```
+`
 
 Preferir:
 
-```text
+`text
 Mudanças recentes
 
 - frequência caiu progressivamente nas últimas 8 semanas;
 - 3 de 5 atividades recentes não foram entregues;
 - dois registros mencionam menor participação;
 - existe acompanhamento aberto pela coordenação.
-```
+`
 
 ---
 
@@ -152,19 +152,19 @@ O professor registra fatos observáveis em texto livre.
 
 Exemplo:
 
-```text
+`text
 Lucas participou menos das discussões nesta semana e não entregou
 a última atividade. Nas primeiras semanas do semestre costumava
 participar com frequência.
-```
+`
 
 O sistema pode sugerir sinais estruturados:
 
-```text
+`text
 participation_change: negative
 assignment_status: not_delivered
 temporal_reference: recent
-```
+`
 
 Esses sinais devem manter referência ao registro original e, quando usados em acompanhamento, passar por revisão humana.
 
@@ -180,7 +180,7 @@ O projeto pode utilizar Scikit-Learn para experimentar com padrões associados �
 
 Pipeline inicial:
 
-```text
+`text
 SimpleImputer
 +
 OneHotEncoder
@@ -188,7 +188,7 @@ OneHotEncoder
 StandardScaler quando aplicável
 +
 RandomForestClassifier
-```
+`
 
 Outros modelos podem ser comparados posteriormente.
 
@@ -198,15 +198,15 @@ No MVP com dados sintéticos, ele não deve ser apresentado como uma probabilida
 
 Evitar:
 
-```text
+`text
 Este estudante tem 82% de chance de evasão.
-```
+`
 
 ## 2. Processamento de Registros Pedagógicos
 
 NLP/LLM pode ajudar a transformar observações livres em sinais estruturados.
 
-```text
+`text
 Registro original
       ↓
 Extração
@@ -216,7 +216,7 @@ Sinais sugeridos
 Revisão humana
       ↓
 Sinais confirmados
-```
+`
 
 A IA organiza informação. Ela não diagnostica o estudante.
 
@@ -224,7 +224,7 @@ A IA organiza informação. Ela não diagnostica o estudante.
 
 # Visão Geral da Solução
 
-```text
+`text
 Dados acadêmicos
      │
      ├──── Frequência
@@ -258,7 +258,7 @@ ML Experimental   Registros Pedagógicos
             ├──── registros
             ├──── ações
             └──── próximos passos
-```
+`
 
 ---
 
@@ -272,7 +272,7 @@ O dataset sintético deve ser controlado e documentado.
 
 Perfis possíveis:
 
-```text
+`text
 estável
 dificuldade acadêmica
 queda de frequência
@@ -280,7 +280,7 @@ aumento de atividades pendentes
 deterioração combinada
 alta ausência com notas estáveis
 mudança temporária seguida de recuperação
-```
+`
 
 Sugestão inicial:
 
@@ -296,12 +296,12 @@ Os resultados obtidos nesse dataset não devem ser descritos como desempenho rea
 
 Com o backend configurado (`backend/.env`), na pasta `backend`:
 
-```bash
+`bash
 uv run python -m app.infrastructure.db.seed_dev_user
 uv run python -m app.infrastructure.db.seed_dev_fixtures
 uv run python -m app.synthetic.generate --seed 42 --reset
 uv run python -m app.synthetic.prepare_demo
-```
+`
 
 O gerador distribui notas, entregas e observações ao longo de cada bimestre, então a demonstração funciona na data real, sem `SINALIZA_DEMO_AS_OF`, e o que for lançado ao vivo aparece na hora. O `prepare_demo` calcula uma vez a trajetória de cada estudante da demo, porque a página inicial só lista mudanças já calculadas: rode de novo no dia da apresentação. É uma ação manual, nunca agendada. Para ensaiar um dia específico, defina `SINALIZA_DEMO_AS_OF` (no backend e no `prepare_demo`). No ambiente hospedado, veja o passo 9b de `deploy/vm-provisioning-runbook.md`.
 
@@ -309,7 +309,7 @@ O gerador distribui notas, entregas e observações ao longo de cada bimestre, e
 
 # Pipeline de Machine Learning
 
-```text
+`text
 Dataset sintético
       │
       ▼
@@ -333,7 +333,7 @@ Evaluation
       │
       ▼
 Artifact Version
-```
+`
 
 O mesmo pipeline de transformação deve ser utilizado no treinamento e na inferência.
 
@@ -345,7 +345,7 @@ O projeto deve priorizar trajetória, não apenas snapshot.
 
 Exemplos:
 
-```text
+`text
 attendance_current
 attendance_last_30_days
 attendance_trend
@@ -357,7 +357,7 @@ grade_trend
 missing_assignments_current
 missing_assignments_last_period
 missing_assignment_delta
-```
+`
 
 Um valor isolado é menos informativo do que sua mudança.
 
@@ -394,11 +394,11 @@ Se houver extração de sinais de texto, criar observações sintéticas rotulad
 
 Exemplo:
 
-```text
+`text
 texto
 expected_signals
 predicted_signals
-```
+`
 
 Medir:
 
@@ -414,20 +414,20 @@ Qualquer sinal exibido deve apontar para sua fonte.
 
 Exemplo:
 
-```text
+`text
 Mudança observada:
 "menor participação"
 
 Evidências:
 - registro #184 — Matemática — 31/08
 - registro #177 — Português — 29/08
-```
+`
 
 Evitar:
 
-```text
+`text
 "A IA identificou risco alto."
-```
+`
 
 ---
 
@@ -437,12 +437,12 @@ A unidade operacional é um **acompanhamento**, não um score.
 
 Estados possíveis:
 
-```text
+`text
 EM_OBSERVACAO
 ACOMPANHAMENTO_ATIVO
 AGUARDANDO_RETORNO
 ENCERRADO
-```
+`
 
 Um acompanhamento pode conter:
 
@@ -499,7 +499,7 @@ Não ordenar automaticamente estudantes por um score probabilístico.
 
 # Modelo de Domínio Inicial
 
-```text
+`text
 User
 Role
 
@@ -527,7 +527,7 @@ FollowUpAction
 
 MLModelVersion
 MLPrediction
-```
+`
 
 `MLPrediction` é resultado experimental, não um fato sobre o estudante.
 
@@ -537,7 +537,7 @@ MLPrediction
 
 Exemplos conceituais:
 
-```text
+`text
 GET  /students
 GET  /students/{id}
 GET  /students/{id}/trajectory
@@ -558,7 +558,7 @@ PATCH /follow-ups/{id}
 
 GET  /ml/models
 POST /ml/predictions
-```
+`
 
 ---
 
@@ -596,7 +596,7 @@ Opcional no MVP inicial, sempre atrás de um adapter de provider.
 
 # Estrutura Sugerida
 
-```text
+`text
 school-trajectory/
 │
 ├── AGENTS.md
@@ -626,7 +626,7 @@ school-trajectory/
 │   └── decisions/
 │
 └── docker-compose.yml
-```
+`
 
 ---
 
@@ -675,17 +675,17 @@ school-trajectory/
 
 Nunca afirmar:
 
-```text
+`text
 "O estudante irá evadir."
-```
+`
 
 ## 2. Não apresentar probabilidade sintética como realidade
 
 Nunca:
 
-```text
+`text
 "82% de chance de evasão"
-```
+`
 
 quando o modelo foi treinado em dados simulados.
 
@@ -695,7 +695,7 @@ Mostrar mudanças observáveis.
 
 ## 4. Humano no processo
 
-```text
+`text
 detecção
 ↓
 organização de evidências
@@ -703,7 +703,7 @@ organização de evidências
 análise pedagógica
 ↓
 ação humana
-```
+`
 
 ## 5. Não transformar estudante em ativo
 
@@ -729,19 +729,19 @@ O sistema é empacotado em três serviços (`postgres`, `backend`, `frontend`) d
 
 Para rodar localmente ou em uma VM:
 
-```bash
+`bash
 cp backend/.env.example .env   # .env na raiz — o Compose carrega esse arquivo automaticamente
 docker compose up --build
-```
+`
 
 O `frontend` (Nginx) fica disponível em `http://localhost/` e faz proxy de `/api/*` para o `backend`. Dados do Postgres persistem em um volume nomeado entre reinicializações.
 
 Para atualizar uma instância já publicada:
 
-```bash
+`bash
 git pull
 docker compose up --build
-```
+`
 
 ---
 
@@ -774,21 +774,21 @@ Testes, métricas, limitações e demonstração.
 
 Ao final, o sistema deve demonstrar:
 
-```text
+`text
 dados escolares
 → trajetória
 → detecção de mudanças
 → evidências
 → acompanhamento humano
-```
+`
 
 e, de forma experimental:
 
-```text
+`text
 dados sintéticos
 → Machine Learning
 → avaliação de padrões
-```
+`
 
 O objetivo não é prever com certeza quem abandonará a escola.
 

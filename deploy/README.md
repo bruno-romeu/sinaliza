@@ -32,11 +32,11 @@ separately in `plan-c-contingency-runbook.md` — see that section below.
 
 ## Usage at a glance
 
-```bash
+``bash
 # After provisioning + deploying per the runbook:
 ./deploy/verify-always-on.sh ubuntu@<vm-ip>
 ./deploy/smoke-test.sh http://<vm-ip>
-```
+``
 
 See `vm-provisioning-runbook.md` for full context on each step.
 
@@ -59,7 +59,7 @@ deployment.
   Plan C, to force the Render/Neon cold start to resolve before the
   audience sees it. Never scheduled — see the script's own header.
 
-```bash
+``bash
 # Before a live demo on Plan C only:
 ./deploy/prewarm.sh https://<render-backend-url>
-```
+``

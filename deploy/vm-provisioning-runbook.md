@@ -116,13 +116,13 @@ via a Compose override, and running `deploy/enable-swap.sh`.
 
 ## 5. SSH in and install Docker + Compose plugin
 
-```bash
+``bash
 ssh -i ~/.ssh/id_ed25519 ubuntu@<VM_PUBLIC_IP>
-```
+``
 
 On the VM:
 
-```bash
+``bash
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg
 
@@ -141,33 +141,33 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 
 # Allow running docker without sudo (log out/in after this)
 sudo usermod -aG docker $USER
-```
+``
 
 Log out and back in (or run `newgrp docker`) so the group change takes
 effect, then verify:
 
-```bash
+``bash
 docker --version
 docker compose version
-```
+``
 
 ---
 
 ## 6. Clone the repository
 
-```bash
+``bash
 git clone <your-repo-url> sinaliza
 cd sinaliza
-```
+``
 
 ---
 
 ## 7. Configure environment
 
-```bash
+``bash
 cp backend/.env.example .env
 nano .env   # or vim/vi — edit as needed
-```
+``
 
 At minimum, set a real `JWT_SECRET` (long random value — `docker-compose.yml`
 requires it to be set, there is no default), and `DEV_SEED_EMAIL` /
@@ -196,7 +196,7 @@ arbitrary mounted `.conf` files. Instead, create a
 `docker-compose.override.yml` automatically — no edit to the committed
 file):
 
-```yaml
+``yaml
 # docker-compose.override.yml — Plan B only. Not committed to the repo;
 # created once, by hand, on the Plan B VM. Values match
 # deploy/postgres-plan-b.conf (the documented source of truth).
@@ -210,16 +210,16 @@ services:
       - work_mem=4MB
       - -c
       - max_connections=20
-```
+``
 
 See `deploy/postgres-plan-b.conf` for the rationale behind each value.
 
 ### 8b. Enable swap
 
-```bash
+``bash
 chmod +x deploy/enable-swap.sh
 ./deploy/enable-swap.sh
-```
+``
 
 This creates a 2GB `/swapfile`, activates it, and persists it via
 `/etc/fstab` — safe to re-run (it detects existing swap and does nothing on
@@ -231,9 +231,9 @@ is at meaningful risk of an OOM kill under load — do not skip it on Plan B.
 
 ## 9. Deploy
 
-```bash
+``bash
 docker compose up --build -d
-```
+``
 
 This reuses Story 6.1's `docker-compose.yml` unmodified (with
 `docker-compose.override.yml` additionally applied on Plan B, per Step 8a).
@@ -243,9 +243,9 @@ or cron job.
 
 Check status:
 
-```bash
+``bash
 docker compose ps
-```
+``
 
 ---
 
@@ -254,12 +254,12 @@ docker compose ps
 The containers start with an empty database (only the schema, from
 `alembic upgrade head`). Populate it once, by hand, from the repo root:
 
-```bash
+``bash
 docker compose exec backend python -m app.infrastructure.db.seed_dev_user
 docker compose exec backend python -m app.infrastructure.db.seed_dev_fixtures
 docker compose exec backend python -m app.synthetic.generate --seed 42 --reset
 docker compose exec backend python -m app.synthetic.prepare_demo
-```
+``
 
 - `seed_dev_user` creates the login from `DEV_SEED_*` in `.env`.
 - `seed_dev_fixtures` creates the 4 academic periods of 2026 (it also adds
@@ -290,7 +290,7 @@ used a non-default key as in Section 5, add a `Host` alias for it in
 
 From your local machine (or on the VM itself):
 
-```bash
+``bash
 # Confirm all 3 services are Up with restart: unless-stopped honored
 ./deploy/verify-always-on.sh ubuntu@<VM_PUBLIC_IP>
 # or, run directly on the VM:
@@ -298,7 +298,7 @@ From your local machine (or on the VM itself):
 
 # Confirm RNF-01: responses complete within 5 seconds
 ./deploy/smoke-test.sh http://<VM_PUBLIC_IP>
-```
+``
 
 Both scripts print a pass/fail summary and exit non-zero (naming the
 offending service/URL) on failure. Neither installs anything — they are

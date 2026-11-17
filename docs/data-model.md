@@ -4,19 +4,19 @@ Este documento registra o modelo de dados mínimo para a primeira fatia vertical
 
 Este modelo cobre dados sintéticos, conforme definido no README e no AGENTS.md.
 
-> Atualizado por `docs/architecture/architecture-sinaliza-2026-09-17/ARCHITECTURE-SPINE.md` (AD-1, AD-4, AD-7, AD-10, AD-11): `role` de `User` reduzido a valor único (perfil único, PRD RF-02), `AttendanceRecord.present` virou `status` + `UNIQUE(student_id, classroom_id, date)` (resolve `[NOTE FOR PM]` do RF-03 e RF-04/RNF-11), `Grade.value` fixado em escala 0–10 (resolve `[NOTE FOR PM]` do RF-05), `source_record_ids[]` de `TrajectoryChange` formalizado como tabela de junção, `TrajectoryChange` ganha `period_id` (chave de upsert de AD-1), `PedagogicalObservation` definida (antes ausente e incorretamente listada como Etapa 5), e `Student` ganha `dataset_split` (RF-23).
+> Atualizado por `docs/architecture.md` (AD-1, AD-4, AD-7, AD-10, AD-11): `role` de `User` reduzido a valor único (perfil único, PRD RF-02), `AttendanceRecord.present` virou `status` + `UNIQUE(student_id, classroom_id, date)` (resolve `[NOTE FOR PM]` do RF-03 e RF-04/RNF-11), `Grade.value` fixado em escala 0–10 (resolve `[NOTE FOR PM]` do RF-05), `source_record_ids[]` de `TrajectoryChange` formalizado como tabela de junção, `TrajectoryChange` ganha `period_id` (chave de upsert de AD-1), `PedagogicalObservation` definida (antes ausente e incorretamente listada como Etapa 5), e `Student` ganha `dataset_split` (RF-23).
 
 ---
 
 ## Domínio
 
-```
+`
 User            { id, name, email, role: COORDENACAO_PEDAGOGICA }
 Classroom       { id, name, academic_year }
 AcademicPeriod  { id, label, start_date, end_date, order_index }
 Student         { id, name, dataset_split: TRAIN | EVAL_DEMO, synthetic_profile: SyntheticProfile | null }
 Enrollment      { id, student_id, classroom_id }
-```
+`
 
 `role` tem um único valor possível hoje (perfil único, RF-02) — mantido como enum só por extensibilidade estrutural futura, nunca um segundo valor "professor" (proibido em nomenclatura de produto/código, ver PRD §2.1 e addendum do brief).
 
@@ -28,13 +28,13 @@ Enrollment      { id, student_id, classroom_id }
 
 ## Fatos observáveis
 
-```
+`
 AttendanceRecord     { id, student_id, classroom_id, date, status: PRESENT | ABSENT_JUSTIFIED | ABSENT_UNJUSTIFIED }  -- UNIQUE(student_id, classroom_id, date)
 Grade                { id, student_id, classroom_id, subject, period_id, date, value: numeric(4,2) }
 Assignment           { id, classroom_id, subject, period_id, due_date }
 AssignmentSubmission { id, assignment_id, student_id, status: DELIVERED | NOT_DELIVERED | PARTIAL, date }
 PedagogicalObservation { id, student_id, author_user_id, text, created_at }
-```
+`
 
 Estes são fatos registrados pela coordenação pedagógica na rotina (chamada, avaliação, entrega, observação). Não existe entidade `Assessment` separada — `subject`/`date` ficam direto em `Grade` para reduzir indireção sem perda de informação relevante ao MVP.
 
@@ -44,10 +44,10 @@ Estes são fatos registrados pela coordenação pedagógica na rotina (chamada, 
 
 ## Geração sintética
 
-```
+`
 SyntheticGenerationRun { id, seed, generator_version, executed_at, student_count, train_ratio }
 SyntheticProfile       -- enum: STABLE | FALLING_ATTENDANCE | COMBINED_DETERIORATION | ...
-```
+`
 
 `SyntheticGenerationRun` é a única entidade nova da Epic 2. Registra a proveniência de cada execução do gerador — a seed usada, a versão do gerador e a data de execução — para que qualquer base sintética possa ser reproduzida ou auditada depois (RNF-13, AC de Story 2.1). `train_ratio` fica persistido junto porque a proporção entre os dois recortes é uma decisão de geração, não uma constante global: uma base gerada com uma proporção diferente precisa ser identificável como tal.
 
@@ -59,7 +59,7 @@ Nenhuma tabela paralela existe para dado sintético: presença, notas, atividade
 
 ## Trajetória
 
-```
+`
 TrajectorySnapshot {
   id, student_id, snapshot_date, window_days,
   attendance_rate, attendance_trend,
@@ -74,7 +74,7 @@ TrajectoryChange {
 TrajectoryChangeSource {
   id, trajectory_change_id, source_type: ATTENDANCE_RECORD | GRADE | ASSIGNMENT_SUBMISSION | PEDAGOGICAL_OBSERVATION, source_id
 }
-```
+`
 
 `period_id` referencia o `AcademicPeriod`/bimestre em que a convergência foi detectada — é a chave de upsert que dá estabilidade a `FollowUpEvidence.trajectory_change_id` (arquitetura, AD-1): uma vez que uma `TrajectoryChange` tem `FollowUpEvidence` apontando para ela, recomputações futuras não a alteram mais (congelada); antes disso, é livremente substituída (`description`/`detected_at`/suas `TrajectoryChangeSource`) a cada recomputação.
 
@@ -84,31 +84,31 @@ TrajectoryChangeSource {
 
 `type` é um enum fechado (rascunho inicial, sujeito a revisão ao implementar a regra de detecção):
 
-```
+`
 ATTENDANCE_DROP
 GRADE_DROP
 MISSING_ASSIGNMENTS_INCREASE
 COMBINED_DETERIORATION
-```
+`
 
 `TrajectoryChangeSource` referencia os registros de origem (`AttendanceRecord`, `Grade`, `AssignmentSubmission` ou `PedagogicalObservation`) que sustentam a mudança — toda mudança exibida deve apontar para dado-fonte, nunca "IA identificou risco". É FK real (não array solto), inserida na mesma transação que a `TrajectoryChange` (RNF-11) — nenhuma `TrajectoryChange` existe sem ao menos uma linha aqui.
 
 ## Acompanhamento
 
-```
+`
 FollowUp         { id, student_id, status, reason, responsible_user_id, next_review_date, created_at }  -- UNIQUE(student_id, responsible_user_id) WHERE status <> 'ENCERRADO'
 FollowUpEvidence { id, follow_up_id, trajectory_change_id }
 FollowUpAction   { id, follow_up_id, description, author_user_id, created_at }
-```
+`
 
 `status` segue os estados definidos no README/AGENTS.md:
 
-```
+`
 EM_OBSERVACAO
 ACOMPANHAMENTO_ATIVO
 AGUARDANDO_RETORNO
 ENCERRADO
-```
+`
 
 Não existe estado `HIGH_RISK` nem substituto — acompanhamento é processo humano, não classificação automática.
 
@@ -128,17 +128,17 @@ A unicidade é **parcial**: no máximo um acompanhamento *em aberto* por `(stude
 - **Split de dataset:** `Student.dataset_split` (arquitetura, AD-4) — decidido na geração sintética, nunca em query time.
 - **`PedagogicalObservation` trazida para o MVP:** definida acima (arquitetura, AD-8/AD-11) — corrige a agregação anterior com entidades de NLP (Etapa 5), que era um erro de escopo deste rascunho.
 - **Duplicidade de presença em nível de banco:** `UNIQUE(student_id, classroom_id, date)` em `AttendanceRecord` (arquitetura, AD-7) — resolve RF-04/RNF-11.
-- **Duplicidade de acompanhamento aberto em nível de banco:** índice único parcial `UNIQUE(student_id, responsible_user_id) WHERE status <> 'ENCERRADO'` em `FollowUp` (migration 0017, `docs/spec-acompanhamento-aberto-unico-no-banco.md`) — a regra que `spec-ui-1` escreveu como `SELECT`-depois-`INSERT` passa a ser do banco; perder a corrida devolve o acompanhamento vencedor, não erro.
+- **Duplicidade de acompanhamento aberto em nível de banco:** índice único parcial `UNIQUE(student_id, responsible_user_id) WHERE status <> 'ENCERRADO'` em `FollowUp` (migration 0017, `spec-acompanhamento-aberto-unico-no-banco` (removido da arvore; ver historico do repositorio)`) — a regra que `spec-ui-1` escreveu como `SELECT`-depois-`INSERT` passa a ser do banco; perder a corrida devolve o acompanhamento vencedor, não erro.
 - **Proveniência de geração persistida:** `SyntheticGenerationRun` (seed + versão do gerador + data) — sem ela o determinismo do gerador é inverificável depois do fato (RNF-13, Epic 2).
 - **Perfil sintético em `Student`, fora da API do produto:** `Student.synthetic_profile` nullable, consultável pela avaliação offline e nunca exposto em schema de resposta do produto — mesma fronteira que AD-3 impõe ao score de ML.
 - **"Fator Preocupante" nunca persistido:** puramente computado por requisição (arquitetura, AD-1) — nenhuma tabela nova para ele.
 
 ## Fora deste rascunho (etapas futuras)
 
-```
+`
 ExtractedSignal, SignalReview   -- Etapa 5 (NLP, derivado de PedagogicalObservation)
 MLModelVersion, MLPrediction     -- Etapa 4 (ML)
-```
+`
 
 `MLModelVersion`/`MLPrediction` já foram implementadas na Etapa 4 (migrations
 0011, 0012 e 0015) e permanecem fora **deste rascunho**, que cobre as Etapas

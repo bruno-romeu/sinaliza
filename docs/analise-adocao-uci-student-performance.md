@@ -167,12 +167,12 @@ Três leituras, todas com consequência:
 
 Medido, e é o achado mais importante deste documento:
 
-```text
+`text
 student-mat.csv:  G3 == 0 → n = 38;  absences = {0: 38}      (100%)
                   G2 == 0 → n = 13;  absences = {0: 13}      (100%)
 student-por.csv:  G3 == 0 → n = 15;  absences = {0: 15}      (100%)
                   G2 == 0 → n =  7;  absences = {0:  7}      (100%)
-```
+`
 
 **Todo estudante com nota final zero tem exatamente zero faltas registradas.**
 Nenhuma exceção, nos dois arquivos. Entre os estudantes com `G3 > 0`, zero
@@ -185,10 +185,10 @@ coleta, não um fenômeno.
 
 A consequência é brutal e mensurável:
 
-```text
+`text
 corr(absences, G3), todos os estudantes:  +0,034 (Mat.)   −0,091 (Port.)
 corr(absences, G3), só G3 > 0:            −0,213 (Mat.)   −0,196 (Port.)
-```
+`
 
 O sinal **inverte** quando o artefato entra. `G3 == 0` é a única coluna do
 dataset com forma de evasão — e ela está perfeitamente confundida com "zero
@@ -216,10 +216,10 @@ em 59,6% — pouco acima dos ~50% do acaso para um rótulo com essa prevalência
 
 E as faltas do mesmo estudante nos dois arquivos:
 
-```text
+`text
 |absences_mat − absences_por|:  média 3,86   mediana 2,0   máx 60
                                 idênticas em apenas 27,3% dos casos
-```
+`
 
 Confirma a §3.3: `absences` é por disciplina, não por estudante. Não existe
 "a frequência escolar" deste estudante neste dataset.
@@ -242,10 +242,10 @@ pessoas. E ambos ficam longe da âncora brasileira atual.
 
 Também medido, e relevante para quem for citar a literatura do dataset:
 
-```text
+`text
 corr(G1, G3) = 0,801 (Mat.)  /  0,826 (Port.)
 corr(G2, G3) = 0,905 (Mat.)  /  0,919 (Port.)
-```
+`
 
 Os resultados publicados sobre este dataset que incluem `G2` entre as entradas
 estão, em boa medida, prevendo a nota final a partir da nota do segundo
@@ -518,7 +518,7 @@ corrompido por artefato de coleta**.
 Isso é exatamente o argumento de que a escolha de sintetizar é correta e não
 preguiçosa. Entra em `docs/model-evaluation.md` §10 e na revisão de literatura
 como **trabalho relacionado examinado e descartado, com medição própria** —
-na mesma forma que `docs/research/technical-bases-publicas-dados-educacionais-calibr-2026-09-17/research.md`
+na mesma forma que `docs/research-bases-publicas.md`
 já usa para os microdados do INEP.
 
 Custo: um parágrafo e uma citação. Ganho na defesa: a pergunta "por que não
@@ -835,13 +835,13 @@ Os dados **não estão** no repositório e não devem estar. Para refazer:
 
 Números do repositório (reproduzíveis aqui):
 
-```bash
+`bash
 cd backend
 grep -c 'confidence=Confidence.NONE' app/synthetic/calibration.py     # 7
 grep -rc '^\s*\(async \)\?def test_' tests/*.py | awk -F: '{s+=$2} END {print s}'   # 489
 grep -ln 'app\.synthetic' tests/*.py   # 8 arquivos, 131 funções
 grep -ln 'app\.ml'        tests/*.py   # 8 arquivos, 103 funções
-```
+`
 
 ---
 
@@ -853,7 +853,7 @@ grep -ln 'app\.ml'        tests/*.py   # 8 arquivos, 103 funções
 - `AGENTS.md` — §Privacidade, §Features, §Machine Learning, §Dados sintéticos,
   §Controle de escopo, §Atalhos proibidos.
 - `docs/model-evaluation.md` — §1, §3, §6, §10.1, §10.5.
-- `docs/research/technical-bases-publicas-dados-educacionais-calibr-2026-09-17/research.md`
+- `docs/research-bases-publicas.md`
   — o precedente de base pública examinada e descartada.
 - `docs/decisions/0003-comparacao-de-modelos-como-comando-reproduzivel.md`,
   `0004-features-temporais-derivadas-da-regra-geradora.md`.

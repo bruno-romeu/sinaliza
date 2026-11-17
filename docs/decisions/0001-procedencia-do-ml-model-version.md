@@ -2,7 +2,7 @@
 
 - **Data:** 2026-11-04
 - **Status:** aceita
-- **Contexto no repositório:** `docs/spec-ml-model-provenance.md`, `docs/deferred-work.md` (entrada da onda de hardening sobre `MLModelVersionModel`), `epic-5-retro-item-1`
+- **Contexto no repositório:** `spec-ml-model-provenance` (removido da arvore; ver historico do repositorio)`, `deferred-work` (removido da arvore; ver historico do repositorio)` (entrada da onda de hardening sobre `MLModelVersionModel`), `epic-5-retro-item-1`
 
 ## Contexto
 
@@ -75,7 +75,7 @@ Um `MLModelVersion` recém-treinado tem `metrics = NULL`, e isso é honesto.
 
 Formato (versionado em `metrics_schema_version`, hoje `1`):
 
-```json
+`json
 {
   "metrics_schema_version": 1,
   "evaluated_at": "2026-11-04T12:00:00+00:00",
@@ -92,7 +92,7 @@ Formato (versionado em `metrics_schema_version`, hoje `1`):
   "confusion_matrix": [[...]],
   "disclaimer": "These metrics measure the model's ability to recognize simulated patterns in the synthetic dataset. They are NOT a measure of real-world predictive validity."
 }
-```
+`
 
 Dois pontos não negociáveis nesse formato:
 
