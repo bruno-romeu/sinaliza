@@ -12,9 +12,8 @@ Os scripts de verificação daquela época (`deploy/smoke-test.sh`,
 ## Por que VM e não PaaS gratuito
 
 Serviço gratuito de PaaS hiberna por inatividade, e a primeira requisição
-depois disso paga uma penalidade que pode passar de 5 segundos — o
-`plan-c-contingency-runbook.md` registra isso como renúncia explícita ao
-RNF-01. Como a aplicação é aberta por um avaliador em horário que não
+depois disso paga uma penalidade que pode passar de 5 segundos, o que
+violaria o RNF-01. Como a aplicação é aberta por um avaliador em horário que não
 controlamos, "lento ao acordar" é indistinguível de "quebrado".
 
 Uma VM com `restart: unless-stopped` não dorme.

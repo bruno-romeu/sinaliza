@@ -7,7 +7,7 @@ updated: 2026-09-23
 
 # PRD: Sinaliza — Sistema de Apoio ao Acompanhamento da Trajetória Escolar
 
-> Este PRD refina, e não substitui, a **Proposta** e o **Levantamento de Requisitos** já entregues e avaliados pela banca ULBRA (`docs/ulbra-models/`). Todos os requisitos aprovados naquele documento estão preservados aqui, renumerados, sem reinterpretação de texto ou de escopo. Os itens marcados **[NOVO]** fecham lacunas apontadas no parecer do professor (limiares de detecção, privacidade, origem dos dados, fronteira do score experimental, NFRs de acessibilidade/manutenibilidade/compatibilidade/integridade) e foram decididos em sessão de brainstorming dedicada (`docs/brainstorming/brainstorm-sinaliza-requisitos-gaps-2026-09-16/`). Nenhum item novo contradiz ou reabre o que já foi avaliado.
+> Este PRD refina, e não substitui, a **Proposta** e o **Levantamento de Requisitos** já entregues e avaliados pela banca ULBRA. Todos os requisitos aprovados naquele documento estão preservados aqui, renumerados, sem reinterpretação de texto ou de escopo. Os itens marcados **[NOVO]** fecham lacunas apontadas no parecer do professor (limiares de detecção, privacidade, origem dos dados, fronteira do score experimental, NFRs de acessibilidade/manutenibilidade/compatibilidade/integridade). Nenhum item novo contradiz ou reabre o que já foi avaliado.
 
 ## 0. Propósito do Documento
 

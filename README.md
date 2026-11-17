@@ -303,7 +303,7 @@ uv run python -m app.synthetic.generate --seed 42 --reset
 uv run python -m app.synthetic.prepare_demo
 `
 
-O gerador distribui notas, entregas e observações ao longo de cada bimestre, então a demonstração funciona na data real, sem `SINALIZA_DEMO_AS_OF`, e o que for lançado ao vivo aparece na hora. O `prepare_demo` calcula uma vez a trajetória de cada estudante da demo, porque a página inicial só lista mudanças já calculadas: rode de novo no dia da apresentação. É uma ação manual, nunca agendada. Para ensaiar um dia específico, defina `SINALIZA_DEMO_AS_OF` (no backend e no `prepare_demo`). No ambiente hospedado, veja o passo 9b de `deploy/vm-provisioning-runbook.md`.
+O gerador distribui notas, entregas e observações ao longo de cada bimestre, então a demonstração funciona na data real, sem `SINALIZA_DEMO_AS_OF`, e o que for lançado ao vivo aparece na hora. O `prepare_demo` calcula uma vez a trajetória de cada estudante da demo, porque a página inicial só lista mudanças já calculadas: rode de novo no dia da apresentação. É uma ação manual, nunca agendada. Para ensaiar um dia específico, defina `SINALIZA_DEMO_AS_OF` (no backend e no `prepare_demo`). No ambiente hospedado, veja a Etapa 4 de `deploy/azure/README.md`.
 
 ---
 

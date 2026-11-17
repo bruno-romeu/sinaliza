@@ -368,9 +368,9 @@ documentadas no momento em que ocorreram:
 
 1. O Plano A/B da Épica 6 era a camada *Always Free* da Oracle Cloud. Ela **não
    tinha capacidade** na região do Brasil, e o runbook de provisionamento
-   registra a tentativa e a falha.
-2. O Plano C — PaaS gratuito (Render, Neon, Vercel) — está documentado em
-   `deploy/plan-c-contingency-runbook.md` e foi descartado por **conflito com
+   registrava a tentativa e a falha.
+2. O Plano C — PaaS gratuito (Render, Neon, Vercel) — foi documentado como
+   contingência e descartado por **conflito com
    outro requisito**: serviço gratuito hiberna por inatividade, e a primeira
    requisição depois da hibernação paga uma penalidade que pode ultrapassar os
    5 segundos de RNF-01. Como a aplicação será aberta por um avaliador em
@@ -386,8 +386,8 @@ React, Scikit-Learn e **nenhum job agendado**.
 
 **O que seria necessário para concluir.** Reinstalar a stack sobre uma camada
 sempre-gratuita que não hiberne — na prática, aguardar capacidade *Always Free*
-da Oracle na região e reexecutar `deploy/vm-provisioning-runbook.md`, que já está
-escrito e é independente de provedor a partir do passo de bootstrap do Docker. A
+da Oracle na região e repetir o procedimento de `deploy/azure/README.md`, que é
+independente de provedor a partir do bootstrap do Docker. A
 alternativa (Plano C) só seria aceitável se RNF-01 fosse reescrito para excluir a
 primeira requisição após inatividade.
 
