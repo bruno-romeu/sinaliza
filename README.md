@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/bruno-romeu/sinaliza/actions/workflows/ci.yml/badge.svg)](https://github.com/bruno-romeu/sinaliza/actions/workflows/ci.yml)
 
-**Demonstração:** http://sinaliza.mexicocentral.cloudapp.azure.com
+**Demonstração:** https://sinaliza.mexicocentral.cloudapp.azure.com
 
 > Projeto acadêmico (TCC — Análise e Desenvolvimento de Sistemas, ULBRA). Todos os dados são **sintéticos**: nenhum estudante real.
 
