@@ -6,6 +6,7 @@
 #   deploy/smoke-test.sh <base-url>
 #   deploy/smoke-test.sh http://localhost
 #   deploy/smoke-test.sh http://<vm-public-ip>
+#   deploy/smoke-test.sh https://sinaliza.mexicocentral.cloudapp.azure.com
 #
 # Checks the frontend root and a representative /api/* route. Prints
 # per-request latency and a pass/fail summary. Exits non-zero (naming the

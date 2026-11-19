@@ -1,0 +1,51 @@
+# Sobreposição só para a publicação na Azure: coloca o Caddy na frente do
+# frontend para servir HTTPS com certificado Let's Encrypt.
+#
+#   docker compose -f docker-compose.yml -f deploy/azure/docker-compose.https.yml up -d --build
+#
+# (ou COMPOSE_FILE no .env da VM, ver deploy/azure/README.md). O
+# docker-compose.yml da raiz, sozinho, continua servindo http://localhost.
+#
+# Exige Docker Compose >= 2.24.4 por causa do `!reset` abaixo (o
+# docker-compose-v2 do Ubuntu 24.04 é 2.24.6 ou mais novo). Em versão anterior
+# a tag é ignorada ou rejeitada; confira com `docker compose version`.
+
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    environment:
+      SINALIZA_DOMAIN: ${SINALIZA_DOMAIN:?SINALIZA_DOMAIN must be set in .env}
+      SINALIZA_ACME_CA: ${SINALIZA_ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+    volumes:
+      # Relativo ao diretório do projeto (o do docker-compose.yml da raiz),
+      # não a este arquivo: é assim que o Compose resolve caminhos de override.
+      - ./deploy/azure/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificados e conta ACME. Precisam sobreviver à recriação do
+      # container: sem isso cada `up` pediria certificado novo e esbarraria
+      # no rate limit do Let's Encrypt.
+      - caddy_data:/data
+      - caddy_config:/config
+
+  frontend:
+    # `ports` de sobreposição é mesclado, não substituído; `!reset` zera a
+    # lista herdada para que o frontend fique só na rede interna, alcançado
+    # pelo Caddy. A porta 80 do host passa a ser do Caddy.
+    ports: !reset []
+
+  backend:
+    environment:
+      # Caddy -> Nginx -> backend: dois proxies confiáveis à frente. Com o
+      # padrão (1) todo cliente cairia na mesma chave do rate limit de login,
+      # o IP do Caddy. Ver app.presentation.rate_limit.client_key.
+      RATE_LIMIT_TRUSTED_PROXY_HOPS: '2'
+
+volumes:
+  caddy_data:
+  caddy_config:

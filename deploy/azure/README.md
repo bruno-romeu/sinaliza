@@ -31,9 +31,9 @@ Uma VM com `restart: unless-stopped` não dorme.
 
 ## Etapa 1 — Provisionar
 
-``sh
+```sh
 deploy/azure/provision.sh
-``
+```
 
 O script cria o resource group, a VM (Ubuntu 24.04, IP público **estático**,
 rótulo DNS gratuito) e o NSG. Ele percorre uma lista de região×tamanho e fica
@@ -47,29 +47,31 @@ Regras do NSG: **SSH apenas do IP de quem provisiona** (detectado via
 Para forçar uma combinação: `LOCATION=canadacentral VM_SIZE=Standard_B2s deploy/azure/provision.sh`
 
 Ao final o script imprime a **URL pública** no formato
-`http://<rótulo>.<região>.cloudapp.azure.com`. É esse o endereço da entrega.
+`http://<rótulo>.<região>.cloudapp.azure.com`. Depois da Etapa 4, com o Caddy
+na frente, o endereço da entrega passa a ser o mesmo em **https**:
+<https://sinaliza.mexicocentral.cloudapp.azure.com>.
 
 ## Etapa 2 — Confirmar o primeiro boot
 
-``sh
+```sh
 ssh -i ~/.ssh/sinaliza_azure azureuser@<IP> 'cloud-init status --wait; free -h; docker --version'
-``
+```
 
 Espere `status: done`, 2 GB de swap ativos e o Docker respondendo. O
 `cloud-init` leva ~3 minutos.
 
 ## Etapa 3 — Clonar e configurar
 
-``sh
+```sh
 ssh -i ~/.ssh/sinaliza_azure azureuser@<IP>
 git clone https://github.com/bruno-romeu/sinaliza.git /opt/sinaliza
 cd /opt/sinaliza
-``
+```
 
 Crie o `.env` **na VM**, com segredos gerados ali — nunca copie os de
 desenvolvimento:
 
-``sh
+```sh
 cat > /opt/sinaliza/.env <<EOF
 POSTGRES_USER=sinaliza
 POSTGRES_DB=sinaliza
@@ -79,9 +81,17 @@ JWT_EXPIRE_MINUTES=60
 DEV_SEED_NAME=Coordenação Pedagógica
 DEV_SEED_EMAIL=avaliacao@sinaliza.app
 DEV_SEED_PASSWORD=$(openssl rand -base64 12 | tr -d '/+=')
+SINALIZA_DOMAIN=sinaliza.mexicocentral.cloudapp.azure.com
+COMPOSE_FILE=docker-compose.yml:deploy/azure/docker-compose.https.yml
 EOF
 chmod 600 /opt/sinaliza/.env
-``
+```
+
+`SINALIZA_DOMAIN` é o endereço para o qual o Caddy pede o certificado (o
+FQDN impresso pela Etapa 1). `COMPOSE_FILE` faz todo `docker compose` nesta
+pasta (`up`, `exec`, `ps`, os scripts de verificação) carregar também o
+override de HTTPS, sem precisar repetir `-f` — e evita que um `up` sem o
+override devolva a porta 80 ao Nginx e derrube o Caddy.
 
 `JWT_SECRET` precisa de **no mínimo 32 caracteres**: `Settings` valida e o
 backend não sobe sem isso. O `.env` está no `.gitignore` e nunca é versionado.
@@ -89,15 +99,20 @@ backend não sobe sem isso. O `.env` está no `.gitignore` e nunca é versionado
 Guarde `DEV_SEED_EMAIL` e `DEV_SEED_PASSWORD` — são as credenciais que vão no
 item 3.2 do documento de entrega:
 
-``sh
+```sh
 grep DEV_SEED /opt/sinaliza/.env
-``
+```
 
 ## Etapa 4 — Subir
 
-``sh
-cd /opt/sinaliza && docker compose up -d --build
-``
+```sh
+cd /opt/sinaliza && docker compose -f docker-compose.yml -f deploy/azure/docker-compose.https.yml up -d --build
+```
+
+Com o `COMPOSE_FILE` da Etapa 3, `docker compose up -d --build` é equivalente.
+Sobem quatro containers: os três do `docker-compose.yml` e o `caddy`, que
+passa a ser o único com portas publicadas (80 e 443); o Nginx do frontend
+fica só na rede interna. Detalhes na seção [HTTPS](#https).
 
 O `docker-entrypoint.sh` roda `alembic upgrade head` antes do uvicorn, então
 o **schema** nasce com a stack. O primeiro build leva alguns minutos.
@@ -105,7 +120,7 @@ o **schema** nasce com a stack. O primeiro build leva alguns minutos.
 **Os dados não nascem.** O entrypoint só migra e serve — semear é manual, e
 a ordem importa:
 
-``sh
+```sh
 cd /opt/sinaliza
 
 # 1. O usuário de avaliação. Precisa vir primeiro: o gerador atribui a
@@ -122,7 +137,7 @@ docker compose exec -T backend python -m app.synthetic.generate     --seed 42 --
 
 # 4. As mudanças de trajetória.
 docker compose exec -T backend python -m app.synthetic.prepare_demo
-``
+```
 
 O passo 4 é o menos óbvio e o mais fácil de esquecer: `TrajectoryChange` é
 calculado **dentro da requisição** que lê a trajetória de um estudante
@@ -132,19 +147,20 @@ Home fica **vazia** até alguém abrir cada estudante um a um. O
 
 Ao final, confira:
 
-``sh
+```sh
 docker compose exec -T postgres psql -U sinaliza -d sinaliza -c   "SELECT count(*) FROM students UNION ALL SELECT count(*) FROM trajectory_changes;"
-``
+```
 
 Esperado na configuração acima: 200 estudantes e ~15 mudanças detectadas.
 
 ## Etapa 5 — Verificar
 
-``sh
-curl -sf http://localhost/api/openapi.json > /dev/null && echo "backend ok"
+```sh
+curl -sf https://sinaliza.mexicocentral.cloudapp.azure.com/api/openapi.json > /dev/null && echo "backend ok"
 docker compose ps
-bash deploy/smoke-test.sh          # da Épica 6, continua válido
-``
+bash deploy/smoke-test.sh https://sinaliza.mexicocentral.cloudapp.azure.com
+bash deploy/verify-always-on.sh    # inclui o caddy quando o override está carregado
+```
 
 E de fora da VM, no seu navegador: abra a URL pública **numa janela anônima**
 — é assim que o avaliador vai abrir, e é o que o checklist da entrega pede.
@@ -157,10 +173,10 @@ igual a ligada e em uso.
 `shutdown` por dentro do sistema **não** para a cobrança — a VM fica
 `Stopped` e o compute continua faturando. Só `deallocate` para:
 
-``sh
+```sh
 deploy/azure/power.sh stop     # desaloca
 deploy/azure/power.sh start    # religa
-``
+```
 
 Mesmo desalocada, o disco gerenciado e o IP estático seguem custando alguns
 centavos por mês.
@@ -171,13 +187,59 @@ aplicação precisa responder a qualquer hora.
 
 Crie um alerta de orçamento em *Cost Management → Budgets* antes de esquecer.
 
-## HTTPS (opcional)
+## HTTPS
 
-A entrega não exige TLS, e o Nginx hoje serve HTTP na 80. Se quiser
-certificado, a porta 443 já está aberta no NSG e o rótulo
-`*.cloudapp.azure.com` é validável pelo Let's Encrypt via HTTP-01 sem comprar
-domínio.
+O `deploy/azure/docker-compose.https.yml` põe um Caddy na frente do Nginx. Ele
+pede o certificado ao Let's Encrypt pelo desafio HTTP-01 (o rótulo
+`*.cloudapp.azure.com` é aceito sem comprar domínio), redireciona HTTP para
+HTTPS e **renova sozinho** antes do vencimento — não há cron nem tarefa
+agendada. Certificado e conta ACME ficam nos volumes `caddy_data` e
+`caddy_config`, que sobrevivem a `up --build` e à recriação do container.
+**Não apague esses volumes** (`docker compose down -v`): cada emissão nova conta
+no rate limit do Let's Encrypt.
 
-Ao fazer isso, revise a CSP em `frontend/nginx.conf`: ela hoje é parcial e
-não inclui `script-src`, pelo motivo registrado no histórico do projeto (o
-bootstrap de tema é um `<script>` inline).
+O override exige **Docker Compose ≥ 2.24.4**, por causa do `!reset` que tira a
+porta 80 do frontend. O `docker-compose-v2` do Ubuntu 24.04 atende; confira
+com `docker compose version` e com:
+
+```sh
+docker compose config | grep -A8 '^  frontend:'   # não pode haver `ports:`
+```
+
+O override também define `RATE_LIMIT_TRUSTED_PROXY_HOPS=2` no backend: com
+Caddy e Nginx à frente, o padrão (1) faria todo cliente cair na mesma chave do
+rate limit de login — o IP do Caddy.
+
+### Verificar o certificado
+
+```sh
+curl -vI https://sinaliza.mexicocentral.cloudapp.azure.com 2>&1 | grep -E 'issuer|expire|HTTP/|strict-transport'
+curl -sI http://sinaliza.mexicocentral.cloudapp.azure.com | head -2   # espera 308 para https
+```
+
+O emissor deve ser do Let's Encrypt (`O=Let's Encrypt`), e a resposta, `200`
+com `strict-transport-security`.
+
+### Se a emissão falhar
+
+Leia o log do Caddy primeiro: `docker compose logs caddy | grep -iE 'error|challenge'`.
+
+- **Porta 80 inacessível de fora.** O HTTP-01 chega pela 80. Confira a regra do
+  NSG e que nenhum outro processo na VM ocupa a porta (`sudo ss -ltnp | grep ':80'`).
+- **Domínio errado.** `SINALIZA_DOMAIN` precisa ser exatamente o FQDN que
+  resolve para o IP público da VM (`dig +short <domínio>`).
+- **Rate limit** (`too many certificates`/`rateLimited` no log). Não insista:
+  espere o prazo indicado na mensagem. Para testar sem gastar o limite de
+  produção, use o ambiente de staging do Let's Encrypt — acrescente ao `.env`
+  `SINALIZA_ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory`,
+  rode o `up -d` de novo e confira no log que a emissão funcionou (o navegador
+  vai reclamar do certificado de staging, é esperado). Depois remova a linha,
+  apague só o certificado de staging com
+  `docker compose exec caddy rm -rf /data/caddy/certificates/acme-staging-v02.api.letsencrypt.org-directory`
+  e rode `docker compose up -d` de novo.
+
+E-mail ACME é opcional e não está configurado (ver comentário no
+`deploy/azure/Caddyfile`); nunca versione um e-mail real.
+
+A CSP em `frontend/nginx.conf` continua parcial e não inclui `script-src`,
+pelo motivo registrado ali (o bootstrap de tema é um `<script>` inline).

@@ -25,6 +25,13 @@ run() {
   fi
 }
 
+# Na publicação com HTTPS (deploy/azure/docker-compose.https.yml, carregado
+# via COMPOSE_FILE no .env) existe um quarto serviço, o caddy: ele também
+# precisa estar no ar, senão o site some.
+if run 'docker compose config --services' 2>/dev/null | grep -qx caddy; then
+  EXPECTED_SERVICES+=("caddy")
+fi
+
 echo "== verify-always-on.sh =="
 if [ -n "${SSH_HOST}" ]; then
   echo "Target: ${SSH_HOST} (over SSH)"
@@ -90,7 +97,7 @@ done
 
 echo
 if [ "${FAILED}" -eq 0 ]; then
-  echo "== PASS: all 3 services Up/running with restart: unless-stopped =="
+  echo "== PASS: all ${#EXPECTED_SERVICES[@]} services Up/running with restart: unless-stopped =="
   exit 0
 else
   echo "== FAIL: issues found with: ${FAILED_SERVICES[*]} =="

@@ -1,0 +1,28 @@
+# Caddy na frente do Nginx do frontend, só na publicação (ver
+# deploy/azure/docker-compose.https.yml). Emite e renova sozinho o certificado
+# Let's Encrypt via HTTP-01 e redireciona HTTP -> HTTPS automaticamente; não há
+# cron nem tarefa agendada (RNF-06).
+#
+# Sem e-mail ACME, de propósito: o Let's Encrypt deixou de enviar avisos de
+# expiração por e-mail em 2025 e a conta ACME não exige um. Se quiser
+# cadastrar um, acrescente `email voce@exemplo` no bloco global abaixo apenas
+# na VM — nunca versione um e-mail real.
+{
+	# Padrão: produção do Let's Encrypt. Para testar sem gastar o rate limit,
+	# defina no .env da VM:
+	# SINALIZA_ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory
+	acme_ca {$SINALIZA_ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
+}
+
+{$SINALIZA_DOMAIN} {
+	# HSTS só aqui, onde existe TLS (o Nginx também serve o dev em http, onde
+	# o cabeçalho não faz sentido). max-age de 1 dia e sem `preload`: o rótulo
+	# *.cloudapp.azure.com pertence à Azure e a VM pode deixar de existir
+	# depois da avaliação, então não convém prender navegadores por meses.
+	header Strict-Transport-Security "max-age=86400"
+
+	# O Caddy descarta o X-Forwarded-For vindo do cliente (não confiável) e
+	# envia o IP real; o Nginx acrescenta o IP do Caddy. Por isso o backend
+	# confia em 2 saltos no override.
+	reverse_proxy frontend:80
+}
